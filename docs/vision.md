@@ -1,4 +1,4 @@
-# MyOutside — 产品愿景（核心动机与世界观）
+# MyOutside（中文名：地球online）— 产品愿景（核心动机与世界观）
 
 > 本文记录产品的核心动机与世界观。`requirements.md`（决策）与 `protocol-v0.md`（协议）服务于本文。
 

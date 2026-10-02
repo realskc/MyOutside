@@ -45,6 +45,38 @@ export function createKernel({ storage }: KernelOptions) {
     input: z.unknown(),
     handler: () => [...apps.values()].map((app) => ({ id: app.id, name: app.name })),
   });
+  functions.set("platform.settings.get", {
+    kind: "read",
+    appId: "platform",
+    input: z.object({ key: z.string().min(1) }),
+    handler: (_ctx, input) => {
+      const row = storage.select<{ value: string }>("SELECT value FROM platform_setting WHERE key = ?", [input.key])[0];
+      return { value: row ? (JSON.parse(row.value) as unknown) : null };
+    },
+  });
+  functions.set("platform.settings.set", {
+    kind: "tx",
+    appId: "platform",
+    input: z.object({ key: z.string().min(1), value: z.unknown() }),
+    handler: (_ctx, input) => {
+      const serialized = JSON.stringify(input.value ?? null);
+      const existing = storage.select<{ key: string }>("SELECT key FROM platform_setting WHERE key = ?", [input.key])[0];
+      if (existing) {
+        storage.execute("UPDATE platform_setting SET value = ?, updated_at = ? WHERE key = ?", [
+          serialized,
+          Date.now(),
+          input.key,
+        ]);
+      } else {
+        storage.execute("INSERT INTO platform_setting (key, value, updated_at) VALUES (?, ?, ?)", [
+          input.key,
+          serialized,
+          Date.now(),
+        ]);
+      }
+      return { ok: true as const };
+    },
+  });
 
   function registerApp(app: AppModule): void {
     if (started) throw new Error("内核已启动，应用必须在 start() 之前注册");
@@ -68,6 +100,13 @@ export function createKernel({ storage }: KernelOptions) {
          migration_id TEXT NOT NULL,
          applied_at INTEGER NOT NULL,
          PRIMARY KEY (app_id, migration_id)
+       )`,
+    );
+    storage.execute(
+      `CREATE TABLE IF NOT EXISTS platform_setting (
+         key TEXT PRIMARY KEY,
+         value TEXT NOT NULL,
+         updated_at INTEGER NOT NULL
        )`,
     );
     storage.transaction(() => {

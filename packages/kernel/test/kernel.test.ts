@@ -203,4 +203,30 @@ describe("kernel", () => {
     if (!r.ok) return;
     expect(r.result).toBe(1);
   });
+
+  it("平台设置：set/get，且同一存储上的新内核可见（持久化）", async () => {
+    const storage = createMemoryAdapter();
+    const first = createKernel({ storage });
+    first.registerApp(notesApp);
+    first.start();
+
+    const before = await first.handle({ call: "platform.settings.get", payload: { key: "ui.language" } });
+    expect(before.ok).toBe(true);
+    if (!before.ok) return;
+    expect((before.result as { value: unknown }).value).toBe(null);
+
+    const set = await first.handle({
+      call: "platform.settings.set",
+      payload: { key: "ui.language", value: "en" },
+    });
+    expect(set.ok).toBe(true);
+
+    const second = createKernel({ storage });
+    second.registerApp(notesApp);
+    second.start();
+    const after = await second.handle({ call: "platform.settings.get", payload: { key: "ui.language" } });
+    expect(after.ok).toBe(true);
+    if (!after.ok) return;
+    expect((after.result as { value: unknown }).value).toBe("en");
+  });
 });

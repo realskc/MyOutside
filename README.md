@@ -1,4 +1,4 @@
-# MyOutside
+# MyOutside（中文名：地球online）
 
 跨平台（Windows / Linux / macOS）GUI 宿主应用：按协议装载多个子应用（模拟器式界面）；每个子应用拥有私有数据和公开 API，跨应用通过宿主相互调用并原子地交换数据。
 

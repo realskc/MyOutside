@@ -8,12 +8,12 @@
   </head>
   <body>
     <header class="topbar">
-      <h1>学英语</h1>
+      <h1 data-i18n="appTitle">学英语</h1>
       <nav id="tabs">
-        <button class="tab active" data-tab="review">复习</button>
-        <button class="tab" data-tab="browse">词库</button>
-        <button class="tab" data-tab="add">添加</button>
-        <button class="tab" data-tab="stats">统计</button>
+        <button class="tab active" data-tab="review" data-i18n="tabReview">复习</button>
+        <button class="tab" data-tab="browse" data-i18n="tabBrowse">词库</button>
+        <button class="tab" data-tab="add" data-i18n="tabAdd">添加</button>
+        <button class="tab" data-tab="stats" data-i18n="tabStats">统计</button>
       </nav>
     </header>
 
@@ -23,32 +23,35 @@
         <div class="card-face" id="review-front"></div>
         <div class="card-back hidden" id="review-back"></div>
         <div class="review-actions">
-          <button id="btn-reveal" class="primary">显示答案</button>
+          <button id="btn-reveal" class="primary" data-i18n="showAnswer">显示答案</button>
           <div id="review-ratings" class="rating-row hidden">
-            <button data-rating="again" class="danger">重来</button>
-            <button data-rating="good" class="primary">不错</button>
-            <button data-rating="easy" class="ok">简单</button>
+            <button data-rating="again" class="danger" data-i18n="again">重来</button>
+            <button data-rating="good" class="primary" data-i18n="good">不错</button>
+            <button data-rating="easy" class="ok" data-i18n="easy">简单</button>
           </div>
         </div>
       </section>
 
       <section id="view-browse" class="view">
         <div class="toolbar">
-          <input id="browse-query" placeholder="搜索拼写…" />
-          <button id="browse-refresh">刷新</button>
+          <input id="browse-query" data-i18n-placeholder="searchPlaceholder" placeholder="搜索拼写…" />
+          <button id="browse-refresh" data-i18n="refresh">刷新</button>
         </div>
         <div id="browse-list" class="list"></div>
       </section>
 
       <section id="view-add" class="view">
         <form id="add-form" class="form" autocomplete="off">
-          <label>单词 <input name="term" required /></label>
-          <label>本质意项 <input name="sense" required placeholder="例：椰枣（食物）" /></label>
-          <label>释义 <textarea name="meaning" rows="2"></textarea></label>
-          <label>音标 <input name="phonetic" placeholder="/ˈserənˈdɪpəti/" /></label>
-          <label>例句 / 语境 <textarea name="context" rows="2"></textarea></label>
+          <label><span data-i18n="fTerm">单词</span> <input name="term" required /></label>
+          <label>
+            <span data-i18n="fSense">本质意项</span>
+            <input name="sense" required data-i18n-placeholder="sensePlaceholder" placeholder="例：椰枣（食物）" />
+          </label>
+          <label><span data-i18n="fMeaning">释义</span> <textarea name="meaning" rows="2"></textarea></label>
+          <label><span data-i18n="fPhonetic">音标</span> <input name="phonetic" placeholder="/ˈserənˈdɪpəti/" /></label>
+          <label><span data-i18n="fContext">例句 / 语境</span> <textarea name="context" rows="2"></textarea></label>
           <div class="form-actions">
-            <button type="submit" class="primary">添加</button>
+            <button type="submit" class="primary" data-i18n="add">添加</button>
           </div>
         </form>
         <div id="add-result" class="add-result hidden"></div>

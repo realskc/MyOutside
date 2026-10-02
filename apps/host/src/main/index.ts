@@ -1,7 +1,7 @@
-import { app, BrowserWindow, ipcMain, protocol } from "electron";
+import { app, BrowserWindow, ipcMain, Menu, protocol, type MenuItemConstructorOptions } from "electron";
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { extname, join, normalize, resolve, sep } from "node:path";
-import { createKernel } from "@myoutside/kernel";
+import { createKernel, type Kernel } from "@myoutside/kernel";
 import { createNodeSqliteAdapter } from "@myoutside/kernel-node";
 import { vocabApp } from "@myoutside/vocab";
 
@@ -80,6 +80,78 @@ async function createMainWindow(): Promise<BrowserWindow> {
   return win;
 }
 
+type Lang = "zh" | "en";
+
+const STRINGS: Record<
+  Lang,
+  {
+    appName: string;
+    file: string;
+    quit: string;
+    view: string;
+    reload: string;
+    devtools: string;
+    resetZoom: string;
+    zoomIn: string;
+    zoomOut: string;
+  }
+> = {
+  zh: {
+    appName: "地球online",
+    file: "文件",
+    quit: "退出",
+    view: "视图",
+    reload: "重新加载",
+    devtools: "开发者工具",
+    resetZoom: "实际大小",
+    zoomIn: "放大",
+    zoomOut: "缩小",
+  },
+  en: {
+    appName: "MyOutside",
+    file: "File",
+    quit: "Quit",
+    view: "View",
+    reload: "Reload",
+    devtools: "Toggle DevTools",
+    resetZoom: "Actual Size",
+    zoomIn: "Zoom In",
+    zoomOut: "Zoom Out",
+  },
+};
+
+function buildMenu(lang: Lang): void {
+  const t = STRINGS[lang];
+  const template: MenuItemConstructorOptions[] = [
+    { label: t.file, submenu: [{ role: "quit", label: t.quit }] },
+    {
+      label: t.view,
+      submenu: [
+        { role: "reload", label: t.reload },
+        { role: "toggleDevTools", label: t.devtools },
+        { type: "separator" },
+        { role: "resetZoom", label: t.resetZoom },
+        { role: "zoomIn", label: t.zoomIn },
+        { role: "zoomOut", label: t.zoomOut },
+      ],
+    },
+  ];
+  Menu.setApplicationMenu(Menu.buildFromTemplate(template));
+}
+
+async function getLanguage(kernel: Kernel): Promise<Lang> {
+  try {
+    const res = await kernel.handle({ call: "platform.settings.get", payload: { key: "ui.language" } });
+    if (res.ok) {
+      const { value } = res.result as { value: unknown };
+      if (value === "zh" || value === "en") return value;
+    }
+  } catch {
+    /* ignore */
+  }
+  return app.getLocale().toLowerCase().startsWith("zh") ? "zh" : "en";
+}
+
 async function runSmoke(win: BrowserWindow): Promise<void> {
   const guard = setTimeout(() => {
     console.error("[smoke] 超时，强制退出");
@@ -109,8 +181,13 @@ async function runSmoke(win: BrowserWindow): Promise<void> {
       console.log("[smoke] vocab iframe 未找到");
     }
 
+    const settingsCheck = await win.webContents.executeJavaScript(
+      `(async () => { document.getElementById("btn-settings").click(); await new Promise((r) => setTimeout(r, 400)); return { hasLangSelect: !!document.getElementById("set-lang"), hasApiKey: !!document.getElementById("set-api-key"), brand: document.querySelector(".brand").textContent }; })()`,
+    );
+    console.log("[smoke] settings:", JSON.stringify(settingsCheck));
+
     const shotPath = join(app.getPath("temp"), "myoutside-smoke.png");
-    let png = Buffer.alloc(0);
+    let png: Buffer = Buffer.alloc(0);
     for (let attempt = 0; attempt < 10 && png.length === 0; attempt += 1) {
       await new Promise((resolve) => setTimeout(resolve, 500));
       const image = await win.webContents.capturePage();
@@ -125,7 +202,7 @@ async function runSmoke(win: BrowserWindow): Promise<void> {
     await win.loadURL("app://vocab/index.html");
     await new Promise((resolve) => setTimeout(resolve, 800));
     const vocabShotPath = join(app.getPath("temp"), "myoutside-vocab.png");
-    let vocabPng = Buffer.alloc(0);
+    let vocabPng: Buffer = Buffer.alloc(0);
     for (let attempt = 0; attempt < 10 && vocabPng.length === 0; attempt += 1) {
       await new Promise((resolve) => setTimeout(resolve, 400));
       vocabPng = (await win.webContents.capturePage()).toPNG();
@@ -164,12 +241,27 @@ app.whenReady().then(async () => {
   kernel.start();
   console.log("[host] kernel ready. functions:", kernel.listFunctions().join(", "));
 
+  let currentLang = await getLanguage(kernel);
+  buildMenu(currentLang);
+
   ipcMain.handle("kernel:call", async (_event, request: { call: string; payload?: unknown }) => {
-    return kernel.handle(request);
+    const result = await kernel.handle(request);
+    if (request.call === "platform.settings.set" && result.ok) {
+      const nextLang = await getLanguage(kernel);
+      if (nextLang !== currentLang) {
+        currentLang = nextLang;
+        buildMenu(currentLang);
+        for (const win of BrowserWindow.getAllWindows()) {
+          win.setTitle(STRINGS[currentLang].appName);
+        }
+      }
+    }
+    return result;
   });
 
   registerAppProtocol();
   const win = await createMainWindow();
+  win.setTitle(STRINGS[currentLang].appName);
 
   if (process.env.MYOUTSIDE_SMOKE === "1") {
     await runSmoke(win);
