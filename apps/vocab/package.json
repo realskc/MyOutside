@@ -1,0 +1,21 @@
+{
+  "name": "@myoutside/vocab",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "scripts": {
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit -p tsconfig.json"
+  },
+  "dependencies": {
+    "@myoutside/contracts": "workspace:*",
+    "@myoutside/kernel": "workspace:*",
+    "ts-fsrs": "^5.4.2"
+  },
+  "devDependencies": {
+    "@myoutside/kernel-node": "workspace:*",
+    "@types/node": "^24.0.0",
+    "typescript": "^5.6.0",
+    "vitest": "^3.0.0"
+  }
+}
