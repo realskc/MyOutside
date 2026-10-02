@@ -11,6 +11,7 @@
       <h1 data-i18n="appTitle">学英语</h1>
       <nav id="tabs">
         <button class="tab active" data-tab="review" data-i18n="tabReview">复习</button>
+        <button class="tab" data-tab="lookup" data-i18n="tabLookup">查词</button>
         <button class="tab" data-tab="browse" data-i18n="tabBrowse">词库</button>
         <button class="tab" data-tab="add" data-i18n="tabAdd">添加</button>
         <button class="tab" data-tab="stats" data-i18n="tabStats">统计</button>
@@ -29,6 +30,18 @@
             <button data-rating="good" class="primary" data-i18n="good">不错</button>
             <button data-rating="easy" class="ok" data-i18n="easy">简单</button>
           </div>
+        </div>
+      </section>
+
+      <section id="view-lookup" class="view">
+        <div class="toolbar">
+          <input id="lookup-term" data-i18n-placeholder="lookupPlaceholder" placeholder="输入单词或短语…" />
+          <button id="lookup-run" class="primary" data-i18n="lookupRun">查询</button>
+        </div>
+        <div id="lookup-status" class="lookup-status"></div>
+        <div id="lookup-result" class="lookup-result hidden">
+          <div id="lookup-text" class="lookup-text"></div>
+          <div id="lookup-draft" class="lookup-draft hidden"></div>
         </div>
       </section>
 

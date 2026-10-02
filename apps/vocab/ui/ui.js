@@ -1,4 +1,4 @@
-/* 学英语 v0：复习 / 词库 / 添加 / 统计（中英文） */
+/* 学英语 v0：复习 / 查词 / 词库 / 添加 / 统计（中英文） */
 (() => {
   const bridge = window.outside;
   if (!bridge) {
@@ -10,6 +10,7 @@
     zh: {
       appTitle: "学英语",
       tabReview: "复习",
+      tabLookup: "查词",
       tabBrowse: "词库",
       tabAdd: "添加",
       tabStats: "统计",
@@ -20,6 +21,13 @@
       again: "重来",
       good: "不错",
       easy: "简单",
+      lookupPlaceholder: "输入单词或短语…",
+      lookupRun: "查询",
+      lookupSearching: "查询中…",
+      lookupFailed: "查询失败",
+      lookupNeedKey: "请先在「设置」里配置 DeepSeek API Key。",
+      addToVocab: "加入词库",
+      ignore: "忽略",
       searchPlaceholder: "搜索拼写…",
       refresh: "刷新",
       noCards: "没有卡片",
@@ -40,6 +48,7 @@
       toastMastered: "已标记掌握",
       toastUnmastered: "已恢复学习",
       existingNotice: (n) => `该拼写已有 ${n} 张卡片：`,
+      aiMatchNotice: "AI 判断为同一本质意项：",
       replaceThis: "替换这张",
       addAnyway: "仍新增（不同意项）",
       abandon: "放弃",
@@ -59,6 +68,7 @@
     en: {
       appTitle: "Vocabulary",
       tabReview: "Review",
+      tabLookup: "Lookup",
       tabBrowse: "Cards",
       tabAdd: "Add",
       tabStats: "Stats",
@@ -69,6 +79,13 @@
       again: "Again",
       good: "Good",
       easy: "Easy",
+      lookupPlaceholder: "Type a word or phrase…",
+      lookupRun: "Look up",
+      lookupSearching: "Looking up…",
+      lookupFailed: "Lookup failed",
+      lookupNeedKey: "Configure the DeepSeek API key in Settings first.",
+      addToVocab: "Add to vocabulary",
+      ignore: "Ignore",
       searchPlaceholder: "Search spelling…",
       refresh: "Refresh",
       noCards: "No cards",
@@ -89,6 +106,7 @@
       toastMastered: "Marked as mastered",
       toastUnmastered: "Back to learning",
       existingNotice: (n) => `${n} card(s) already exist for this spelling:`,
+      aiMatchNotice: "AI found an existing card with the same essential sense:",
       replaceThis: "Replace this",
       addAnyway: "Add anyway (different sense)",
       abandon: "Discard",
@@ -164,7 +182,7 @@
   }
 
   // ---- 标签切换 ----
-  const loaders = { review: loadReview, browse: loadBrowse, add: () => {}, stats: loadStats };
+  const loaders = { review: loadReview, lookup: () => {}, browse: loadBrowse, add: () => {}, stats: loadStats };
   function switchTab(name) {
     document.querySelectorAll(".tab").forEach((tab) => tab.classList.toggle("active", tab.dataset.tab === name));
     document.querySelectorAll(".view").forEach((view) => view.classList.toggle("active", view.id === `view-${name}`));
@@ -237,6 +255,273 @@
       reviewIndex += 1;
       renderReview();
     });
+  });
+
+  // ---- 添加（两步：解析 → 提交；AI 不可用时回退机械流程）----
+
+  async function runAddFlow(values, container, onFinished) {
+    const finish = () => {
+      if (onFinished) onFinished();
+    };
+    container.innerHTML = "";
+    container.classList.remove("hidden");
+    try {
+      let resolved = null;
+      try {
+        resolved = await call("vocab.resolveCard", {
+          term: values.term,
+          sense: values.sense,
+          meaning: values.meaning,
+        });
+      } catch {
+        resolved = null; // AI 不可用 → 回退机械检查
+      }
+
+      if (resolved && resolved.action === "new") {
+        await call("vocab.addCard", values);
+        toast(t("toastCreated"));
+        finish();
+        return;
+      }
+
+      if (resolved && resolved.action === "match") {
+        const cards = await call("vocab.listCards", { term: values.term });
+        const matched = cards.filter((card) => card.id === resolved.cardId);
+        renderChoices(container, matched, values, true, finish);
+        return;
+      }
+
+      const existing = await call("vocab.listCards", { term: values.term });
+      if (existing.length === 0) {
+        await call("vocab.addCard", values);
+        toast(t("toastCreated"));
+        finish();
+        return;
+      }
+      renderChoices(container, existing, values, false, finish);
+    } catch (error) {
+      toast(error.message, true);
+    }
+  }
+
+  function renderChoices(container, cards, values, aiMatched, finish) {
+    container.innerHTML = "";
+    const notice = document.createElement("div");
+    notice.className = "notice";
+    notice.textContent = aiMatched ? t("aiMatchNotice") : t("existingNotice", cards.length);
+    container.appendChild(notice);
+
+    for (const card of cards) {
+      const item = document.createElement("div");
+      item.className = "existing-card";
+      item.innerHTML =
+        `<div><b>${escapeHtml(card.display)}</b> · ${escapeHtml(card.sense)}<br/>` +
+        `<small>${escapeHtml(card.meaning ?? "")}</small></div>`;
+      const actions = document.createElement("div");
+      actions.className = "existing-actions";
+      const replace = document.createElement("button");
+      replace.className = "primary";
+      replace.textContent = t("replaceThis");
+      replace.addEventListener("click", async () => {
+        try {
+          await call("vocab.updateCard", {
+            cardId: card.id,
+            patch: {
+              sense: values.sense,
+              meaning: values.meaning,
+              phonetic: values.phonetic,
+              context: values.context,
+            },
+          });
+          toast(t("toastReplaced"));
+          finish();
+        } catch (error) {
+          toast(error.message, true);
+        }
+      });
+      actions.appendChild(replace);
+      item.appendChild(actions);
+      container.appendChild(item);
+    }
+
+    const footer = document.createElement("div");
+    footer.className = "existing-actions";
+    if (!aiMatched) {
+      const addAnyway = document.createElement("button");
+      addAnyway.className = "plain";
+      addAnyway.textContent = t("addAnyway");
+      addAnyway.addEventListener("click", async () => {
+        try {
+          await call("vocab.addCard", values);
+          toast(t("toastAdded"));
+          finish();
+        } catch (error) {
+          toast(error.message, true);
+        }
+      });
+      footer.appendChild(addAnyway);
+    }
+    const abandon = document.createElement("button");
+    abandon.className = "plain";
+    abandon.textContent = t("abandon");
+    abandon.addEventListener("click", () => {
+      toast(t("toastAbandoned"));
+      finish();
+    });
+    footer.appendChild(abandon);
+    container.appendChild(footer);
+  }
+
+  document.getElementById("add-form").addEventListener("submit", async (event) => {
+    event.preventDefault();
+    const form = event.target;
+    const values = {
+      term: form.term.value.trim(),
+      sense: form.sense.value.trim(),
+      meaning: form.meaning.value,
+      phonetic: form.phonetic.value,
+      context: form.context.value,
+      source: "manual",
+    };
+    await runAddFlow(values, document.getElementById("add-result"), () => {
+      form.reset();
+      document.getElementById("add-result").classList.add("hidden");
+    });
+  });
+
+  // ---- 查词 ----
+
+  const CARD_TOOL = {
+    type: "function",
+    function: {
+      name: "make_card",
+      description: "生成一张学习卡片草稿（单词 + 本质意项 + 音标 + 释义 + 例句）",
+      parameters: {
+        type: "object",
+        properties: {
+          term: { type: "string", description: "单词原形（小写）" },
+          sense: { type: "string", description: "本质意项的简短描述（用界面语言）" },
+          phonetic: { type: "string", description: "IPA 音标，含斜杠，如 /rʌn/" },
+          meaning: { type: "string", description: "释义与解说（用界面语言）" },
+          example: { type: "string", description: "一个例句" },
+        },
+        required: ["term", "sense", "meaning"],
+      },
+    },
+  };
+
+  const lookupSystemPrompt = () =>
+    lang === "zh"
+      ? "你是英语学习助手。用户给你一个英语单词或短语：先用中文给出翻译与简明解说（可含常见搭配），然后必须调用 make_card 工具生成一张学习卡片草稿。若该词有多种本质不同的意项，只针对最常见的一种生成，并在解说里简要提及其它意项。"
+      : "You are an English learning assistant. Given a word or phrase: give a brief explanation first, then you MUST call the make_card tool to produce a card draft. If the word has multiple distinct senses, cover the most common one and briefly mention the others.";
+
+  async function runLookup() {
+    const input = document.getElementById("lookup-term");
+    const term = input.value.trim();
+    if (!term) return;
+    const status = document.getElementById("lookup-status");
+    const result = document.getElementById("lookup-result");
+    const textEl = document.getElementById("lookup-text");
+    const draftEl = document.getElementById("lookup-draft");
+
+    status.textContent = t("lookupSearching");
+    status.classList.remove("error");
+    result.classList.add("hidden");
+    draftEl.classList.add("hidden");
+    draftEl.innerHTML = "";
+    textEl.textContent = "";
+
+    try {
+      const response = await call("platform.ai.chat", {
+        messages: [
+          { role: "system", content: lookupSystemPrompt() },
+          { role: "user", content: term },
+        ],
+        tools: [CARD_TOOL],
+        temperature: 0.3,
+      });
+      status.textContent = "";
+      textEl.textContent = response.content || "";
+      result.classList.remove("hidden");
+
+      const cardCall = (response.toolCalls || []).find((item) => item.function.name === "make_card");
+      if (cardCall) {
+        let draft = null;
+        try {
+          draft = JSON.parse(cardCall.function.arguments);
+        } catch {
+          draft = null;
+        }
+        if (draft && draft.term && draft.sense) {
+          renderDraft(draftEl, draft);
+        }
+      }
+    } catch (error) {
+      status.textContent =
+        error.code === "PRECONDITION" ? t("lookupNeedKey") : `${t("lookupFailed")}：${error.message}`;
+      status.classList.add("error");
+    }
+  }
+
+  function renderDraft(container, draft) {
+    container.classList.remove("hidden");
+    container.innerHTML = "";
+
+    const card = document.createElement("div");
+    card.className = "draft-card";
+    card.innerHTML =
+      `<div class="draft-term">${escapeHtml(draft.term)}` +
+      `<span class="phonetic">${escapeHtml(draft.phonetic ?? "")}</span></div>` +
+      `<div class="draft-sense">${escapeHtml(draft.sense)}</div>` +
+      `<div class="draft-meaning">${escapeHtml(draft.meaning)}</div>` +
+      (draft.example ? `<div class="context">${escapeHtml(draft.example)}</div>` : "");
+    container.appendChild(card);
+
+    const actions = document.createElement("div");
+    actions.className = "draft-actions";
+    const addButton = document.createElement("button");
+    addButton.className = "primary";
+    addButton.textContent = t("addToVocab");
+    const ignoreButton = document.createElement("button");
+    ignoreButton.className = "plain";
+    ignoreButton.textContent = t("ignore");
+
+    const choices = document.createElement("div");
+    choices.className = "add-result hidden";
+
+    addButton.addEventListener("click", async () => {
+      addButton.disabled = true;
+      const values = {
+        term: String(draft.term),
+        sense: String(draft.sense),
+        meaning: draft.meaning ? String(draft.meaning) : "",
+        phonetic: draft.phonetic ? String(draft.phonetic) : "",
+        context: draft.example ? String(draft.example) : "",
+        source: "lookup",
+      };
+      await runAddFlow(values, choices, () => {
+        addButton.disabled = true;
+        choices.classList.add("hidden");
+      });
+    });
+    ignoreButton.addEventListener("click", () => {
+      container.classList.add("hidden");
+    });
+
+    actions.appendChild(addButton);
+    actions.appendChild(ignoreButton);
+    container.appendChild(actions);
+    container.appendChild(choices);
+  }
+
+  document.getElementById("lookup-run").addEventListener("click", () => {
+    runLookup().catch((error) => toast(error.message, true));
+  });
+  document.getElementById("lookup-term").addEventListener("keydown", (event) => {
+    if (event.key === "Enter") {
+      event.preventDefault();
+      runLookup().catch((error) => toast(error.message, true));
+    }
   });
 
   // ---- 词库 ----
@@ -336,100 +621,6 @@
     if (event.key === "Enter") {
       event.preventDefault();
       loadBrowse().catch((error) => toast(error.message, true));
-    }
-  });
-
-  // ---- 添加 ----
-  document.getElementById("add-form").addEventListener("submit", async (event) => {
-    event.preventDefault();
-    const form = event.target;
-    const values = {
-      term: form.term.value.trim(),
-      sense: form.sense.value.trim(),
-      meaning: form.meaning.value,
-      phonetic: form.phonetic.value,
-      context: form.context.value,
-    };
-    const resultBox = document.getElementById("add-result");
-    try {
-      const existing = await call("vocab.listCards", { term: values.term });
-      resultBox.innerHTML = "";
-      resultBox.classList.remove("hidden");
-
-      if (existing.length === 0) {
-        await call("vocab.addCard", values);
-        toast(t("toastCreated"));
-        form.reset();
-        resultBox.classList.add("hidden");
-        return;
-      }
-
-      const notice = document.createElement("div");
-      notice.className = "notice";
-      notice.textContent = t("existingNotice", existing.length);
-      resultBox.appendChild(notice);
-
-      for (const card of existing) {
-        const item = document.createElement("div");
-        item.className = "existing-card";
-        item.innerHTML =
-          `<div><b>${escapeHtml(card.display)}</b> · ${escapeHtml(card.sense)}<br/>` +
-          `<small>${escapeHtml(card.meaning ?? "")}</small></div>`;
-        const actions = document.createElement("div");
-        actions.className = "existing-actions";
-        const replace = document.createElement("button");
-        replace.className = "primary";
-        replace.textContent = t("replaceThis");
-        replace.addEventListener("click", async () => {
-          try {
-            await call("vocab.updateCard", {
-              cardId: card.id,
-              patch: {
-                sense: values.sense,
-                meaning: values.meaning,
-                phonetic: values.phonetic,
-                context: values.context,
-              },
-            });
-            toast(t("toastReplaced"));
-            form.reset();
-            resultBox.classList.add("hidden");
-          } catch (error) {
-            toast(error.message, true);
-          }
-        });
-        actions.appendChild(replace);
-        item.appendChild(actions);
-        resultBox.appendChild(item);
-      }
-
-      const footer = document.createElement("div");
-      footer.className = "existing-actions";
-      const addAnyway = document.createElement("button");
-      addAnyway.className = "plain";
-      addAnyway.textContent = t("addAnyway");
-      addAnyway.addEventListener("click", async () => {
-        try {
-          await call("vocab.addCard", values);
-          toast(t("toastAdded"));
-          form.reset();
-          resultBox.classList.add("hidden");
-        } catch (error) {
-          toast(error.message, true);
-        }
-      });
-      const abandon = document.createElement("button");
-      abandon.className = "plain";
-      abandon.textContent = t("abandon");
-      abandon.addEventListener("click", () => {
-        toast(t("toastAbandoned"));
-        resultBox.classList.add("hidden");
-      });
-      footer.appendChild(addAnyway);
-      footer.appendChild(abandon);
-      resultBox.appendChild(footer);
-    } catch (error) {
-      toast(error.message, true);
     }
   });
 

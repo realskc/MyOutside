@@ -3,6 +3,7 @@ import {
   AddCardInput,
   GetDueInput,
   ListCardsInput,
+  ResolveCardInput,
   SetMasteredInput,
   SubmitReviewInput,
   UpdateCardInput,
@@ -129,6 +130,67 @@ export const vocabApp: AppModule = {
         due: result.card.due.getTime(),
         scheduledDays: result.card.scheduled_days,
       };
+    }),
+
+    /** 添加第一步：判断新卡片与已有卡片是否同类（单词已存在时调用平台 AI；未配 key 会抛错，由调用方回退机械流程） */
+    resolveCard: defineRead(ResolveCardInput, async (ctx, input) => {
+      const term = normalizeTerm(input.term);
+      const existing = ctx.db.all<CardRow>("card", { term }, { orderBy: "created_at" });
+      if (existing.length === 0) return { action: "new" as const };
+
+      const existingBrief = existing
+        .map((row, index) => `${index + 1}. ${row.display} —— 意项：${row.sense}；释义：${row.meaning || "（无）"}`)
+        .join("\n");
+
+      const response = (await ctx.call("platform.ai.chat", {
+        messages: [
+          {
+            role: "system",
+            content:
+              "你是英语学习卡片管理助手。判断「新卡片」与「已有卡片」是否属于同一个本质意项（同词义），而不是同一个拼写。必须调用 submit_decision 工具提交结果。",
+          },
+          {
+            role: "user",
+            content:
+              `已有卡片：\n${existingBrief}\n\n` +
+              `新卡片：\n单词：${input.term}\n本质意项：${input.sense}\n释义：${input.meaning ?? "（无）"}\n\n` +
+              "新卡片与哪张已有卡片属于同一个本质意项？调用 submit_decision：matchIndex 为对应序号（从 1 开始）；若没有同类，matchIndex 为 null。",
+          },
+        ],
+        tools: [
+          {
+            type: "function",
+            function: {
+              name: "submit_decision",
+              description: "提交「是否与已有卡片同类」的判断结果",
+              parameters: {
+                type: "object",
+                properties: {
+                  matchIndex: {
+                    type: ["integer", "null"],
+                    description: "同类已有卡片的序号（从 1 开始）；没有同类则为 null",
+                  },
+                },
+                required: ["matchIndex"],
+              },
+            },
+          },
+        ],
+        temperature: 0,
+      })) as { toolCalls: Array<{ function: { name: string; arguments: string } }> };
+
+      const decision = response.toolCalls.find((call) => call.function.name === "submit_decision");
+      if (decision) {
+        try {
+          const args = JSON.parse(decision.function.arguments) as { matchIndex?: number | null };
+          const index = typeof args.matchIndex === "number" ? args.matchIndex - 1 : -1;
+          const matched = existing[index];
+          if (matched) return { action: "match" as const, cardId: matched.id };
+        } catch {
+          /* 解析失败 → 视为无同类 */
+        }
+      }
+      return { action: "new" as const };
     }),
 
     getDue: defineRead(GetDueInput, (ctx, input) => {

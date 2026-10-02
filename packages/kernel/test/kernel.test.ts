@@ -204,6 +204,17 @@ describe("kernel", () => {
     expect(r.result).toBe(1);
   });
 
+  it("平台 AI：未配置 key 时返回 PRECONDITION", async () => {
+    const { kernel } = setup();
+    const r = await kernel.handle({
+      call: "platform.ai.chat",
+      payload: { messages: [{ role: "user", content: "hi" }] },
+    });
+    expect(r.ok).toBe(false);
+    if (r.ok) return;
+    expect(r.error.code).toBe("PRECONDITION");
+  });
+
   it("平台设置：set/get，且同一存储上的新内核可见（持久化）", async () => {
     const storage = createMemoryAdapter();
     const first = createKernel({ storage });

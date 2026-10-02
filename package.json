@@ -8,6 +8,7 @@
     "test": "pnpm -r test",
     "typecheck": "pnpm -r typecheck",
     "simulate": "tsx scripts/simulate-dialog.ts",
+    "ai:ping": "tsx scripts/ai-ping.ts",
     "dev": "pnpm --filter @myoutside/host dev",
     "smoke": "pnpm --filter @myoutside/host smoke"
   },

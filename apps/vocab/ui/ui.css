@@ -379,3 +379,87 @@ button.plain {
 .toast.error {
   background: var(--danger);
 }
+
+/* ---- 查词 ---- */
+
+.lookup-status {
+  min-height: 18px;
+  font-size: 13px;
+  color: var(--muted);
+  margin: 2px 0 12px;
+}
+
+.lookup-status.error {
+  color: var(--danger);
+}
+
+.lookup-result {
+  max-width: 760px;
+}
+
+.lookup-text {
+  font-size: 14px;
+  line-height: 1.75;
+  white-space: pre-wrap;
+}
+
+.draft-card {
+  margin-top: 16px;
+  border: 1px dashed #c7d2fe;
+  border-radius: 12px;
+  padding: 14px 16px;
+  background: #f8faff;
+}
+
+.draft-term {
+  font-size: 20px;
+  font-weight: 700;
+}
+
+.draft-term .phonetic {
+  font-size: 14px;
+  font-weight: 400;
+  color: var(--muted);
+  margin-left: 8px;
+}
+
+.draft-sense {
+  font-size: 15px;
+  font-weight: 600;
+  margin-top: 6px;
+}
+
+.draft-meaning {
+  font-size: 14px;
+  margin-top: 6px;
+  white-space: pre-wrap;
+}
+
+.draft-actions {
+  display: flex;
+  gap: 10px;
+  margin-top: 14px;
+}
+
+.draft-actions button {
+  border: 0;
+  border-radius: 10px;
+  padding: 9px 16px;
+  cursor: pointer;
+  font-size: 14px;
+}
+
+.draft-actions button.primary {
+  background: var(--accent);
+  color: #fff;
+}
+
+.draft-actions button.primary:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+.draft-actions button.plain {
+  background: #fff;
+  border: 1px solid var(--border);
+}

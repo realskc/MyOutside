@@ -41,6 +41,20 @@ describe("vocab backend", () => {
     expect(list).toHaveLength(2);
   });
 
+  it("resolveCard：新拼写直接返回 new（不触发 AI）", async () => {
+    const kernel = setup();
+    const r = await call<{ action: string }>(kernel, "vocab.resolveCard", { term: "brandnew", sense: "新词" });
+    expect(r.action).toBe("new");
+  });
+
+  it("resolveCard：已存在拼写且未配置 key → PRECONDITION（前端回退机械流程）", async () => {
+    const kernel = setup();
+    await call(kernel, "vocab.addCard", { term: "run", sense: "跑" });
+    const res = await kernel.handle({ call: "vocab.resolveCard", payload: { term: "run", sense: "奔跑" } });
+    expect(res.ok).toBe(false);
+    if (!res.ok) expect(res.error.code).toBe("PRECONDITION");
+  });
+
   it("submitReview 推进调度：复习后不再到期", async () => {
     const kernel = setup();
     const { cardId } = await call<{ cardId: string }>(kernel, "vocab.addCard", { term: "run", sense: "跑" });

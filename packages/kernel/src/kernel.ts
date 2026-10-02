@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { createAppDb, createMigrationCtx } from "./appdb.js";
 import { KernelError } from "./errors.js";
+import { createPlatformAiDefinition } from "./platform-ai.js";
 import type {
   ApiDefinition,
   AppModule,
@@ -77,6 +78,11 @@ export function createKernel({ storage }: KernelOptions) {
       return { ok: true as const };
     },
   });
+
+  functions.set("platform.ai.chat", {
+    ...createPlatformAiDefinition(storage),
+    appId: "platform",
+  } as RegisteredFunction);
 
   function registerApp(app: AppModule): void {
     if (started) throw new Error("内核已启动，应用必须在 start() 之前注册");

@@ -4,6 +4,8 @@ export type KernelErrorCode =
   | "TX_CALL_INVALID"
   | "CALL_DEPTH_EXCEEDED"
   | "NOT_FOUND"
+  | "PRECONDITION"
+  | "UPSTREAM"
   | "INTERNAL";
 
 export class KernelError extends Error {

@@ -174,7 +174,7 @@ async function runSmoke(win: BrowserWindow): Promise<void> {
       console.log("[smoke] vocab:", JSON.stringify(vocab));
 
       const debug = await vocabFrame.executeJavaScript(
-        `({ title: document.title, ready: document.readyState, hasTopbar: !!document.querySelector(".topbar"), text: (document.body && document.body.innerText || "").slice(0, 160) })`,
+        `({ title: document.title, ready: document.readyState, hasTopbar: !!document.querySelector(".topbar"), hasLookup: !!document.querySelector('[data-tab="lookup"]'), text: (document.body && document.body.innerText || "").slice(0, 160) })`,
       );
       console.log("[smoke] vocab debug:", JSON.stringify(debug));
     } else {

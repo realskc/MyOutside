@@ -105,9 +105,26 @@ export const StatsSchema = z.object({
 });
 export type Stats = z.infer<typeof StatsSchema>;
 
+// —— 添加（两步流程的第一步：解析去重）——
+
+export const ResolveCardInput = z.object({
+  term: z.string().min(1),
+  sense: z.string().min(1),
+  meaning: z.string().optional(),
+  context: z.string().optional(),
+});
+export type ResolveCardInput = z.infer<typeof ResolveCardInput>;
+
+export const ResolveCardOutput = z.union([
+  z.object({ action: z.literal("new") }),
+  z.object({ action: z.literal("match"), cardId: z.string() }),
+]);
+export type ResolveCardOutput = z.infer<typeof ResolveCardOutput>;
+
 /** vocab 应用的 API 面（函数名 → 输入 / 输出）。SDK 与后端都从这里取类型。 */
 export interface VocabApi {
   "vocab.addCard": { input: AddCardInput; output: AddCardOutput };
+  "vocab.resolveCard": { input: ResolveCardInput; output: ResolveCardOutput };
   "vocab.updateCard": { input: UpdateCardInput; output: OkOutput };
   "vocab.getDue": { input: GetDueInput; output: Card[] };
   "vocab.listCards": { input: ListCardsInput; output: Card[] };
