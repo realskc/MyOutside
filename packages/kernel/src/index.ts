@@ -18,4 +18,5 @@ export type {
   SqlValue,
   TxContext,
   TxHandler,
+  WhereValue,
 } from "./types.js";

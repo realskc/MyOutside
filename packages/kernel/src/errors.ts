@@ -3,6 +3,7 @@ export type KernelErrorCode =
   | "VALIDATION"
   | "TX_CALL_INVALID"
   | "CALL_DEPTH_EXCEEDED"
+  | "NOT_FOUND"
   | "INTERNAL";
 
 export class KernelError extends Error {

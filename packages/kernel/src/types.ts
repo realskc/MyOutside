@@ -2,6 +2,19 @@ import type { ZodType } from "zod";
 
 export type SqlValue = string | number | bigint | boolean | null | Uint8Array;
 
+/** where 条件值：标量（相等）或操作符对象 */
+export type WhereValue =
+  | SqlValue
+  | {
+      eq?: SqlValue;
+      lt?: number;
+      lte?: number;
+      gt?: number;
+      gte?: number;
+      like?: string;
+      in?: SqlValue[];
+    };
+
 export interface ExecuteResult {
   changes: number;
   lastInsertRowid: number | bigint;
@@ -19,15 +32,15 @@ export interface DbAdapter {
 /** 以应用为作用域的数据访问助手（表名自动加 `appId__` 前缀） */
 export interface AppDb {
   insert(table: string, row: Record<string, SqlValue>): void;
-  update(table: string, patch: Record<string, SqlValue>, where: Record<string, SqlValue>): number;
-  delete(table: string, where: Record<string, SqlValue>): number;
-  get<T = Record<string, SqlValue>>(table: string, where: Record<string, SqlValue>): T | undefined;
+  update(table: string, patch: Record<string, SqlValue>, where: Record<string, WhereValue>): number;
+  delete(table: string, where: Record<string, WhereValue>): number;
+  get<T = Record<string, SqlValue>>(table: string, where: Record<string, WhereValue>): T | undefined;
   all<T = Record<string, SqlValue>>(
     table: string,
-    where?: Record<string, SqlValue>,
+    where?: Record<string, WhereValue>,
     opts?: { orderBy?: string; limit?: number; offset?: number },
   ): T[];
-  count(table: string, where?: Record<string, SqlValue>): number;
+  count(table: string, where?: Record<string, WhereValue>): number;
 }
 
 export interface MigrationCtx {
@@ -45,7 +58,7 @@ export interface Migration {
 export interface TxContext {
   readonly appId: string;
   readonly db: AppDb;
-  /** 事务内调用其他应用的事务函数（同步、纯数据，与本次写入同生共死） */
+  /** 事务内调用其他应用的事务函数（同步、纯数据，与本次写入一起成败） */
   call(name: string, payload?: unknown): unknown;
 }
 

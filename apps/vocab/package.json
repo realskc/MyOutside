@@ -3,6 +3,10 @@
   "private": true,
   "version": "0.0.0",
   "type": "module",
+  "main": "./backend/src/index.ts",
+  "exports": {
+    ".": "./backend/src/index.ts"
+  },
   "scripts": {
     "test": "vitest run",
     "typecheck": "tsc --noEmit -p tsconfig.json"
@@ -10,7 +14,8 @@
   "dependencies": {
     "@myoutside/contracts": "workspace:*",
     "@myoutside/kernel": "workspace:*",
-    "ts-fsrs": "^5.4.2"
+    "ts-fsrs": "^5.4.2",
+    "zod": "^3.24.0"
   },
   "devDependencies": {
     "@myoutside/kernel-node": "workspace:*",

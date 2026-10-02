@@ -17,9 +17,9 @@ export interface KernelOptions {
   storage: DbAdapter;
 }
 
-interface RegisteredFunction extends ApiDefinition {
-  appId: string;
-}
+type TxFunction = Extract<ApiDefinition, { kind: "tx" }> & { appId: string };
+type ReadFunction = Extract<ApiDefinition, { kind: "read" }> & { appId: string };
+type RegisteredFunction = TxFunction | ReadFunction;
 
 /**
  * 创建内核：应用注册 → 迁移 → 处理调用（读直接执行；写经串行队列、单事务执行）。
@@ -39,6 +39,12 @@ export function createKernel({ storage }: KernelOptions) {
     input: z.unknown(),
     handler: () => dataVersion,
   });
+  functions.set("platform.listApps", {
+    kind: "read",
+    appId: "platform",
+    input: z.unknown(),
+    handler: () => [...apps.values()].map((app) => ({ id: app.id, name: app.name })),
+  });
 
   function registerApp(app: AppModule): void {
     if (started) throw new Error("内核已启动，应用必须在 start() 之前注册");
@@ -47,7 +53,7 @@ export function createKernel({ storage }: KernelOptions) {
     for (const [shortName, def] of Object.entries(app.api)) {
       const fullName = `${app.id}.${shortName}`;
       if (functions.has(fullName)) throw new Error(`函数已注册：${fullName}`);
-      functions.set(fullName, { ...def, appId: app.id });
+      functions.set(fullName, { ...def, appId: app.id } as RegisteredFunction);
     }
     for (const migration of app.migrations ?? []) {
       migrationList.push({ appId: app.id, migration });
@@ -99,7 +105,7 @@ export function createKernel({ storage }: KernelOptions) {
     };
   }
 
-  function runTx(fn: RegisteredFunction, input: unknown, depth: number): unknown {
+  function runTx(fn: TxFunction, input: unknown, depth: number): unknown {
     if (depth >= MAX_CALL_DEPTH)
       throw new KernelError("CALL_DEPTH_EXCEEDED", `调用深度超过 ${MAX_CALL_DEPTH}：${fn.appId}`);
     const ctx: TxContext = {

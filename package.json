@@ -6,10 +6,15 @@
   "packageManager": "pnpm@12.8.1",
   "scripts": {
     "test": "pnpm -r test",
-    "typecheck": "pnpm -r typecheck"
+    "typecheck": "pnpm -r typecheck",
+    "simulate": "tsx scripts/simulate-dialog.ts"
   },
   "devDependencies": {
+    "@myoutside/kernel": "workspace:*",
+    "@myoutside/kernel-node": "workspace:*",
+    "@myoutside/vocab": "workspace:*",
     "@types/node": "^24.0.0",
+    "esbuild": "^0.28.0",
     "tsx": "^4.19.0",
     "typescript": "^5.6.0",
     "vitest": "^3.0.0",

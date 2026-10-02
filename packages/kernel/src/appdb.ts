@@ -1,4 +1,4 @@
-import type { AppDb, DbAdapter, MigrationCtx, SqlValue } from "./types.js";
+import type { AppDb, DbAdapter, MigrationCtx, SqlValue, WhereValue } from "./types.js";
 
 const IDENT = /^[A-Za-z_][A-Za-z0-9_]*$/;
 const ORDER_BY = /^[A-Za-z_][A-Za-z0-9_]*(\s+(ASC|DESC))?$/i;
@@ -14,14 +14,55 @@ export function physicalTableName(appId: string, table: string): string {
   return `${appId}__${table}`;
 }
 
-function buildWhere(where: Record<string, SqlValue>): { sql: string; params: SqlValue[] } {
-  const keys = Object.keys(where);
-  for (const key of keys) assertIdent(key, "列名");
-  if (keys.length === 0) return { sql: "", params: [] };
-  return {
-    sql: " WHERE " + keys.map((k) => `${k} = ?`).join(" AND "),
-    params: keys.map((k) => where[k]!),
-  };
+function isOperatorObject(value: WhereValue): value is Exclude<WhereValue, SqlValue> {
+  return typeof value === "object" && value !== null && !(value instanceof Uint8Array);
+}
+
+function buildWhere(where: Record<string, WhereValue>): { sql: string; params: SqlValue[] } {
+  const clauses: string[] = [];
+  const params: SqlValue[] = [];
+  for (const [key, value] of Object.entries(where)) {
+    assertIdent(key, "列名");
+    if (!isOperatorObject(value)) {
+      clauses.push(`${key} = ?`);
+      params.push(value);
+      continue;
+    }
+    if (value.eq !== undefined) {
+      clauses.push(`${key} = ?`);
+      params.push(value.eq);
+    }
+    if (value.lt !== undefined) {
+      clauses.push(`${key} < ?`);
+      params.push(value.lt);
+    }
+    if (value.lte !== undefined) {
+      clauses.push(`${key} <= ?`);
+      params.push(value.lte);
+    }
+    if (value.gt !== undefined) {
+      clauses.push(`${key} > ?`);
+      params.push(value.gt);
+    }
+    if (value.gte !== undefined) {
+      clauses.push(`${key} >= ?`);
+      params.push(value.gte);
+    }
+    if (value.like !== undefined) {
+      clauses.push(`${key} LIKE ?`);
+      params.push(value.like);
+    }
+    if (value.in !== undefined) {
+      if (value.in.length === 0) {
+        clauses.push("1 = 0");
+      } else {
+        clauses.push(`${key} IN (${value.in.map(() => "?").join(", ")})`);
+        params.push(...value.in);
+      }
+    }
+  }
+  if (clauses.length === 0) return { sql: "", params: [] };
+  return { sql: " WHERE " + clauses.join(" AND "), params };
 }
 
 /** 创建以某个应用为作用域的数据访问助手；表名不能越出该应用（所有权由构造保证） */

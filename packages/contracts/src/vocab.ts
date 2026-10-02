@@ -24,6 +24,7 @@ export const CardSchema = z.object({
   difficulty: z.number(),
   elapsed_days: z.number().int(),
   scheduled_days: z.number().int(),
+  learning_steps: z.number().int(),
   reps: z.number().int(),
   lapses: z.number().int(),
   state: z.number().int(),

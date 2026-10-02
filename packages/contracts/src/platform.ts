@@ -6,4 +6,5 @@ export const EmptyInput = z.union([z.undefined(), z.object({}).strict()]);
 /** 平台内置 API 面 */
 export interface PlatformApi {
   "platform.dataVersion": { input: Record<string, never>; output: number };
+  "platform.listApps": { input: Record<string, never>; output: Array<{ id: string; name: string }> };
 }
