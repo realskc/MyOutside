@@ -21,6 +21,12 @@
       again: "重来",
       good: "不错",
       easy: "简单",
+      intervalNow: "不到 1 分钟",
+      intervalMinutes: (n) => `${n} 分钟`,
+      intervalHours: (n) => `${n} 小时`,
+      intervalDays: (n) => `${n} 天`,
+      intervalMonths: (n) => `${n} 个月`,
+      intervalYears: (n) => `${n} 年`,
       lookupPlaceholder: "输入单词或短语…",
       lookupRun: "查询",
       lookupSearching: "查询中…",
@@ -79,6 +85,12 @@
       again: "Again",
       good: "Good",
       easy: "Easy",
+      intervalNow: "<1 min",
+      intervalMinutes: (n) => `${n} min`,
+      intervalHours: (n) => `${n} hr`,
+      intervalDays: (n) => `${n} d`,
+      intervalMonths: (n) => `${n} mo`,
+      intervalYears: (n) => `${n} y`,
       lookupPlaceholder: "Type a word or phrase…",
       lookupRun: "Look up",
       lookupSearching: "Looking up…",
@@ -200,6 +212,46 @@
   let reviewIndex = 0;
   let reviewDone = 0;
 
+  const INTERVAL_KEYS = ["again", "good", "easy"];
+
+  function setIntervalLabels(values) {
+    for (const key of INTERVAL_KEYS) {
+      const el = document.querySelector(`[data-interval="${key}"]`);
+      if (el) el.textContent = values ? String(values[key] ?? "") : "";
+    }
+  }
+
+  function formatInterval(dueMs, nowMs) {
+    const diff = Math.max(0, dueMs - nowMs);
+    const minutes = Math.round(diff / 60000);
+    if (minutes < 1) return t("intervalNow");
+    if (minutes < 60) return t("intervalMinutes", minutes);
+    const hours = Math.round(minutes / 60);
+    if (hours < 24) return t("intervalHours", hours);
+    const days = Math.round(diff / 86400000);
+    if (days < 30) return t("intervalDays", days);
+    const months = Math.round(days / 30);
+    if (months < 12) return t("intervalMonths", months);
+    return t("intervalYears", Math.round(months / 12));
+  }
+
+  async function loadPreview(cardId) {
+    setIntervalLabels({ again: "…", good: "…", easy: "…" });
+    try {
+      const preview = await call("vocab.previewReview", { cardId });
+      const current = reviewQueue[reviewIndex];
+      if (!current || current.id !== cardId) return; // 卡片已切换，丢弃过期结果
+      const now = Date.now();
+      setIntervalLabels({
+        again: formatInterval(preview.again.due, now),
+        good: formatInterval(preview.good.due, now),
+        easy: formatInterval(preview.easy.due, now),
+      });
+    } catch {
+      setIntervalLabels(null);
+    }
+  }
+
   async function loadReview() {
     reviewQueue = await call("vocab.getDue", { limit: 50 });
     reviewIndex = 0;
@@ -224,12 +276,14 @@
       front.textContent = empty ? "🎉" : "✅";
       progress.textContent = empty ? t("reviewEmpty") : t("reviewDone", reviewDone);
       reveal.classList.add("hidden");
+      setIntervalLabels(null);
       return;
     }
 
     const card = reviewQueue[reviewIndex];
     progress.textContent = t("reviewDue", reviewIndex + 1, reviewQueue.length);
     front.textContent = card.display;
+    void loadPreview(card.id);
     back.innerHTML =
       `<div class="phonetic">${escapeHtml(card.phonetic ?? "")}</div>` +
       `<div class="sense">${escapeHtml(card.sense)}</div>` +

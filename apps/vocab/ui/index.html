@@ -26,9 +26,15 @@
         <div class="review-actions">
           <button id="btn-reveal" class="primary" data-i18n="showAnswer">显示答案</button>
           <div id="review-ratings" class="rating-row hidden">
-            <button data-rating="again" class="danger" data-i18n="again">重来</button>
-            <button data-rating="good" class="primary" data-i18n="good">不错</button>
-            <button data-rating="easy" class="ok" data-i18n="easy">简单</button>
+            <button data-rating="again" class="danger">
+              <span data-i18n="again">重来</span><span class="interval" data-interval="again"></span>
+            </button>
+            <button data-rating="good" class="primary">
+              <span data-i18n="good">不错</span><span class="interval" data-interval="good"></span>
+            </button>
+            <button data-rating="easy" class="ok">
+              <span data-i18n="easy">简单</span><span class="interval" data-interval="easy"></span>
+            </button>
           </div>
         </div>
       </section>

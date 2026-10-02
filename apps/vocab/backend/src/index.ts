@@ -3,6 +3,7 @@ import {
   AddCardInput,
   GetDueInput,
   ListCardsInput,
+  PreviewReviewInput,
   ResolveCardInput,
   SetMasteredInput,
   SubmitReviewInput,
@@ -130,6 +131,22 @@ export const vocabApp: AppModule = {
         state: result.card.state,
         due: result.card.due.getTime(),
         scheduledDays: result.card.scheduled_days,
+      };
+    }),
+
+    /** 预览各评分对应的"下一次复习时间"（只读，不写库） */
+    previewReview: defineRead(PreviewReviewInput, (ctx, input) => {
+      const row = getCardOrThrow(ctx.db, input.cardId);
+      const preview = scheduler.repeat(rowToFsrs(row), new Date());
+      const entry = (grade: Grade) => ({
+        due: preview[grade].card.due.getTime(),
+        scheduledDays: preview[grade].card.scheduled_days,
+      });
+      return {
+        again: entry(Rating.Again),
+        hard: entry(Rating.Hard),
+        good: entry(Rating.Good),
+        easy: entry(Rating.Easy),
       };
     }),
 

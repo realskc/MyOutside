@@ -122,6 +122,19 @@ describe("vocab backend", () => {
     expect(list[0]?.phonetic).toBe("/rʌn/");
   });
 
+  it("previewReview：返回四个评分对应的下次复习时间", async () => {
+    const kernel = setup();
+    const { cardId } = await call<{ cardId: string }>(kernel, "vocab.addCard", { term: "preview", sense: "预览" });
+    const preview = await call<{
+      again: { due: number; scheduledDays: number };
+      good: { due: number; scheduledDays: number };
+      easy: { due: number; scheduledDays: number };
+    }>(kernel, "vocab.previewReview", { cardId });
+    expect(preview.again.due).toBeGreaterThan(Date.now());
+    expect(preview.good.due).toBeGreaterThanOrEqual(preview.again.due);
+    expect(preview.easy.due).toBeGreaterThanOrEqual(preview.good.due);
+  });
+
   it("不存在的卡片 → NOT_FOUND", async () => {
     const kernel = setup();
     const res = await kernel.handle({ call: "vocab.submitReview", payload: { cardId: "nope", rating: "good" } });

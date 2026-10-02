@@ -113,6 +113,25 @@ export const SetMasteredInput = z.object({
 });
 export type SetMasteredInput = z.infer<typeof SetMasteredInput>;
 
+// —— 复习预览（不写库）——
+
+export const PreviewReviewInput = z.object({ cardId: z.string() });
+export type PreviewReviewInput = z.infer<typeof PreviewReviewInput>;
+
+export const PreviewReviewEntry = z.object({
+  due: z.number().int(),
+  scheduledDays: z.number().int(),
+});
+export type PreviewReviewEntry = z.infer<typeof PreviewReviewEntry>;
+
+export const PreviewReviewOutput = z.object({
+  again: PreviewReviewEntry,
+  hard: PreviewReviewEntry,
+  good: PreviewReviewEntry,
+  easy: PreviewReviewEntry,
+});
+export type PreviewReviewOutput = z.infer<typeof PreviewReviewOutput>;
+
 export const StatsSchema = z.object({
   cards: z.number().int(),
   learning: z.number().int(),
@@ -145,6 +164,7 @@ export interface VocabApi {
   "vocab.getDue": { input: GetDueInput; output: Card[] };
   "vocab.listCards": { input: ListCardsInput; output: Card[] };
   "vocab.submitReview": { input: SubmitReviewInput; output: SubmitReviewOutput };
+  "vocab.previewReview": { input: PreviewReviewInput; output: PreviewReviewOutput };
   "vocab.setMastered": { input: SetMasteredInput; output: OkOutput };
   "vocab.getStats": { input: Record<string, never>; output: Stats };
 }
