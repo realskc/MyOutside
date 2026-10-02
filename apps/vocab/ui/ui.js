@@ -16,7 +16,7 @@
       tabStats: "统计",
       reviewEmpty: "太棒了，没有待复习的卡片。",
       reviewDone: (n) => `本次复习完成：${n} 张。`,
-      reviewDue: (i, total) => `待复习 ${i} / ${total}`,
+      reviewDue: (remaining, total) => `还剩 ${remaining} / ${total} 张`,
       showAnswer: "显示答案",
       again: "重来",
       good: "不错",
@@ -83,7 +83,7 @@
       tabStats: "Stats",
       reviewEmpty: "All clear — no cards due.",
       reviewDone: (n) => `Review finished: ${n} card(s).`,
-      reviewDue: (i, total) => `Due ${i} / ${total}`,
+      reviewDue: (remaining, total) => `${remaining} / ${total} remaining`,
       showAnswer: "Show answer",
       again: "Again",
       good: "Good",
@@ -288,7 +288,7 @@
     }
 
     const card = reviewQueue[reviewIndex];
-    progress.textContent = t("reviewDue", reviewIndex + 1, reviewQueue.length);
+    progress.textContent = t("reviewDue", reviewQueue.length - reviewIndex, reviewQueue.length);
     front.textContent = card.display;
     void loadPreview(card.id);
     back.innerHTML =
