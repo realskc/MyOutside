@@ -144,14 +144,14 @@ defineApi("vocab.dueCards", { kind: "read" }, (ctx, input) =>
 
 ## 9. 待定
 
-1. API 函数的命名与版本策略（随 `packages/contracts` 第一版确定）。
+1. API 函数的版本策略（命名已随 `packages/contracts` 第一版确定）。
 2. 数据域注册细节：表名约定（如 `vocab__card`）+ 归属登记方式。
-3. 应用内部数据访问的实现方式（SQL / 类型化封装）——内部自由，宿主可选提供辅助库。
+3. 应用内部数据访问的演进（已实现：宿主 AppDb 助手 = 应用私有表自动加前缀；后续可加类型化封装）。
 4. 后端模块的加载 / 打包细节（Electron 已定案：宿主主进程内的 Node 模块）。
 5. 首批子应用：第一步只做学英语应用（见 docs/apps/vocab.md）；对话应用作为第二步（验证跨应用耦合）。
 6. 「临时函数（one-off）」通道的形态（作用域直写、单次执行即消失、自动留痕、由 builder 发起）——见 requirements.md §2.6 / docs/future/one-off-functions.md。
-7. 平台 AI 服务的 API 形状与配额模型（`platform.ai.*`；密钥由平台保管）——见 requirements.md §2.8。
-8. AI 辅助的写流程模式：异步解析（read 侧，可调用平台 AI）→ 事务提交（tx 侧）两步——首个用例见 docs/apps/vocab.md。
+7. 平台 AI 服务的配额与用量统计（API 形状已实现：`platform.ai.chat` 透传 messages / tools；密钥由平台保管）——见 requirements.md §2.8。
+8. AI 辅助的写流程模式（已实现，作为标准模式保留）：异步解析（read 侧）→ 事务提交（tx 侧）——首个用例：`vocab.resolveCard` → `vocab.addCard`。
 
 ---
 

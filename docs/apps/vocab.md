@@ -42,7 +42,7 @@ vocab.card
   context?, source?
   status         -- 'learning' | 'mastered'
   -- ts-fsrs 调度字段（与库的 Card 对齐）
-  due, stability, difficulty, elapsed_days, scheduled_days,
+  due, stability, difficulty, elapsed_days, scheduled_days, learning_steps,
   reps, lapses, state, last_review
   created_at
 ```
@@ -58,6 +58,7 @@ vocab.card
 vocab.getDue({ before?, limit? }) → Card[]
 vocab.listCards({ term?, query?, status?, limit?, offset? }) → Card[]
 vocab.getStats() → { cards, learning, mastered, dueNow }
+vocab.previewReview({ cardId }) → { again, hard, good, easy: { due, scheduledDays } }  // 只读：各评分对应的下次复习时间
 
 // —— 添加：两步（异步解析 → 事务提交）——
 // 1) 解析：判断"新卡片"还是"与已有卡片同类"；term 已存在时使用平台 AI
@@ -65,7 +66,7 @@ vocab.resolveCard({ term, sense, meaning?, context? })
   → { action: "new" } | { action: "match", cardId: string }
 
 // 2) 提交（kind: "tx"）
-vocab.addCard({ term, sense, meaning?, phonetic?, context?, source? })
+vocab.addCard({ term, sense, meaning?, phonetic?, context?, source?, scheduling? })
   → { cardId }
 
 // —— 复习与状态（kind: "tx"）——
@@ -81,6 +82,7 @@ vocab.updateCard({ cardId, patch: { sense?, meaning?, phonetic?, context? } }) �
 - resolve 的 LLM 输入：新词条 + 该拼写已有卡片的「单词 + 释义」列表（数量很少，直接全给）。
 - `addCard` 只负责**创建新卡片**，本身不查重——查重由 `resolveCard` + 用户决定完成；跨应用调用方应遵循同样的两步流程。
 - `addCard` 支持可选的 `scheduling`（导入 / 恢复调度状态时使用）；普通添加不传即可。
+- `previewReview` 供复习界面显示「下次复习间隔」（ts-fsrs fuzz 默认关闭 → 预览与实际结果一致）。
 - match 后**没有自动合并**：告知用户已有卡片，由用户选择**放弃**或**替换**；替换 = 用新内容覆盖该卡片（走 `updateCard`），保留复习调度。
 - 掌握状态：**全手动**，按卡片记。
 
@@ -90,7 +92,7 @@ vocab.updateCard({ cardId, patch: { sense?, meaning?, phonetic?, context? } }) �
 
 ### 6.1 背单词
 
-- **复习页**：显示单词 → 翻面显示音标 / 释义 / 语境 → 评分（重来 / 不错 / 简单；API 另有 hard 档）。
+- **复习页**：顶部显示本批剩余张数 → 显示单词 → 翻面显示音标 / 释义 / 语境 → 评分（重来 / 不错 / 简单，按钮下方显示下次复习间隔）或「完全学会」（手动标记掌握、移出复习队列；API 另有 hard 档）。
 - **词库页**：卡片列表（同拼写卡片可分组展示）+ 搜索 + 编辑 + 手动标记掌握。
 - **统计**：卡片数 / 学习中 / 已掌握 / 待复习（简版）。
 
