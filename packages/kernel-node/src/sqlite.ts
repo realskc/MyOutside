@@ -21,6 +21,7 @@ function normalizeParams(params: SqlValue[]): Array<string | number | bigint | n
 export function createNodeSqliteAdapter({ path }: NodeSqliteOptions): DbAdapter {
   const db = new DatabaseSync(path);
   db.exec("PRAGMA foreign_keys = ON");
+  db.exec("PRAGMA busy_timeout = 5000");
   if (path !== ":memory:") db.exec("PRAGMA journal_mode = WAL");
 
   return {

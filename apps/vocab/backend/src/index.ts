@@ -86,6 +86,7 @@ export const vocabApp: AppModule = {
     addCard: defineTx(AddCardInput, (ctx, input) => {
       const now = new Date();
       const id = randomUUID();
+      const scheduling = input.scheduling ?? fsrsToColumns(createEmptyCard(now));
       ctx.db.insert("card", {
         id,
         term: normalizeTerm(input.term),
@@ -97,7 +98,7 @@ export const vocabApp: AppModule = {
         source: input.source ?? "manual",
         status: "learning",
         created_at: now.getTime(),
-        ...fsrsToColumns(createEmptyCard(now)),
+        ...scheduling,
       });
       return { cardId: id };
     }),

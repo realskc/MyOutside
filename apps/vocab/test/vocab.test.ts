@@ -41,6 +41,37 @@ describe("vocab backend", () => {
     expect(list).toHaveLength(2);
   });
 
+  it("addCard 支持携带调度状态（用于导入 / 恢复）", async () => {
+    const kernel = setup();
+    const future = Date.now() + 30 * 86400 * 1000;
+    const { cardId } = await call<{ cardId: string }>(kernel, "vocab.addCard", {
+      term: "restored",
+      sense: "恢复的卡",
+      scheduling: {
+        due: future,
+        stability: 12.5,
+        difficulty: 6.2,
+        elapsed_days: 10,
+        scheduled_days: 12,
+        learning_steps: 0,
+        reps: 5,
+        lapses: 1,
+        state: 2,
+        last_review: Date.now() - 10 * 86400 * 1000,
+      },
+    });
+    expect(cardId).toBeTruthy();
+
+    // due 在未来 → 不出现在待复习
+    expect(await call<unknown[]>(kernel, "vocab.getDue", {})).toHaveLength(0);
+
+    const list = await call<Array<Record<string, unknown>>>(kernel, "vocab.listCards", { term: "restored" });
+    expect(list[0]?.stability).toBe(12.5);
+    expect(list[0]?.difficulty).toBe(6.2);
+    expect(list[0]?.reps).toBe(5);
+    expect(list[0]?.last_review).not.toBeNull();
+  });
+
   it("resolveCard：新拼写直接返回 new（不触发 AI）", async () => {
     const kernel = setup();
     const r = await call<{ action: string }>(kernel, "vocab.resolveCard", { term: "brandnew", sense: "新词" });

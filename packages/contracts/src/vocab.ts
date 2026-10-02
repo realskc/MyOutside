@@ -35,6 +35,21 @@ export type Card = z.infer<typeof CardSchema>;
 
 // —— API 输入 / 输出 ——
 
+/** 调度状态（导入 / 恢复时使用；不传则由 ts-fsrs 生成新卡状态） */
+export const CardSchedulingInput = z.object({
+  due: z.number().int(),
+  stability: z.number(),
+  difficulty: z.number(),
+  elapsed_days: z.number().int(),
+  scheduled_days: z.number().int(),
+  learning_steps: z.number().int(),
+  reps: z.number().int(),
+  lapses: z.number().int(),
+  state: z.number().int().min(0).max(3),
+  last_review: z.number().int().nullable(),
+});
+export type CardSchedulingInput = z.infer<typeof CardSchedulingInput>;
+
 export const AddCardInput = z.object({
   term: z.string().min(1),
   display: z.string().min(1).optional(),
@@ -43,6 +58,7 @@ export const AddCardInput = z.object({
   phonetic: z.string().optional(),
   context: z.string().optional(),
   source: z.string().optional(),
+  scheduling: CardSchedulingInput.optional(),
 });
 export type AddCardInput = z.infer<typeof AddCardInput>;
 

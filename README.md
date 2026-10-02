@@ -22,6 +22,7 @@ pnpm.cmd test       # 单元 / 集成测试（kernel、vocab、适配器）
 pnpm.cmd typecheck  # 全部类型检查
 pnpm.cmd simulate   # 模拟「对话应用」经内核调用 vocab（跨应用路径演示）
 pnpm.cmd ai:ping    # 用应用数据目录里的 key 做一次真实 AI 调用（验证配置）
+pnpm.cmd import:vocabry  # 从旧 Vocabry 库 + Anki 迁移卡片（近似迁移复习状态；可重复运行）
 pnpm.cmd dev        # 启动桌面端（Electron 窗口）
 pnpm.cmd smoke      # 冒烟测试：自检内核 / 桥 / 子应用 iframe 后自动退出
 ```
