@@ -141,6 +141,19 @@ async function runSmoke(win: BrowserWindow): Promise<void> {
 }
 
 app.whenReady().then(async () => {
+  // 单实例：重复双击时聚焦已有窗口
+  if (!app.requestSingleInstanceLock()) {
+    app.quit();
+    return;
+  }
+  app.on("second-instance", () => {
+    const [existing] = BrowserWindow.getAllWindows();
+    if (existing) {
+      if (existing.isMinimized()) existing.restore();
+      existing.focus();
+    }
+  });
+
   const dataDir = app.getPath("userData");
   mkdirSync(dataDir, { recursive: true });
   const dbPath = join(dataDir, "myoutside.db");
