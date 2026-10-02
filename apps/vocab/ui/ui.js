@@ -27,6 +27,9 @@
       intervalDays: (n) => `${n} 天`,
       intervalMonths: (n) => `${n} 个月`,
       intervalYears: (n) => `${n} 年`,
+      fullyLearned: "完全学会",
+      masteredHint: "移出复习",
+      toastFullyLearned: "已标记为完全学会",
       lookupPlaceholder: "输入单词或短语…",
       lookupRun: "查询",
       lookupSearching: "查询中…",
@@ -91,6 +94,9 @@
       intervalDays: (n) => `${n} d`,
       intervalMonths: (n) => `${n} mo`,
       intervalYears: (n) => `${n} y`,
+      fullyLearned: "Mastered",
+      masteredHint: "removed",
+      toastFullyLearned: "Marked as fully learned",
       lookupPlaceholder: "Type a word or phrase…",
       lookupRun: "Look up",
       lookupSearching: "Looking up…",
@@ -212,7 +218,7 @@
   let reviewIndex = 0;
   let reviewDone = 0;
 
-  const INTERVAL_KEYS = ["again", "good", "easy"];
+  const INTERVAL_KEYS = ["again", "good", "easy", "mastered"];
 
   function setIntervalLabels(values) {
     for (const key of INTERVAL_KEYS) {
@@ -236,7 +242,7 @@
   }
 
   async function loadPreview(cardId) {
-    setIntervalLabels({ again: "…", good: "…", easy: "…" });
+    setIntervalLabels({ again: "…", good: "…", easy: "…", mastered: t("masteredHint") });
     try {
       const preview = await call("vocab.previewReview", { cardId });
       const current = reviewQueue[reviewIndex];
@@ -246,6 +252,7 @@
         again: formatInterval(preview.again.due, now),
         good: formatInterval(preview.good.due, now),
         easy: formatInterval(preview.easy.due, now),
+        mastered: t("masteredHint"),
       });
     } catch {
       setIntervalLabels(null);
@@ -309,6 +316,19 @@
       reviewIndex += 1;
       renderReview();
     });
+  });
+
+  document.getElementById("btn-mastered").addEventListener("click", async () => {
+    const card = reviewQueue[reviewIndex];
+    try {
+      await call("vocab.setMastered", { cardId: card.id, mastered: true });
+      toast(t("toastFullyLearned"));
+      reviewDone += 1;
+    } catch (error) {
+      toast(error.message, true);
+    }
+    reviewIndex += 1;
+    renderReview();
   });
 
   // ---- 添加（两步：解析 → 提交；AI 不可用时回退机械流程）----

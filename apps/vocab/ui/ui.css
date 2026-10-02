@@ -162,7 +162,8 @@ button {
 
 button.primary,
 button.danger,
-button.ok {
+button.ok,
+button.mastered {
   border: 0;
   border-radius: 10px;
   padding: 10px 18px;
@@ -180,6 +181,10 @@ button.danger {
 
 button.ok {
   background: var(--ok);
+}
+
+button.mastered {
+  background: #7c5cff;
 }
 
 button.plain {
