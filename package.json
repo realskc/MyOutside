@@ -7,7 +7,9 @@
   "scripts": {
     "test": "pnpm -r test",
     "typecheck": "pnpm -r typecheck",
-    "simulate": "tsx scripts/simulate-dialog.ts"
+    "simulate": "tsx scripts/simulate-dialog.ts",
+    "dev": "pnpm --filter @myoutside/host dev",
+    "smoke": "pnpm --filter @myoutside/host smoke"
   },
   "devDependencies": {
     "@myoutside/kernel": "workspace:*",

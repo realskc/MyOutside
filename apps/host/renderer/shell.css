@@ -1,0 +1,95 @@
+:root {
+  --sidebar-bg: #1f2430;
+  --sidebar-fg: #cfd6e4;
+  --sidebar-active: #3a4358;
+  --workspace-bg: #f6f7f9;
+  --border: #e3e6ec;
+  --accent: #4a7dff;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  height: 100%;
+}
+
+body {
+  display: flex;
+  font-family: "Segoe UI", "Microsoft YaHei", system-ui, sans-serif;
+  background: var(--workspace-bg);
+}
+
+.sidebar {
+  width: 210px;
+  flex: 0 0 210px;
+  background: var(--sidebar-bg);
+  color: var(--sidebar-fg);
+  display: flex;
+  flex-direction: column;
+  padding: 14px 10px;
+  gap: 10px;
+}
+
+.brand {
+  font-size: 15px;
+  font-weight: 600;
+  letter-spacing: 0.5px;
+  padding: 4px 8px 10px;
+  color: #fff;
+  border-bottom: 1px solid #333b4d;
+}
+
+.apps {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  flex: 1;
+}
+
+.app-item {
+  text-align: left;
+  background: transparent;
+  border: 0;
+  color: var(--sidebar-fg);
+  padding: 9px 10px;
+  border-radius: 8px;
+  font-size: 14px;
+  cursor: pointer;
+}
+
+.app-item:hover {
+  background: #2a3142;
+}
+
+.app-item.active {
+  background: var(--sidebar-active);
+  color: #fff;
+}
+
+.empty {
+  color: #8b94a8;
+  font-size: 13px;
+  padding: 8px 10px;
+}
+
+.version {
+  color: #6d7690;
+  font-size: 12px;
+  padding: 0 10px;
+}
+
+.workspace {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+}
+
+.panel {
+  flex: 1;
+  border: 0;
+  background: #fff;
+}

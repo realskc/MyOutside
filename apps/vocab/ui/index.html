@@ -1,0 +1,65 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>学英语</title>
+    <link rel="stylesheet" href="ui.css" />
+  </head>
+  <body>
+    <header class="topbar">
+      <h1>学英语</h1>
+      <nav id="tabs">
+        <button class="tab active" data-tab="review">复习</button>
+        <button class="tab" data-tab="browse">词库</button>
+        <button class="tab" data-tab="add">添加</button>
+        <button class="tab" data-tab="stats">统计</button>
+      </nav>
+    </header>
+
+    <main>
+      <section id="view-review" class="view active">
+        <div class="review-progress" id="review-progress"></div>
+        <div class="card-face" id="review-front"></div>
+        <div class="card-back hidden" id="review-back"></div>
+        <div class="review-actions">
+          <button id="btn-reveal" class="primary">显示答案</button>
+          <div id="review-ratings" class="rating-row hidden">
+            <button data-rating="again" class="danger">重来</button>
+            <button data-rating="good" class="primary">不错</button>
+            <button data-rating="easy" class="ok">简单</button>
+          </div>
+        </div>
+      </section>
+
+      <section id="view-browse" class="view">
+        <div class="toolbar">
+          <input id="browse-query" placeholder="搜索拼写…" />
+          <button id="browse-refresh">刷新</button>
+        </div>
+        <div id="browse-list" class="list"></div>
+      </section>
+
+      <section id="view-add" class="view">
+        <form id="add-form" class="form" autocomplete="off">
+          <label>单词 <input name="term" required /></label>
+          <label>本质意项 <input name="sense" required placeholder="例：椰枣（食物）" /></label>
+          <label>释义 <textarea name="meaning" rows="2"></textarea></label>
+          <label>音标 <input name="phonetic" placeholder="/ˈserənˈdɪpəti/" /></label>
+          <label>例句 / 语境 <textarea name="context" rows="2"></textarea></label>
+          <div class="form-actions">
+            <button type="submit" class="primary">添加</button>
+          </div>
+        </form>
+        <div id="add-result" class="add-result hidden"></div>
+      </section>
+
+      <section id="view-stats" class="view">
+        <div id="stats-box" class="stats"></div>
+      </section>
+    </main>
+
+    <div id="toast" class="toast hidden"></div>
+    <script src="ui.js"></script>
+  </body>
+</html>
