@@ -147,7 +147,7 @@ defineApi("vocab.dueCards", { kind: "read" }, (ctx, input) =>
 1. API 函数的版本策略（命名已随 `packages/contracts` 第一版确定）。
 2. 数据域注册细节：表名约定（如 `vocab__card`）+ 归属登记方式。
 3. 应用内部数据访问的演进（已实现：宿主 AppDb 助手 = 应用私有表自动加前缀；后续可加类型化封装）。
-4. 后端模块的加载 / 打包细节（Electron 已定案：宿主主进程内的 Node 模块）。
+4. 后端模块的加载 / 打包细节（TS 化阶段实施）：每个子应用独立产出 + 内核 `reloadApp` 运行时重载；**不接受"整机重启"作为开发更新方案**（内核重启会连带重启所有应用、丢失会话）。
 5. 首批子应用：第一步只做学英语应用（见 docs/apps/vocab.md）；对话应用作为第二步（验证跨应用耦合）。
 6. 「临时函数（one-off）」通道的形态（作用域直写、单次执行即消失、自动留痕、由 builder 发起）——见 requirements.md §2.6 / docs/future/one-off-functions.md。
 7. 平台 AI 服务的配额与用量统计（API 形状已实现：`platform.ai.chat` 透传 messages / tools；密钥由平台保管）——见 requirements.md §2.8。
