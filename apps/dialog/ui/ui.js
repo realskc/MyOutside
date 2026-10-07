@@ -40,6 +40,13 @@
       errorPrefix: "生成失败：",
       needKey: "请先在「设置」里配置 DeepSeek API Key。",
       confirmDelete: (title) => `删除会话「${title}」？此操作不可恢复。`,
+      usageTotal: (n) => `累计 ${n} tokens`,
+      usageMsg: (prompt, completion, reasoning) =>
+        reasoning == null
+          ? `输入 ${prompt} · 输出 ${completion}`
+          : `输入 ${prompt} · 输出 ${completion} · 思考 ${reasoning}`,
+      usageTitle: (prompt, completion, reasoning, total) =>
+        `输入 ${prompt} · 输出 ${completion} · 思考 ${reasoning} · 合计 ${total}`,
       you: "你",
       assistant: "助手",
     },
@@ -76,6 +83,11 @@
       errorPrefix: "Generation failed: ",
       needKey: "Configure the DeepSeek API key in Settings first.",
       confirmDelete: (title) => `Delete conversation “${title}”? This cannot be undone.`,
+      usageTotal: (n) => `${n} tokens total`,
+      usageMsg: (prompt, completion, reasoning) =>
+        reasoning == null ? `in ${prompt} · out ${completion}` : `in ${prompt} · out ${completion} · think ${reasoning}`,
+      usageTitle: (prompt, completion, reasoning, total) =>
+        `in ${prompt} · out ${completion} · think ${reasoning} · total ${total}`,
       you: "You",
       assistant: "Assistant",
     },
@@ -113,6 +125,7 @@
   const settingsPanel = document.getElementById("settings-panel");
   const toastEl = document.getElementById("toast");
   const backdropEl = document.getElementById("backdrop");
+  const usageTotalEl = document.getElementById("usage-total");
 
   // ---- 状态 ----
   let conversations = [];
@@ -121,6 +134,7 @@
   let pathHasMore = false;
   let pathLimit = 100;
   let composing = false;
+  let usageSummary = null;
   const generating = new Set();
   const errors = new Map();
 
@@ -146,6 +160,25 @@
   }
 
   // ---- 语言 ----
+
+  const formatNumber = (value) => value.toLocaleString(lang === "zh" ? "zh-CN" : "en-US");
+
+  function renderUsage() {
+    const conversation = currentConversation();
+    if (!conversation || !usageSummary || usageSummary.totalTokens <= 0) {
+      usageTotalEl.textContent = "";
+      usageTotalEl.title = "";
+      return;
+    }
+    usageTotalEl.textContent = t("usageTotal", formatNumber(usageSummary.totalTokens));
+    usageTotalEl.title = t(
+      "usageTitle",
+      formatNumber(usageSummary.promptTokens),
+      formatNumber(usageSummary.completionTokens),
+      formatNumber(usageSummary.reasoningTokens),
+      formatNumber(usageSummary.totalTokens),
+    );
+  }
 
   async function initLanguage() {
     let value = null;
@@ -176,6 +209,7 @@
     renderMessages();
     renderComposerState();
     syncComposer();
+    renderUsage();
   }
 
   // ---- 会话列表 ----
@@ -294,17 +328,24 @@
     if (!currentId) {
       pathMessages = [];
       pathHasMore = false;
+      usageSummary = null;
       renderMessages();
       renderComposerState();
       syncComposer();
+      renderUsage();
       return;
     }
-    const result = await callOrThrow("dialog.getPath", { conversationId: currentId, limit: pathLimit });
+    const [result, usage] = await Promise.all([
+      callOrThrow("dialog.getPath", { conversationId: currentId, limit: pathLimit }),
+      callOrThrow("dialog.getUsage", { conversationId: currentId }),
+    ]);
     pathMessages = result.messages;
     pathHasMore = result.hasMore;
+    usageSummary = usage;
     renderMessages({ scroll });
     renderComposerState();
     syncComposer();
+    renderUsage();
   }
 
   function renderMessages(options = {}) {
@@ -374,6 +415,18 @@
 
     const actions = document.createElement("div");
     actions.className = "msg-actions";
+    if (message.usage) {
+      const usageNote = document.createElement("span");
+      usageNote.className = "usage-note";
+      const reasoningTokens = message.usage.reasoningTokens;
+      usageNote.textContent = t(
+        "usageMsg",
+        formatNumber(message.usage.promptTokens),
+        formatNumber(message.usage.completionTokens),
+        reasoningTokens == null ? null : formatNumber(reasoningTokens),
+      );
+      actions.appendChild(usageNote);
+    }
     const copyBtn = document.createElement("button");
     copyBtn.type = "button";
     copyBtn.className = "link-btn";

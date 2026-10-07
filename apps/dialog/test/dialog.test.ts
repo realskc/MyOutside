@@ -203,6 +203,40 @@ describe("dialog backend", () => {
     if (!gone.ok) expect(gone.error.code).toBe("NOT_FOUND");
   });
 
+  it("getUsage：汇总所有回复（忽略无 usage 的消息，不计其他会话）", async () => {
+    const kernel = setup();
+    const conversationId = await createConversation(kernel);
+    await append(kernel, conversationId, "user", "hi");
+    await append(kernel, conversationId, "assistant", "a", {
+      usage: { promptTokens: 10, completionTokens: 5, totalTokens: 15, reasoningTokens: 3 },
+    });
+    await append(kernel, conversationId, "user", "again");
+    await append(kernel, conversationId, "assistant", "b", {
+      usage: { promptTokens: 20, completionTokens: 7, totalTokens: 27 },
+    });
+
+    const other = await createConversation(kernel);
+    await append(kernel, other, "user", "x");
+    await append(kernel, other, "assistant", "y", {
+      usage: { promptTokens: 1, completionTokens: 1, totalTokens: 2 },
+    });
+
+    const usage = await call<{
+      replies: number;
+      promptTokens: number;
+      completionTokens: number;
+      totalTokens: number;
+      reasoningTokens: number;
+    }>(kernel, "dialog.getUsage", { conversationId });
+    expect(usage).toEqual({
+      replies: 2,
+      promptTokens: 30,
+      completionTokens: 12,
+      totalTokens: 42,
+      reasoningTokens: 3,
+    });
+  });
+
   it("generateReply：无 key → PRECONDITION；无回复时不允许生成", async () => {
     const kernel = setup();
     const conversationId = await createConversation(kernel);

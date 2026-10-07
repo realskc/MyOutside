@@ -57,6 +57,19 @@ export const GetPathOutput = z.object({
 });
 export type GetPathOutput = z.infer<typeof GetPathOutput>;
 
+export const GetUsageInput = z.object({ conversationId: z.string() });
+export type GetUsageInput = z.infer<typeof GetUsageInput>;
+
+/** 会话累计 token 用量（汇总所有分叉） */
+export const UsageSummarySchema = z.object({
+  replies: z.number().int(),
+  promptTokens: z.number().int(),
+  completionTokens: z.number().int(),
+  totalTokens: z.number().int(),
+  reasoningTokens: z.number().int(),
+});
+export type UsageSummary = z.infer<typeof UsageSummarySchema>;
+
 export const GenerateReplyInput = z.object({ conversationId: z.string() });
 export type GenerateReplyInput = z.infer<typeof GenerateReplyInput>;
 
@@ -132,6 +145,7 @@ export type DeleteConversationInput = z.infer<typeof DeleteConversationInput>;
 export interface DialogApi {
   "dialog.listConversations": { input: ListConversationsInput; output: Conversation[] };
   "dialog.getPath": { input: GetPathInput; output: GetPathOutput };
+  "dialog.getUsage": { input: GetUsageInput; output: UsageSummary };
   "dialog.generateReply": { input: GenerateReplyInput; output: GenerateReplyOutput };
   "dialog.createConversation": { input: CreateConversationInput; output: CreateConversationOutput };
   "dialog.appendMessage": { input: AppendMessageInput; output: AppendMessageOutput };

@@ -166,6 +166,21 @@ function prepareSmokeDataDir(realDataDir: string): string {
   return smokeDir;
 }
 
+/** 冒烟截图：先确保窗口可见（被遮挡时 capturePage 会失败），失败自动重试 */
+async function captureWindow(win: BrowserWindow, attempts: number, delayMs: number): Promise<Buffer> {
+  win.show();
+  win.focus();
+  for (let attempt = 0; attempt < attempts; attempt += 1) {
+    await new Promise((resolve) => setTimeout(resolve, delayMs));
+    try {
+      return (await win.webContents.capturePage()).toPNG();
+    } catch (error) {
+      if (attempt === attempts - 1) console.error("[smoke] capturePage 失败：", error);
+    }
+  }
+  return Buffer.alloc(0);
+}
+
 async function runSmoke(win: BrowserWindow): Promise<void> {
   const guard = setTimeout(() => {
     console.error("[smoke] 超时，强制退出");
@@ -201,14 +216,7 @@ async function runSmoke(win: BrowserWindow): Promise<void> {
     console.log("[smoke] settings:", JSON.stringify(settingsCheck));
 
     const shotPath = join(app.getPath("temp"), "myoutside-smoke.png");
-    let png: Buffer = Buffer.alloc(0);
-    for (let attempt = 0; attempt < 10 && png.length === 0; attempt += 1) {
-      await new Promise((resolve) => setTimeout(resolve, 500));
-      const image = await win.webContents.capturePage();
-      const size = image.getSize();
-      console.log("[smoke] capture size:", JSON.stringify(size));
-      png = image.toPNG();
-    }
+    const png = await captureWindow(win, 10, 500);
     writeFileSync(shotPath, png);
     console.log("[smoke] screenshot:", shotPath, `(${png.length} bytes)`);
 
@@ -227,11 +235,7 @@ async function runSmoke(win: BrowserWindow): Promise<void> {
     );
     console.log("[smoke] reveal:", JSON.stringify(reveal));
     const vocabShotPath = join(app.getPath("temp"), "myoutside-vocab.png");
-    let vocabPng: Buffer = Buffer.alloc(0);
-    for (let attempt = 0; attempt < 10 && vocabPng.length === 0; attempt += 1) {
-      await new Promise((resolve) => setTimeout(resolve, 400));
-      vocabPng = (await win.webContents.capturePage()).toPNG();
-    }
+    const vocabPng = await captureWindow(win, 10, 400);
     writeFileSync(vocabShotPath, vocabPng);
     console.log("[smoke] vocab screenshot:", vocabShotPath, `(${vocabPng.length} bytes)`);
 
@@ -274,11 +278,7 @@ async function runSmoke(win: BrowserWindow): Promise<void> {
     );
     console.log("[smoke] dialog reasoning toggle:", reasoningOpen);
     const dialogShotPath = join(app.getPath("temp"), "myoutside-dialog.png");
-    let dialogPng: Buffer = Buffer.alloc(0);
-    for (let attempt = 0; attempt < 10 && dialogPng.length === 0; attempt += 1) {
-      await new Promise((resolve) => setTimeout(resolve, 400));
-      dialogPng = (await win.webContents.capturePage()).toPNG();
-    }
+    const dialogPng = await captureWindow(win, 12, 500);
     writeFileSync(dialogShotPath, dialogPng);
     console.log("[smoke] dialog screenshot:", dialogShotPath, `(${dialogPng.length} bytes)`);
   } catch (error) {

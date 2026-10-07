@@ -27,7 +27,7 @@
 | 链接 | AI 回复中的链接渲染为**可点击**（仅 http/https），点击经宿主 `host.openExternal` 用系统浏览器打开 |
 | 模型 | 平台默认 `deepseek-flash`（平台设置可覆盖） |
 | Markdown | 前端极简渲染（零依赖、转义优先）；代码块带复制按钮；无语法高亮 |
-| usage | `platform.ai.chat` 透传 token usage（含 reasoning tokens）；助手消息落库保存 |
+| usage | `platform.ai.chat` 透传 token usage（含 reasoning tokens）；助手消息落库保存；**输入区显示会话累计**、每条回复显示本条明细 |
 | 刷新模型 | 面板装载时拉取；单活动面板，无推送 |
 
 ## 3. 数据模型（v1）
@@ -69,6 +69,8 @@ dialog.listConversations({}) → Conversation[]            // updated_at 倒序�
 dialog.getPath({ conversationId, limit? }) → { messages: PathMessage[], hasMore: boolean }
   // 当前路径的最近 N 条（升序返回）。PathMessage = Message + { siblingCount, siblingIndex, siblingIds }
   // siblingIds 按创建时间升序（含自己），供 ‹i/k› 切换器定位目标分叉；「加载更早」= 增大 limit
+dialog.getUsage({ conversationId }) → { replies, promptTokens, completionTokens, totalTokens, reasoningTokens }
+  // 会话累计 token（汇总所有分叉；忽略无 usage 的消息）
 dialog.generateReply({ conversationId }) → { content, reasoning, model, usage }   // 异步；不落库
 
 // —— 写（kind: "tx"）——
@@ -117,6 +119,7 @@ dialog.deleteConversation({ conversationId }) → { ok }
 - **编辑用户消息**：用户消息悬停出现「编辑」→ 行内编辑 → 保存 = 新分叉 + 自动重新生成回复；旧分叉保留，可用切换器切回。
 - **思考强度**：输入区工具条上的档位选择（关 / 低 / 高 / 最高），改动即存（`dialog.setReasoningEffort`），对之后的新回复生效；会话设置里同样可见。
 - **思考过程**：助手消息如有 `reasoning`，在回复上方显示折叠块「思考过程」，点击展开。
+- **用量显示**：输入区右侧显示本会话累计 tokens（悬停查看 输入 / 输出 / 思考 / 合计）；每条 assistant 消息的操作栏显示本条明细（悬停消息可见）。
 - **发送编排**：`appendMessage(user)` → 等待状态 → `generateReply` → `appendMessage(assistant)`；失败显示错误气泡 +「重试」，用户消息保留。
 - **生成中**：该会话的发送 / 编辑 / 切换分叉暂时禁用；可以切到其他会话（生成按会话在后台完成，回到会话时重新拉取）。
 - **输入**：`Enter` 发送 / `Shift+Enter` 换行；处理中文输入法 composition，避免误发。
@@ -126,7 +129,7 @@ dialog.deleteConversation({ conversationId }) → { ok }
 
 ## 7. 非目标（v1 不做）
 
-- 抓词进词库（下一步，见 §8）、流式、助手回复重新生成（机制已备，后置）、消息删除、会话搜索、附件 / 图片 / 语音、多模型选择、token 用量展示。
+- 抓词进词库（下一步，见 §8）、流式、助手回复重新生成（机制已备，后置）、消息删除、会话搜索、附件 / 图片 / 语音、多模型选择。
 
 ## 8. 与未来的连接点
 

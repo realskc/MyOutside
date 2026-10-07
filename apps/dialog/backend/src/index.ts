@@ -6,6 +6,7 @@ import {
   EditUserMessageInput,
   GenerateReplyInput,
   GetPathInput,
+  GetUsageInput,
   ListConversationsInput,
   RenameConversationInput,
   SetReasoningEffortInput,
@@ -17,6 +18,7 @@ import {
 import { defineRead, defineTx, KernelError, type AppDb, type AppModule, type SqlValue } from "@myoutside/kernel";
 import { trimHistory, type HistoryMessage } from "./history.js";
 import {
+  parseUsage,
   rowToConversation,
   rowToMessage,
   type ConversationRow,
@@ -293,6 +295,23 @@ export const dialogApp: AppModule = {
         };
       });
       return { messages, hasMore: path.length > limit };
+    }),
+
+    /** 会话累计用量：汇总所有分叉中带 usage 的消息 */
+    getUsage: defineRead(GetUsageInput, (ctx, input) => {
+      const conversation = getConversationOrThrow(ctx.db, input.conversationId);
+      const messages = loadAllMessages(ctx.db, conversation.id);
+      const summary = { replies: 0, promptTokens: 0, completionTokens: 0, totalTokens: 0, reasoningTokens: 0 };
+      for (const message of messages) {
+        const usage = parseUsage(message.usage);
+        if (!usage) continue;
+        summary.replies += 1;
+        summary.promptTokens += usage.promptTokens;
+        summary.completionTokens += usage.completionTokens;
+        summary.totalTokens += usage.totalTokens;
+        summary.reasoningTokens += usage.reasoningTokens ?? 0;
+      }
+      return summary;
     }),
 
     generateReply: defineRead(GenerateReplyInput, async (ctx, input) => {
