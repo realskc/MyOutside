@@ -106,7 +106,7 @@ main {
 
 .card-back .phonetic {
   color: var(--muted);
-  font-size: 15px;
+  font-size: 17px;
   margin-bottom: 6px;
 }
 
@@ -124,7 +124,7 @@ main {
 .card-back .context {
   margin-top: 10px;
   color: var(--muted);
-  font-size: 13px;
+  font-size: 15px;
   border-left: 3px solid var(--border);
   padding-left: 10px;
   white-space: pre-wrap;
@@ -437,10 +437,19 @@ button.plain {
 }
 
 .draft-term .phonetic {
-  font-size: 14px;
+  font-size: 16px;
   font-weight: 400;
   color: var(--muted);
   margin-left: 8px;
+}
+
+.draft-card .context {
+  margin-top: 10px;
+  color: var(--muted);
+  font-size: 15px;
+  border-left: 3px solid var(--border);
+  padding-left: 10px;
+  white-space: pre-wrap;
 }
 
 .draft-sense {

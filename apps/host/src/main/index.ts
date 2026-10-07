@@ -200,7 +200,18 @@ async function runSmoke(win: BrowserWindow): Promise<void> {
 
     // iframe 属跨源 OOPIF，capturePage 可能拍不到；这里单独加载 vocab UI 再截一张
     await win.loadURL("app://vocab/index.html");
-    await new Promise((resolve) => setTimeout(resolve, 800));
+    // 等复习卡数据就绪（正面出现文字）后点「显示答案」，让截图能看到卡背面
+    for (let i = 0; i < 24; i += 1) {
+      const frontText = (await win.webContents.executeJavaScript(
+        'document.getElementById("review-front").textContent',
+      )) as string;
+      if (frontText && frontText.trim() !== "") break;
+      await new Promise((resolve) => setTimeout(resolve, 250));
+    }
+    const reveal = await win.webContents.executeJavaScript(
+      `(async () => { const btn = document.getElementById("btn-reveal"); if (!btn) return { clicked: false }; btn.click(); await new Promise((resolve) => setTimeout(resolve, 300)); return { clicked: true, backHidden: document.getElementById("review-back").classList.contains("hidden") }; })()`,
+    );
+    console.log("[smoke] reveal:", JSON.stringify(reveal));
     const vocabShotPath = join(app.getPath("temp"), "myoutside-vocab.png");
     let vocabPng: Buffer = Buffer.alloc(0);
     for (let attempt = 0; attempt < 10 && vocabPng.length === 0; attempt += 1) {
