@@ -5,10 +5,39 @@ import type { ApiDefinition, DbAdapter } from "./types.js";
 const DEFAULT_BASE_URL = "https://api.deepseek.com";
 const DEFAULT_MODEL = "deepseek-flash";
 
-export const AiMessageSchema = z.object({
-  role: z.enum(["system", "user", "assistant"]),
-  content: z.string(),
+const AiToolCallSchema = z.object({
+  id: z.string(),
+  type: z.literal("function"),
+  function: z.object({ name: z.string(), arguments: z.string() }),
 });
+
+/**
+ * 聊天消息（OpenAI 形状）：
+ * - system / user：必须带字符串 content；
+ * - assistant：content 可为 null 或省略（配 tool_calls）——2026-10-07 支持工具循环；
+ * - tool：工具结果，必须带 tool_call_id 与字符串 content。
+ */
+export const AiMessageSchema = z
+  .object({
+    role: z.enum(["system", "user", "assistant", "tool"]),
+    content: z.string().nullable().optional(),
+    tool_calls: z.array(AiToolCallSchema).optional(),
+    tool_call_id: z.string().optional(),
+  })
+  .superRefine((message, ctx) => {
+    if ((message.role === "system" || message.role === "user") && typeof message.content !== "string") {
+      ctx.addIssue({ code: z.ZodIssueCode.custom, message: `role=${message.role} 的消息必须带字符串 content` });
+    }
+    if (message.role === "tool" && typeof message.tool_call_id !== "string") {
+      ctx.addIssue({ code: z.ZodIssueCode.custom, message: "role=tool 的消息必须带 tool_call_id" });
+    }
+    if (message.role === "tool" && typeof message.content !== "string") {
+      ctx.addIssue({ code: z.ZodIssueCode.custom, message: "role=tool 的消息必须带字符串 content" });
+    }
+    if (message.role === "assistant" && message.content == null && !message.tool_calls?.length) {
+      ctx.addIssue({ code: z.ZodIssueCode.custom, message: "assistant 消息必须带 content 或 tool_calls" });
+    }
+  });
 
 export const AiChatInputSchema = z.object({
   messages: z.array(AiMessageSchema).min(1),
@@ -69,6 +98,11 @@ export function createPlatformAiDefinition(storage: DbAdapter): ApiDefinition {
       const baseUrl = readStringSetting(storage, "ai.deepseek.baseUrl") ?? DEFAULT_BASE_URL;
       const model = input.model ?? readStringSetting(storage, "ai.deepseek.model") ?? DEFAULT_MODEL;
 
+      // assistant 带 tool_calls 而省略 content 时，显式补 null（OpenAI 形状）
+      const messages = input.messages.map((message) =>
+        message.role === "assistant" && message.content === undefined ? { ...message, content: null } : message,
+      );
+
       let response: Response;
       try {
         response = await fetch(`${baseUrl.replace(/\/+$/, "")}/chat/completions`, {
@@ -79,7 +113,7 @@ export function createPlatformAiDefinition(storage: DbAdapter): ApiDefinition {
           },
           body: JSON.stringify({
             model,
-            messages: input.messages,
+            messages,
             ...(input.tools ? { tools: input.tools } : {}),
             ...(input.temperature !== undefined ? { temperature: input.temperature } : {}),
             ...(input.reasoningEffort ? { reasoning_effort: input.reasoningEffort } : {}),

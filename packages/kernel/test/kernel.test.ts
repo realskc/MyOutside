@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto";
 import { DatabaseSync } from "node:sqlite";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { z } from "zod";
 import { createKernel, defineRead, defineTx, type AppModule, type DbAdapter, type SqlValue } from "../src/index.js";
 
@@ -213,6 +213,84 @@ describe("kernel", () => {
     expect(r.ok).toBe(false);
     if (r.ok) return;
     expect(r.error.code).toBe("PRECONDITION");
+  });
+
+  it("平台 AI：工具循环消息透传（assistant.tool_calls / tool），响应 toolCalls 映射", async () => {
+    const { kernel } = setup();
+    await kernel.handle({
+      call: "platform.settings.set",
+      payload: { key: "ai.deepseek.apiKey", value: "test-key" },
+    });
+
+    let captured: { messages?: Array<Record<string, unknown>> } = {};
+    vi.stubGlobal("fetch", async (_url: string, init: { body: string }) => {
+      captured = JSON.parse(init.body) as typeof captured;
+      return {
+        ok: true,
+        status: 200,
+        json: async () => ({
+          model: "deepseek-flash",
+          choices: [
+            {
+              message: {
+                content: "",
+                tool_calls: [{ id: "call_1", type: "function", function: { name: "submit", arguments: "{}" } }],
+              },
+            },
+          ],
+          usage: { prompt_tokens: 10, completion_tokens: 5, total_tokens: 15 },
+        }),
+        text: async () => "",
+      };
+    });
+
+    try {
+      const r = await kernel.handle({
+        call: "platform.ai.chat",
+        payload: {
+          messages: [
+            { role: "user", content: "开始" },
+            {
+              role: "assistant",
+              tool_calls: [{ id: "call_1", type: "function", function: { name: "note", arguments: "{}" } }],
+            },
+            { role: "tool", tool_call_id: "call_1", content: "已记录" },
+          ],
+        },
+      });
+      expect(r.ok).toBe(true);
+      if (!r.ok) return;
+      const out = r.result as { toolCalls: Array<{ id: string }> };
+      expect(out.toolCalls.map((call) => call.id)).toEqual(["call_1"]);
+
+      const messages = captured.messages ?? [];
+      expect(messages).toHaveLength(3);
+      expect(messages[1]?.tool_calls).toBeTruthy();
+      expect(messages[1]?.content).toBe(null); // assistant 省略 content 时补 null
+      expect(messages[2]).toMatchObject({ role: "tool", tool_call_id: "call_1", content: "已记录" });
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
+
+  it("平台 AI：非法工具消息 → VALIDATION（tool 缺 tool_call_id；assistant 两者皆空）", async () => {
+    const { kernel } = setup();
+
+    const missingId = await kernel.handle({
+      call: "platform.ai.chat",
+      payload: { messages: [{ role: "tool", content: "x" }] },
+    });
+    expect(missingId.ok).toBe(false);
+    if (missingId.ok) return;
+    expect(missingId.error.code).toBe("VALIDATION");
+
+    const emptyAssistant = await kernel.handle({
+      call: "platform.ai.chat",
+      payload: { messages: [{ role: "assistant" }] },
+    });
+    expect(emptyAssistant.ok).toBe(false);
+    if (emptyAssistant.ok) return;
+    expect(emptyAssistant.error.code).toBe("VALIDATION");
   });
 
   it("平台设置：set/get，且同一存储上的新内核可见（持久化）", async () => {

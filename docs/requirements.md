@@ -75,6 +75,7 @@ MyOutside 是一个可移植到 Windows / Linux / macOS 的 GUI 宿主应用：�
 
 - MyOutside 维护 **DeepSeek API key**（平台设置项）；**密钥由平台保管，子应用拿不到**。
 - 子应用通过**平台 API**（如 `platform.ai.chat`）调用 AI：请求透传 messages / tools / **思考强度（`reasoning_effort`：none / low / high / max）**；响应返回 content、tool calls、**思考过程（`reasoning_content`）** 与 **usage**（含 reasoning tokens，供配额 / 成本统计）。
+- **工具循环消息形状（2026-10-07 扩展）**：`messages` 支持 OpenAI 形状的 `assistant.tool_calls` 与 `tool` 角色消息（含 `tool_call_id`），为子应用内的 agent 循环铺路；纯文本写法不变。
 - 默认模型：**`deepseek-flash`**（2026-10-07 更新；平台设置可覆盖）。
 - 由平台代理调用，将来才能实现**按应用配额、用量统计、更换模型**（暂不做）。
 - 密钥存储 v1 存平台设置（SQLite 明文；后续迁系统钥匙串）。
