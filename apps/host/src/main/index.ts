@@ -1,9 +1,10 @@
-import { app, BrowserWindow, ipcMain, Menu, protocol, type MenuItemConstructorOptions } from "electron";
-import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { app, BrowserWindow, ipcMain, Menu, protocol, shell, type MenuItemConstructorOptions } from "electron";
+import { copyFileSync, existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { extname, join, normalize, resolve, sep } from "node:path";
 import { createKernel, type Kernel } from "@myoutside/kernel";
 import { createNodeSqliteAdapter } from "@myoutside/kernel-node";
 import { vocabApp } from "@myoutside/vocab";
+import { dialogApp } from "@myoutside/dialog";
 
 // 数据目录使用正式名称：%APPDATA%/MyOutside
 app.setName("MyOutside");
@@ -41,6 +42,7 @@ function registerAppProtocol(): void {
   const uiDirs: Record<string, string> = {
     shell: resolve(appPath, "renderer"),
     vocab: resolve(appPath, "..", "vocab", "ui"),
+    dialog: resolve(appPath, "..", "dialog", "ui"),
   };
 
   protocol.handle("app", async (request) => {
@@ -152,6 +154,18 @@ async function getLanguage(kernel: Kernel): Promise<Lang> {
   return app.getLocale().toLowerCase().startsWith("zh") ? "zh" : "en";
 }
 
+/** 冒烟模式：把真实数据库复制到临时目录，允许演示写入而不污染真实数据 */
+function prepareSmokeDataDir(realDataDir: string): string {
+  const smokeDir = join(app.getPath("temp"), "myoutside-smoke-data");
+  rmSync(smokeDir, { recursive: true, force: true });
+  mkdirSync(smokeDir, { recursive: true });
+  for (const suffix of ["", "-wal", "-shm"]) {
+    const source = join(realDataDir, `myoutside.db${suffix}`);
+    if (existsSync(source)) copyFileSync(source, join(smokeDir, `myoutside.db${suffix}`));
+  }
+  return smokeDir;
+}
+
 async function runSmoke(win: BrowserWindow): Promise<void> {
   const guard = setTimeout(() => {
     console.error("[smoke] 超时，强制退出");
@@ -220,6 +234,53 @@ async function runSmoke(win: BrowserWindow): Promise<void> {
     }
     writeFileSync(vocabShotPath, vocabPng);
     console.log("[smoke] vocab screenshot:", vocabShotPath, `(${vocabPng.length} bytes)`);
+
+    // 对话应用：走真实桥读会话列表（只读，不写真实数据），再截一张
+    await win.loadURL("app://dialog/index.html");
+    for (let i = 0; i < 24; i += 1) {
+      const ready = (await win.webContents.executeJavaScript(
+        'document.readyState === "complete" && typeof window.outside === "object"',
+      )) as boolean;
+      if (ready) break;
+      await new Promise((resolve) => setTimeout(resolve, 250));
+    }
+    const dialogCheck = await win.webContents.executeJavaScript(
+      `(async () => { const r = await window.outside.call("dialog.listConversations", {}); return { ok: r.ok, count: r.ok ? r.result.length : null, hasComposer: !!document.getElementById("btn-send"), hasEffort: !!document.getElementById("effort-select"), title: document.title }; })()`,
+    );
+    console.log("[smoke] dialog:", JSON.stringify(dialogCheck));
+
+    // 在临时副本上做一次演示写入：会话 → 两条消息 → 编辑生成分叉（用于查看切换器与思考过程）
+    const demoAssistant =
+      "我是 **MyOutside** 里的对话助手：\n\n- 记住历史（树形保存，永不丢）\n- 修改用户消息会生成新**分叉**\n- 思考强度可调（输入框上方）";
+    const demoReasoning = "用户要求一句话自我介绍。保持简短，顺便提示本应用的分叉与思考强度能力。";
+    const demoConversation = await win.webContents.executeJavaScript(
+      `(async () => {
+        const create = await window.outside.call("dialog.createConversation", {});
+        const conversationId = create.result.conversationId;
+        await window.outside.call("dialog.appendMessage", { conversationId, role: "user", content: ${JSON.stringify("你好！简单介绍一下你自己。")} });
+        await window.outside.call("dialog.appendMessage", { conversationId, role: "assistant", content: ${JSON.stringify("你好！我是运行在 MyOutside 里的对话助手。")}, reasoning: "用户让我自我介绍，先用一句话问候并说明身份。" });
+        const pathResult = await window.outside.call("dialog.getPath", { conversationId });
+        const firstUser = pathResult.result.messages.find((message) => message.role === "user");
+        await window.outside.call("dialog.editUserMessage", { messageId: firstUser.id, content: ${JSON.stringify("你好！用一句话介绍你自己。")} });
+        await window.outside.call("dialog.appendMessage", { conversationId, role: "assistant", content: ${JSON.stringify(demoAssistant)}, reasoning: ${JSON.stringify(demoReasoning)}, model: "deepseek-flash", usage: { promptTokens: 32, completionTokens: 48, totalTokens: 80, reasoningTokens: 18 } });
+        return conversationId;
+      })()`,
+    );
+    console.log("[smoke] dialog demo:", JSON.stringify(demoConversation));
+    await win.reload();
+    await new Promise((resolve) => setTimeout(resolve, 900));
+    const reasoningOpen = await win.webContents.executeJavaScript(
+      `(async () => { const toggle = document.querySelector(".reasoning-toggle"); if (toggle) toggle.click(); await new Promise((r) => setTimeout(r, 250)); return !!toggle; })()`,
+    );
+    console.log("[smoke] dialog reasoning toggle:", reasoningOpen);
+    const dialogShotPath = join(app.getPath("temp"), "myoutside-dialog.png");
+    let dialogPng: Buffer = Buffer.alloc(0);
+    for (let attempt = 0; attempt < 10 && dialogPng.length === 0; attempt += 1) {
+      await new Promise((resolve) => setTimeout(resolve, 400));
+      dialogPng = (await win.webContents.capturePage()).toPNG();
+    }
+    writeFileSync(dialogShotPath, dialogPng);
+    console.log("[smoke] dialog screenshot:", dialogShotPath, `(${dialogPng.length} bytes)`);
   } catch (error) {
     console.error("[smoke] 失败：", error);
   } finally {
@@ -242,13 +303,18 @@ app.whenReady().then(async () => {
     }
   });
 
-  const dataDir = app.getPath("userData");
+  let dataDir = app.getPath("userData");
+  if (process.env.MYOUTSIDE_SMOKE === "1") {
+    dataDir = prepareSmokeDataDir(dataDir);
+    console.log("[smoke] 临时数据副本:", dataDir);
+  }
   mkdirSync(dataDir, { recursive: true });
   const dbPath = join(dataDir, "myoutside.db");
   console.log("[host] data dir:", dataDir);
 
   const kernel = createKernel({ storage: createNodeSqliteAdapter({ path: dbPath }) });
   kernel.registerApp(vocabApp);
+  kernel.registerApp(dialogApp);
   kernel.start();
   console.log("[host] kernel ready. functions:", kernel.listFunctions().join(", "));
 
@@ -268,6 +334,13 @@ app.whenReady().then(async () => {
       }
     }
     return result;
+  });
+
+  // 子应用 UI 的外链：交给系统浏览器（仅 http/https）
+  ipcMain.handle("host:openExternal", async (_event, url: unknown) => {
+    if (typeof url !== "string" || !/^https?:\/\//i.test(url)) return false;
+    await shell.openExternal(url);
+    return true;
   });
 
   registerAppProtocol();

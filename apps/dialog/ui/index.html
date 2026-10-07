@@ -1,0 +1,51 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>对话</title>
+    <link rel="stylesheet" href="ui.css" />
+  </head>
+  <body>
+    <header class="topbar">
+      <button id="btn-menu" class="icon-btn menu-btn" aria-label="menu">☰</button>
+      <h1 data-i18n="appTitle">对话</h1>
+      <span class="spacer"></span>
+      <button id="btn-new" class="primary" data-i18n="newChat">新建对话</button>
+    </header>
+
+    <div class="layout">
+      <aside id="sidebar" class="sidebar">
+        <div id="conv-list" class="conv-list"></div>
+      </aside>
+      <main class="chat">
+        <div id="messages" class="messages"></div>
+        <div class="composer">
+          <div class="composer-tools">
+            <label class="effort-wrap">
+              <span data-i18n="thinkingLabel">思考</span>
+              <select id="effort-select">
+                <option value="none" data-i18n="effortNone">关</option>
+                <option value="low" data-i18n="effortLow">低</option>
+                <option value="high" data-i18n="effortHigh">高</option>
+                <option value="max" data-i18n="effortMax">最高</option>
+              </select>
+            </label>
+            <button id="btn-conv-settings" class="link-btn" data-i18n="convSettings">会话设置</button>
+          </div>
+          <div class="composer-row">
+            <textarea id="input" rows="1" data-i18n-placeholder="inputPlaceholder" placeholder="输入消息…"></textarea>
+            <button id="btn-send" class="primary" data-i18n="send">发送</button>
+          </div>
+        </div>
+      </main>
+      <div id="backdrop" class="backdrop"></div>
+    </div>
+
+    <div id="settings-panel" class="settings-panel hidden"></div>
+    <div id="toast" class="toast hidden"></div>
+
+    <script src="markdown.js"></script>
+    <script src="ui.js"></script>
+  </body>
+</html>

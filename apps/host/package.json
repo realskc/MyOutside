@@ -13,7 +13,8 @@
   "dependencies": {
     "@myoutside/kernel": "workspace:*",
     "@myoutside/kernel-node": "workspace:*",
-    "@myoutside/vocab": "workspace:*"
+    "@myoutside/vocab": "workspace:*",
+    "@myoutside/dialog": "workspace:*"
   },
   "devDependencies": {
     "@types/node": "^24.0.0",

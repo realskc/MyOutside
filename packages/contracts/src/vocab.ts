@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { OkOutput } from "./common.js";
 
 /** 卡片状态：学习 / 已掌握（全手动） */
 export const CardStatus = z.enum(["learning", "mastered"]);
@@ -75,9 +76,6 @@ export const UpdateCardInput = z.object({
   }),
 });
 export type UpdateCardInput = z.infer<typeof UpdateCardInput>;
-
-export const OkOutput = z.object({ ok: z.literal(true) });
-export type OkOutput = z.infer<typeof OkOutput>;
 
 export const GetDueInput = z.object({
   before: z.number().int().optional(),

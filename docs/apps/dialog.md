@@ -1,6 +1,6 @@
 # 子应用规格：对话应用（dialog）
 
-> 状态：v1 规格草案（2026-10-07，含树形历史 / 分叉 / 思考强度）。应用 id：`dialog`；显示名「对话」。
+> 状态：v1 已实现（2026-10-07；树形历史 / 分叉 / 思考强度）。应用 id：`dialog`；显示名「对话」。
 > 第二个子应用。v1 = 纯聊天 + 树形分叉历史；抓词耦合（跨应用旗舰示例）为下一步，设计见 §8。
 
 ## 1. 定位
@@ -67,8 +67,8 @@ dialog.message
 // —— 读（kind: "read"）——
 dialog.listConversations({}) → Conversation[]            // updated_at 倒序；含 system_prompt / reasoning_effort
 dialog.getPath({ conversationId, limit? }) → { messages: PathMessage[], hasMore: boolean }
-  // 当前路径的最近 N 条（升序返回）。PathMessage = Message + { siblingCount, siblingIndex }
-  // siblingCount > 1 时界面显示 ‹i/k› 切换器；「加载更早」= 增大 limit
+  // 当前路径的最近 N 条（升序返回）。PathMessage = Message + { siblingCount, siblingIndex, siblingIds }
+  // siblingIds 按创建时间升序（含自己），供 ‹i/k› 切换器定位目标分叉；「加载更早」= 增大 limit
 dialog.generateReply({ conversationId }) → { content, reasoning, model, usage }   // 异步；不落库
 
 // —— 写（kind: "tx"）——
@@ -145,5 +145,5 @@ dialog.deleteConversation({ conversationId }) → { ok }
 - `apps/dialog/backend/src/index.ts`（`AppModule`：迁移 + API + 路径计算 / 预算截断助手）、`apps/dialog/ui/`（静态 UI，零构建）；
 - `apps/host/src/main/index.ts`：`registerApp(dialogApp)` + `uiDirs.dialog` + `host.openExternal`（仅 http/https；preload 暴露 `outside.openExternal`）；`apps/host/package.json` 加依赖；
 - 测试（`apps/dialog/test/`）：会话 / 消息 CRUD、路径计算（含分叉）、编辑产生分叉 + 切换、思考档位透传（stub `fetch` 断言请求体）、reasoning / usage 落库、自动标题、预算截断（小预算模拟）、无 key → `PRECONDITION`；
-- 验证：`ai:ping` 用真实调用确认 `deepseek-flash` 与 `reasoning_effort` 参数；冒烟：面板加载 + 会话 / 分叉切换器渲染 + 截图；
+- 验证：`ai:ping` 用真实调用确认 `deepseek-flash` 与 `reasoning_effort` 参数（已通过）；冒烟：**临时数据副本 + 演示写入**（会话 → 消息 → 编辑生成分叉 → 展开思考过程）+ 截图（不污染真实数据）；
 - README 与本文按惯例随功能提交同步。

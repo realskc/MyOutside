@@ -3,7 +3,7 @@ import { KernelError } from "./errors.js";
 import type { ApiDefinition, DbAdapter } from "./types.js";
 
 const DEFAULT_BASE_URL = "https://api.deepseek.com";
-const DEFAULT_MODEL = "deepseek-chat";
+const DEFAULT_MODEL = "deepseek-flash";
 
 export const AiMessageSchema = z.object({
   role: z.enum(["system", "user", "assistant"]),
@@ -16,6 +16,8 @@ export const AiChatInputSchema = z.object({
   tools: z.array(z.record(z.unknown())).optional(),
   model: z.string().optional(),
   temperature: z.number().optional(),
+  /** 思考强度（none / low / high / max；不传 = 服务默认） */
+  reasoningEffort: z.enum(["none", "low", "high", "max"]).optional(),
 });
 
 export type AiChatInput = z.infer<typeof AiChatInputSchema>;
@@ -23,12 +25,20 @@ export type AiChatInput = z.infer<typeof AiChatInputSchema>;
 interface DeepSeekChoice {
   message?: {
     content?: string | null;
+    reasoning_content?: string | null;
     tool_calls?: Array<{
       id: string;
       type: string;
       function: { name: string; arguments: string };
     }>;
   };
+}
+
+interface DeepSeekUsage {
+  prompt_tokens?: number;
+  completion_tokens?: number;
+  total_tokens?: number;
+  completion_tokens_details?: { reasoning_tokens?: number };
 }
 
 function readSetting(storage: DbAdapter, key: string): unknown {
@@ -44,7 +54,8 @@ function readStringSetting(storage: DbAdapter, key: string): string | null {
 /**
  * 平台 AI 服务（DeepSeek 代理）：
  * - API key 由平台保管，子应用拿不到；
- * - 请求透传 messages / tools，响应（含 tool calls）原样返回。
+ * - 请求透传 messages / tools / 思考强度（reasoning_effort）；
+ * - 响应返回 content、tool calls、思考过程（reasoning_content）与 usage。
  */
 export function createPlatformAiDefinition(storage: DbAdapter): ApiDefinition {
   return {
@@ -71,6 +82,7 @@ export function createPlatformAiDefinition(storage: DbAdapter): ApiDefinition {
             messages: input.messages,
             ...(input.tools ? { tools: input.tools } : {}),
             ...(input.temperature !== undefined ? { temperature: input.temperature } : {}),
+            ...(input.reasoningEffort ? { reasoning_effort: input.reasoningEffort } : {}),
           }),
         });
       } catch (cause) {
@@ -85,16 +97,32 @@ export function createPlatformAiDefinition(storage: DbAdapter): ApiDefinition {
         throw new KernelError("UPSTREAM", `AI 请求失败（HTTP ${response.status}）：${text.slice(0, 300)}`);
       }
 
-      const data = (await response.json()) as { model?: string; choices?: DeepSeekChoice[] };
+      const data = (await response.json()) as {
+        model?: string;
+        choices?: DeepSeekChoice[];
+        usage?: DeepSeekUsage;
+      };
       const message = data.choices?.[0]?.message;
+      const usage = data.usage
+        ? {
+            promptTokens: data.usage.prompt_tokens ?? 0,
+            completionTokens: data.usage.completion_tokens ?? 0,
+            totalTokens: data.usage.total_tokens ?? 0,
+            ...(typeof data.usage.completion_tokens_details?.reasoning_tokens === "number"
+              ? { reasoningTokens: data.usage.completion_tokens_details.reasoning_tokens }
+              : {}),
+          }
+        : null;
       return {
         content: message?.content ?? "",
+        reasoning: message?.reasoning_content ?? null,
         toolCalls: (message?.tool_calls ?? []).map((call) => ({
           id: call.id,
           type: "function" as const,
           function: call.function,
         })),
         model: data.model ?? model,
+        usage,
       };
     },
   };
