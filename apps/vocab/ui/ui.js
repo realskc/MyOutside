@@ -474,10 +474,10 @@
         type: "object",
         properties: {
           term: { type: "string", description: "单词原形（小写）" },
-          sense: { type: "string", description: "本质意项的简短描述（用界面语言）" },
+          sense: { type: "string", description: "本质意项的简短描述（一律用中文）" },
           phonetic: { type: "string", description: "IPA 音标，含斜杠，如 /rʌn/" },
-          meaning: { type: "string", description: "释义与解说（用界面语言）" },
-          example: { type: "string", description: "一个例句" },
+          meaning: { type: "string", description: "释义与解说（一律用中文）" },
+          example: { type: "string", description: "一个英文例句" },
         },
         required: ["term", "sense", "meaning"],
       },
@@ -485,9 +485,7 @@
   };
 
   const lookupSystemPrompt = () =>
-    lang === "zh"
-      ? "你是英语学习助手。用户给你一个英语单词或短语：先用中文给出翻译与简明解说（可含常见搭配），然后必须调用 make_card 工具生成一张学习卡片草稿。若该词有多种本质不同的意项，只针对最常见的一种生成，并在解说里简要提及其它意项。"
-      : "You are an English learning assistant. Given a word or phrase: give a brief explanation first, then you MUST call the make_card tool to produce a card draft. If the word has multiple distinct senses, cover the most common one and briefly mention the others.";
+    "你是英语学习助手。用户给你一个英语单词或短语：先用中文给出翻译与简明解说（可含常见搭配），然后必须调用 make_card 工具生成一张学习卡片草稿——卡片内容一律使用中文（例句除外）。若该词有多种本质不同的意项，只针对最常见的一种生成，并在解说里简要提及其它意项。";
 
   async function runLookup() {
     const input = document.getElementById("lookup-term");
