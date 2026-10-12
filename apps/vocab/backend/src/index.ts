@@ -59,7 +59,7 @@ function loadWordLevels(db: AppDb, terms: string[]): Map<string, string> {
 export const vocabApp: AppModule = {
   id: "vocab",
   name: "学英语",
-  owns: ["card"],
+  owns: ["card", "word_level"],
 
   migrations: [
     {
