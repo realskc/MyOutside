@@ -46,6 +46,8 @@ export interface AppDb {
 export interface MigrationCtx {
   createTable(table: string, columnsSql: string): void;
   createIndex(indexName: string, table: string, columnsSql: string): void;
+  /** 迁移内写入数据（表名自动加前缀；种子 / 参考数据用） */
+  insert(table: string, row: Record<string, SqlValue>): void;
   /** 逃生口：原样执行 SQL（不自动加表前缀），谨慎使用 */
   exec(sql: string): void;
 }

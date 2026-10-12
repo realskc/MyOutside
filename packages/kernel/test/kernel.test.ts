@@ -101,12 +101,32 @@ const loopApp: AppModule = {
   },
 };
 
+const seedApp: AppModule = {
+  id: "seed",
+  name: "Seed",
+  owns: ["item"],
+  migrations: [
+    {
+      id: "0001_init",
+      up: (ctx) => {
+        ctx.createTable("item", "id TEXT PRIMARY KEY, name TEXT NOT NULL");
+        ctx.insert("item", { id: "1", name: "alpha" });
+        ctx.insert("item", { id: "2", name: "beta" });
+      },
+    },
+  ],
+  api: {
+    listItems: defineRead(z.object({}), (ctx) => ctx.db.all("item", {}, { orderBy: "id" })),
+  },
+};
+
 function setup() {
   const storage = createMemoryAdapter();
   const kernel = createKernel({ storage });
   kernel.registerApp(notesApp);
   kernel.registerApp(tasksApp);
   kernel.registerApp(loopApp);
+  kernel.registerApp(seedApp);
   kernel.start();
   return { storage, kernel };
 }
@@ -131,6 +151,18 @@ describe("kernel", () => {
     // 物理表名带应用前缀
     const rows = storage.select<{ c: number }>("SELECT COUNT(*) AS c FROM notes__note");
     expect(rows[0]?.c).toBe(1);
+  });
+
+  it("迁移内种子数据：insert 自动加应用前缀", async () => {
+    const { storage, kernel } = setup();
+    expect(storage.select<{ c: number }>("SELECT COUNT(*) AS c FROM seed__item")[0]?.c).toBe(2);
+    const listed = await kernel.handle({ call: "seed.listItems", payload: {} });
+    expect(listed.ok).toBe(true);
+    if (!listed.ok) return;
+    expect(listed.result).toEqual([
+      { id: "1", name: "alpha" },
+      { id: "2", name: "beta" },
+    ]);
   });
 
   it("跨应用事务：tx.call 同一个事务，两边都写入", async () => {

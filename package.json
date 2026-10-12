@@ -10,6 +10,7 @@
     "simulate": "tsx scripts/simulate-dialog.ts",
     "ai:ping": "tsx scripts/ai-ping.ts",
     "import:vocabry": "tsx scripts/import-vocabry.ts",
+    "build:toefl": "tsx scripts/build-toefl-levels.ts",
     "dev": "pnpm --filter @myoutside/host dev",
     "smoke": "pnpm --filter @myoutside/host smoke"
   },

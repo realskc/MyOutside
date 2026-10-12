@@ -72,6 +72,25 @@ describe("vocab backend", () => {
     expect(list[0]?.last_review).not.toBeNull();
   });
 
+  it("词表分级：命中导入词表带 level（归一化匹配；A 优先合并），未命中为 null", async () => {
+    const kernel = setup();
+    await call(kernel, "vocab.addCard", { term: "Island", sense: "岛" });
+    await call(kernel, "vocab.addCard", { term: "islet", sense: "小岛" });
+    await call(kernel, "vocab.addCard", { term: "zzzznotaword", sense: "生造词" });
+
+    const due = await call<Array<{ term: string; level: string | null }>>(kernel, "vocab.getDue", {});
+    const byTerm = Object.fromEntries(due.map((card) => [card.term, card.level]));
+    expect(byTerm.island).toBe("A");
+    expect(byTerm.islet).toBe("D");
+    expect(byTerm.zzzznotaword).toBeNull();
+
+    const list = await call<Array<{ level: string | null }>>(kernel, "vocab.listCards", { term: "island" });
+    expect(list[0]?.level).toBe("A");
+
+    const empty = await call<Array<{ level: string | null }>>(kernel, "vocab.listCards", { term: "zzzznotaword" });
+    expect(empty[0]?.level).toBeNull();
+  });
+
   it("resolveCard：新拼写直接返回 new（不触发 AI）", async () => {
     const kernel = setup();
     const r = await call<{ action: string }>(kernel, "vocab.resolveCard", { term: "brandnew", sense: "新词" });

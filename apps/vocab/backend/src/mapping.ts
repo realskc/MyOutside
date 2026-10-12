@@ -26,7 +26,7 @@ export interface CardRow {
   created_at: number;
 }
 
-export function rowToCard(row: CardRow): Card {
+export function rowToCard(row: CardRow, level: string | null = null): Card {
   return {
     id: row.id,
     term: row.term,
@@ -37,6 +37,7 @@ export function rowToCard(row: CardRow): Card {
     context: row.context,
     source: row.source,
     status: row.status as Card["status"],
+    level: level === null ? null : (level as Card["level"]),
     due: row.due,
     stability: row.stability,
     difficulty: row.difficulty,

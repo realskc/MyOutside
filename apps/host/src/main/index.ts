@@ -239,6 +239,18 @@ async function runSmoke(win: BrowserWindow): Promise<void> {
     writeFileSync(vocabShotPath, vocabPng);
     console.log("[smoke] vocab screenshot:", vocabShotPath, `(${vocabPng.length} bytes)`);
 
+    // 词库页：验证导入词表的分级徽章（搜索一个确定命中词表的词）
+    await win.webContents.executeJavaScript(`document.querySelector('[data-tab="browse"]').click()`);
+    await new Promise((resolve) => setTimeout(resolve, 600));
+    await win.webContents.executeJavaScript(
+      `(() => { document.getElementById("browse-query").value = "gorgeous"; document.getElementById("browse-refresh").click(); return true; })()`,
+    );
+    await new Promise((resolve) => setTimeout(resolve, 600));
+    const browseShotPath = join(app.getPath("temp"), "myoutside-vocab-browse.png");
+    const browsePng = await captureWindow(win, 8, 400);
+    writeFileSync(browseShotPath, browsePng);
+    console.log("[smoke] vocab browse screenshot:", browseShotPath, `(${browsePng.length} bytes)`);
+
     // 对话应用：走真实桥读会话列表（只读，不写真实数据），再截一张
     await win.loadURL("app://dialog/index.html");
     for (let i = 0; i < 24; i += 1) {

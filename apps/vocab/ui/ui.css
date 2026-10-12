@@ -257,6 +257,52 @@ button.plain {
   color: var(--ok);
 }
 
+.row-badges {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+/* 词表分级徽章（托福 · 词以类记） */
+
+.level-badge {
+  font-size: 12px;
+  padding: 2px 8px;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  background: #f8f9fb;
+  color: var(--muted);
+  vertical-align: middle;
+}
+
+.phonetic .level-badge {
+  margin-left: 8px;
+}
+
+.level-badge.level-a {
+  background: #e6f4ea;
+  border-color: #bfe3c6;
+  color: var(--ok);
+}
+
+.level-badge.level-b {
+  background: #eef2ff;
+  border-color: #c9d8ff;
+  color: var(--accent);
+}
+
+.level-badge.level-c {
+  background: #fff8e6;
+  border-color: #f0dfb4;
+  color: #b07d00;
+}
+
+.level-badge.level-d {
+  background: #f3f4f6;
+  border-color: var(--border);
+  color: var(--muted);
+}
+
 .row-sub {
   color: var(--muted);
   font-size: 13px;

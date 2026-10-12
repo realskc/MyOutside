@@ -123,6 +123,7 @@ export function createAppDb(adapter: DbAdapter, appId: string): AppDb {
 }
 
 export function createMigrationCtx(adapter: DbAdapter, appId: string): MigrationCtx {
+  const db = createAppDb(adapter, appId);
   return {
     createTable(name, columnsSql) {
       adapter.execute(`CREATE TABLE IF NOT EXISTS ${physicalTableName(appId, name)} (${columnsSql})`);
@@ -132,6 +133,9 @@ export function createMigrationCtx(adapter: DbAdapter, appId: string): Migration
       adapter.execute(
         `CREATE INDEX IF NOT EXISTS ${appId}__${indexName} ON ${physicalTableName(appId, tableName)} (${columnsSql})`,
       );
+    },
+    insert(name, row) {
+      db.insert(name, row);
     },
     exec(sql) {
       adapter.execute(sql);

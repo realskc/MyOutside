@@ -5,6 +5,10 @@ import { OkOutput } from "./common.js";
 export const CardStatus = z.enum(["learning", "mastered"]);
 export type CardStatus = z.infer<typeof CardStatus>;
 
+/** 参考词表分级（导入的「词以类记」托福词表；A 常见 / B 核心 / C 主题 / D 进阶） */
+export const WordLevel = z.enum(["A", "B", "C", "D"]);
+export type WordLevel = z.infer<typeof WordLevel>;
+
 /** 复习评分（ts-fsrs 的 Rating） */
 export const Rating = z.enum(["again", "hard", "good", "easy"]);
 export type Rating = z.infer<typeof Rating>;
@@ -20,6 +24,8 @@ export const CardSchema = z.object({
   context: z.string().nullable(),
   source: z.string().nullable(),
   status: CardStatus,
+  /** 参考词表分级（命中导入词表时有值；否则 null） */
+  level: WordLevel.nullable(),
   due: z.number().int(),
   stability: z.number(),
   difficulty: z.number(),

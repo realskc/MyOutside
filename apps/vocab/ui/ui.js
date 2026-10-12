@@ -30,6 +30,12 @@
       fullyLearned: "完全学会",
       masteredHint: "移出复习",
       toastFullyLearned: "已标记为完全学会",
+      levelBadge: (level) => `托福 ${level}`,
+      levelTitle: (level, desc) => `词以类记 · 托福 ${level}（${desc}）`,
+      levelA: "常见词",
+      levelB: "核心词",
+      levelC: "主题词",
+      levelD: "进阶词",
       lookupPlaceholder: "输入单词或短语…",
       lookupRun: "查询",
       lookupSearching: "查询中…",
@@ -97,6 +103,12 @@
       fullyLearned: "Mastered",
       masteredHint: "removed",
       toastFullyLearned: "Marked as fully learned",
+      levelBadge: (level) => `TOEFL ${level}`,
+      levelTitle: (level, desc) => `词以类记 · TOEFL ${level} (${desc})`,
+      levelA: "common",
+      levelB: "core",
+      levelC: "topic",
+      levelD: "advanced",
       lookupPlaceholder: "Type a word or phrase…",
       lookupRun: "Look up",
       lookupSearching: "Looking up…",
@@ -167,6 +179,17 @@
       if (ch === '"') return "&quot;";
       return "&#39;";
     });
+  }
+
+  /** 词表分级徽章（未命中词表则无） */
+  function levelBadgeHtml(card) {
+    if (!card.level) return "";
+    const level = String(card.level);
+    const desc = t(`level${level}`);
+    return (
+      `<span class="level-badge level-${level.toLowerCase()}" title="${escapeHtml(t("levelTitle", level, desc))}">` +
+      `${escapeHtml(t("levelBadge", level))}</span>`
+    );
   }
 
   async function initLanguage() {
@@ -292,7 +315,7 @@
     front.textContent = card.display;
     void loadPreview(card.id);
     back.innerHTML =
-      `<div class="phonetic">${escapeHtml(card.phonetic ?? "")}</div>` +
+      `<div class="phonetic">${escapeHtml(card.phonetic ?? "")}${levelBadgeHtml(card)}</div>` +
       `<div class="sense">${escapeHtml(card.sense)}</div>` +
       `<div class="meaning">${escapeHtml(card.meaning ?? "")}</div>` +
       (card.context ? `<div class="context">${escapeHtml(card.context)}</div>` : "");
@@ -611,7 +634,8 @@
       row.className = "card-row";
       row.innerHTML =
         `<div class="row-main"><span class="display">${escapeHtml(card.display)}</span>` +
-        `<span class="badge ${card.status}">${card.status === "mastered" ? t("mastered") : t("learning")}</span></div>` +
+        `<span class="row-badges">${levelBadgeHtml(card)}` +
+        `<span class="badge ${card.status}">${card.status === "mastered" ? t("mastered") : t("learning")}</span></span></div>` +
         `<div class="row-sub">${escapeHtml(card.sense)}${card.meaning ? " · " + escapeHtml(card.meaning) : ""}</div>`;
       row.addEventListener("click", () => openEditor(row, card));
       box.appendChild(row);

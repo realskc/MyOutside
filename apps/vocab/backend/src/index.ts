@@ -20,9 +20,15 @@ import {
 } from "@myoutside/kernel";
 import { createEmptyCard, fsrs, Rating, type Grade } from "ts-fsrs";
 import { z } from "zod";
+import toeflWordLevels from "./data/toefl-word-levels.json";
 import { fsrsToColumns, rowToCard, rowToFsrs, type CardRow } from "./mapping.js";
 
 const scheduler = fsrs();
+
+/** 导入的参考词表：《词以类记》托福分级（[term, level]；生成见 scripts/build-toefl-levels.ts） */
+const WORD_LEVELS: ReadonlyArray<readonly [string, string]> = (toeflWordLevels as string[][]).map(
+  ([term, level]) => [term, level] as const,
+);
 
 const RATING_TO_GRADE: Record<"again" | "hard" | "good" | "easy", Grade> = {
   again: Rating.Again,
@@ -40,6 +46,14 @@ function getCardOrThrow(db: AppDb, cardId: string): CardRow {
   const row = db.get<CardRow>("card", { id: cardId });
   if (!row) throw new KernelError("NOT_FOUND", `卡片不存在：${cardId}`);
   return row;
+}
+
+/** 查询若干 term 的词表分级（未命中的词没有条目） */
+function loadWordLevels(db: AppDb, terms: string[]): Map<string, string> {
+  const unique = [...new Set(terms)];
+  if (unique.length === 0) return new Map();
+  const rows = db.all<{ term: string; level: string }>("word_level", { term: { in: unique } });
+  return new Map(rows.map((row) => [row.term, row.level]));
 }
 
 export const vocabApp: AppModule = {
@@ -79,6 +93,16 @@ export const vocabApp: AppModule = {
         ctx.createIndex("card_term", "card", "term");
         ctx.createIndex("card_due", "card", "due");
         ctx.createIndex("card_status", "card", "status");
+      },
+    },
+    {
+      id: "0002_word_level",
+      up: (ctx) => {
+        // 参考词表（非用户数据）：随迁移一次性种入
+        ctx.createTable("word_level", "term TEXT PRIMARY KEY, level TEXT NOT NULL");
+        for (const [term, level] of WORD_LEVELS) {
+          ctx.insert("word_level", { term, level });
+        }
       },
     },
   ],
@@ -218,7 +242,8 @@ export const vocabApp: AppModule = {
         { due: { lte: now }, status: "learning" },
         { orderBy: "due", limit: input.limit ?? 50 },
       );
-      return rows.map(rowToCard);
+      const levels = loadWordLevels(ctx.db, rows.map((row) => row.term));
+      return rows.map((row) => rowToCard(row, levels.get(row.term) ?? null));
     }),
 
     listCards: defineRead(ListCardsInput, (ctx, input) => {
@@ -234,7 +259,8 @@ export const vocabApp: AppModule = {
         limit: input.limit ?? 200,
         offset: input.offset ?? 0,
       });
-      return rows.map(rowToCard);
+      const levels = loadWordLevels(ctx.db, rows.map((row) => row.term));
+      return rows.map((row) => rowToCard(row, levels.get(row.term) ?? null));
     }),
 
     getStats: defineRead(z.object({}), (ctx) => {
