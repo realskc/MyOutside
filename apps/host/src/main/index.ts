@@ -90,6 +90,13 @@ const STRINGS: Record<
     appName: string;
     file: string;
     quit: string;
+    edit: string;
+    undo: string;
+    redo: string;
+    cut: string;
+    copy: string;
+    paste: string;
+    selectAll: string;
     view: string;
     reload: string;
     devtools: string;
@@ -102,6 +109,13 @@ const STRINGS: Record<
     appName: "地球online",
     file: "文件",
     quit: "退出",
+    edit: "编辑",
+    undo: "撤销",
+    redo: "重做",
+    cut: "剪切",
+    copy: "复制",
+    paste: "粘贴",
+    selectAll: "全选",
     view: "视图",
     reload: "重新加载",
     devtools: "开发者工具",
@@ -113,6 +127,13 @@ const STRINGS: Record<
     appName: "MyOutside",
     file: "File",
     quit: "Quit",
+    edit: "Edit",
+    undo: "Undo",
+    redo: "Redo",
+    cut: "Cut",
+    copy: "Copy",
+    paste: "Paste",
+    selectAll: "Select All",
     view: "View",
     reload: "Reload",
     devtools: "Toggle DevTools",
@@ -126,6 +147,18 @@ function buildMenu(lang: Lang): void {
   const t = STRINGS[lang];
   const template: MenuItemConstructorOptions[] = [
     { label: t.file, submenu: [{ role: "quit", label: t.quit }] },
+    {
+      label: t.edit,
+      submenu: [
+        { role: "undo", label: t.undo },
+        { role: "redo", label: t.redo },
+        { type: "separator" },
+        { role: "cut", label: t.cut },
+        { role: "copy", label: t.copy },
+        { role: "paste", label: t.paste },
+        { role: "selectAll", label: t.selectAll },
+      ],
+    },
     {
       label: t.view,
       submenu: [
