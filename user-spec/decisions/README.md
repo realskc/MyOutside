@@ -1,0 +1,103 @@
+# 决策
+
+一条决策记录：为了满足哪些用户预期，选择了怎样的实现，为什么。规则见 [../README.md](../README.md)。
+
+## 约定
+
+- **一条决策一个文件**：`NNNN-简短英文标识.md`，编号四位、递增、永不复用。
+- **引用写法**：`D-0001`，在文档中链接到对应文件，如 `[D-0001](decisions/0001-electron-typescript.md)`。
+- **状态**：`有效` / `已取代（→ D-xxxx）` / `已废弃`。决策文件不删除；被取代时，旧决策标注取代者，新决策标注取代了谁。
+- **决策者**：`用户` / `讨论`（用户与 agent 讨论后确定）/ `agent`（agent 基于用户需求自行决定，用户不一定看过）。
+- 决策可以引用上游决策。
+
+## 模板
+
+```markdown
+# D-NNNN 标题（一句话说清楚决定了什么）
+
+- 状态：有效
+- 日期：YYYY-MM-DD
+- 决策者：用户 / 讨论 / agent
+- 服务于：
+  - 用户预期：[product.md「xxx」](../product.md)
+  - 上游决策：D-xxxx
+
+## 背景
+面对什么问题，有哪些约束。
+
+## 决策
+决定怎么做。
+
+## 考虑过、没有采用
+- 方案 A：为什么没选。
+
+## 代价
+接受了哪些缺点。
+
+## 什么时候应该重新考虑
+出现哪些情况时，这条决策值得推翻。
+```
+
+「考虑过、没有采用」「代价」「什么时候应该重新考虑」可以在确实没有内容时省略，但应尽量写——它们是将来推翻决策时最有用的信息。
+
+## 鼓励推翻决策
+
+**在符合用户预期的前提下，我们鼓励决策被推翻。** 因此要如实记录一条决策有多"硬"，不要把随手的选择写得像深思熟虑：
+
+- 没有强烈理由、只是随便选了一种方案（agent 自己定的尤其常见）→「什么时候应该重新考虑」写 **随时可以**；
+- agent 问用户、用户选了某个选项但没说原因 → 理由写 **用户没说原因**；
+- 用户表达了「随便，就选方案 A」→ 理由写 **用户没有强烈的原因**，「什么时候应该重新考虑」写 **随时可以**。
+
+只有真正有支撑的决策，才写具体的重新考虑条件。
+
+## 索引
+
+| 编号 | 标题 | 状态 |
+|---|---|---|
+| [D-0001](0001-one-off-functions.md) | 一次性需求以「临时函数」完成：软门槛、自动留痕、无晋升 | 有效 |
+| [D-0002](0002-electron-host.md) | 宿主使用 Electron | 有效 |
+| [D-0003](0003-single-language-typescript.md) | 全项目单一语言：TypeScript | 有效 |
+| [D-0004](0004-sqlite-single-writer-queue.md) | 数据存储：SQLite 单文件，宿主是唯一写入者，写操作串行排队 | 有效 |
+| [D-0005](0005-data-ownership-by-table-prefix.md) | 数据归属：按应用划分表，禁止跨应用共用表 | 有效 |
+| [D-0006](0006-cross-app-calls-via-owner-api.md) | 跨应用通道：只能调用对方的 API 函数，分事务内与事务外两种语义 | 有效 |
+| [D-0007](0007-sync-pure-tx-functions.md) | 函数分读、写两类；写函数必须同步、纯数据 | 有效 |
+| [D-0008](0008-resolve-then-commit.md) | AI 辅助的写操作：先解析、后提交 | 有效 |
+| [D-0009](0009-refresh-on-activate.md) | 不做实时推送：面板激活时比对数据版本再刷新 | 有效 |
+| [D-0010](0010-single-window-single-active-panel.md) | 单窗口，同一时刻只有一个活动面板 | 有效 |
+| [D-0011](0011-static-js-app-ui.md) | 子应用界面：零构建的静态 HTML / JS | 有效（计划改为 TS） |
+| [D-0012](0012-runtime-agnostic-kernel.md) | 内核、契约与子应用后台保持运行时无关 | 有效 |
+| [D-0013](0013-cloud-kernel-for-multi-device.md) | 多端方案：云端内核 | 有效（未实施） |
+| [D-0014](0014-deepseek-as-ai-provider.md) | 平台 AI 使用 DeepSeek | 有效 |
+| [D-0015](0015-bilingual-ui.md) | 界面中英双语 | 有效 |
+| [D-0016](0016-single-instance-and-launcher.md) | 单实例运行；Windows 双击快捷方式静默启动 | 有效 |
+| [D-0017](0017-per-app-hot-reload.md) | 开发时按子应用热重载（reloadApp） | 有效（未实现） |
+| [D-0018](0018-iframe-panel-and-app-protocol.md) | 子应用面板：一个 iframe + app:// 自定义协议 | 有效 |
+| [D-0019](0019-api-key-in-platform-settings.md) | AI 密钥存在平台设置里（明文） | 有效（临时方案） |
+| [D-0020](0020-mobile-via-web-ui.md) | 移动端用同一套 Web 界面承载，不做原生 App | 有效（未实施） |
+| [D-0021](0021-card-is-term-plus-sense.md) | 卡片数据模型：一张卡片 = 单词 + 本质意项 | 有效 |
+| [D-0022](0022-dedup-on-add.md) | 添加卡片时的查重：机械检查拼写 + AI 判断是否同义，不自动合并 | 有效 |
+| [D-0023](0023-mastery-is-manual.md) | 「已掌握」完全由用户手动标记 | 有效 |
+| [D-0024](0024-card-content-in-chinese.md) | AI 生成的卡片内容一律用中文，例句保持英文 | 有效 |
+| [D-0025](0025-toefl-word-levels.md) | 导入《词以类记》托福分级作为参考词表 | 有效 |
+| [D-0026](0026-fsrs-scheduling.md) | 复习调度使用 FSRS（ts-fsrs） | 有效 |
+| [D-0027](0027-ai-lookup.md) | 查词：AI 翻译解说并生成卡片草稿 | 有效 |
+| [D-0028](0028-review-screen.md) | 复习界面：三个评分按钮 +「完全学会」 | 有效 |
+| [D-0029](0029-message-tree.md) | 对话消息树：父指针 + 当前选中的分叉指针 | 有效 |
+| [D-0030](0030-backend-orchestrated-reply.md) | 回复由对话应用的后台生成，整段返回，不做流式 | 有效 |
+| [D-0031](0031-edit-user-messages-only.md) | 只能编辑用户消息；暂不支持重新生成助手回复 | 有效 |
+| [D-0032](0032-reasoning-display.md) | 思考强度按会话设置；思考过程折叠显示、不放进后续上下文 | 有效（加搜索时必须修改） |
+| [D-0033](0033-context-budget.md) | 发给 AI 的上下文按约 100 万 token 的预算截断 | 有效 |
+| [D-0034](0034-usage-display.md) | 用量显示：每条回复的明细 + 会话累计 | 有效 |
+| [D-0035](0035-dialog-ui-details.md) | 对话界面细节 | 有效 |
+| [D-0036](0036-zheye-explanation-units.md) | 哲野的讲解单元：词 / 句 / 文三种，三种来源 | 有效（未实现） |
+| [D-0037](0037-zheye-prerequisites.md) | 哲野的前置检查：轻 / 重前置，只问重前置，全递归 | 有效（未实现） |
+| [D-0038](0038-zheye-generation.md) | 哲野的生成：自动开始，全局串行，按依赖顺序，生成后固定 | 有效（未实现） |
+| [D-0039](0039-zheye-article-templates.md) | 哲野的三类文章模板 | 有效（未实现） |
+| [D-0040](0040-zheye-rubric.md) | 哲野的质量标准（rubric） | 有效（未实现） |
+| [D-0041](0041-zheye-no-profiling.md) | 哲野不做口味档案、不做应用内反馈；不要求高保真 | 有效 |
+| [D-0042](0042-zheye-recipes-in-repo.md) | 哲野的配方以人可读文件随仓库版本化 | 有效（未实现） |
+| [D-0043](0043-zheye-v1-scope.md) | 哲野 v1 的范围 | 有效（未实现） |
+| [D-0044](0044-docs-sync-with-features.md) | 功能提交时同步更新 README 与相关文档 | 有效 |
+| [D-0045](0045-commit-and-test-conventions.md) | 提交信息与测试规范 | 有效 |
+| [D-0046](0046-smoke-on-temp-data-copy.md) | 冒烟测试在真实数据的临时副本上运行 | 有效 |
+| [D-0047](0047-current-stage-non-goals.md) | 现阶段不做的事 | 有效 |
