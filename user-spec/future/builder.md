@@ -20,3 +20,6 @@
 ## 未定
 
 - 实现时机：v1 之后。
+- **builder 的权限**整体留到设计 builder 时再讨论。现阶段的设计只考虑两个主体的权限层级：**开发者**（作者与 agent）与**子应用**（运行时）。待讨论的例子：
+  - builder 修改子应用清单（manifest，尤其是权限声明 `uses`）是否必须找用户批准（见 [D-0056](../decisions/0056-app-manifest.md)）；
+  - builder 写的迁移能否使用 `exec` 逃生口（原样执行 SQL、不受表前缀限制，见 [D-0005](../decisions/0005-data-ownership-by-table-prefix.md)）。

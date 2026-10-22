@@ -32,6 +32,13 @@
 - **硬约束（框架层面的安全约束）同样重要**：能在框架层面做的硬性安全约束，就应该做。MyOutside 应当**在内核框架和 agent 框架层面**就对 builder 的行为边界进行限制。
 - 硬约束是**用户能自由享受 vibe coding 的保底**：即使 Agent 没有遵守软约束，用户的数据与应用也不会因此受到严重破坏。
 
+## 统一的内核让 agent 更安全
+
+- **应用的 API 就是 agent 的工具**：子应用对外提供的功能，可以很好地直接包装成 agent 能使用的工具，不需要另起一套。
+- **内核管控 agent 能使用的工具**：agent 能调用什么，由内核检查，而不是只靠提示词约束。
+- 因为内核带来了统一性——所有调用都经过内核、API 形式统一、数据都在内核管理之下——**MyOutside 的 agent 框架可以比现有的通用 agent 框架更安全**。具体要做到多安全，作者仍在考虑（见「未定」）。
+- 实现见 [D-0049](decisions/0049-agent-layering.md)、[D-0052](decisions/0052-agent-execution-modes.md)、[D-0053](decisions/0053-kernel-enforced-call-permissions.md)。
+
 ## 新的 vibe coding：user spec
 
 - vibe coding 的循环（人提需求 → agent 实现 → 人反馈 → agent 调整）**局部收敛、全局漂移**：人的预期没有被显式沉淀，agent 分不清"用户关注的重点"和"自己选择的实现"。
@@ -42,6 +49,8 @@
 - 本项目自身的开发也遵循这一点（即本目录，见 `README.md`）；它同时是 MyOutside 将来要提供给使用者的能力（见 `future/user-spec.md`）。
 
 ## 未定
+
+- agent 框架具体要做到多安全（利用内核的统一性能做到很多，但要不要做到非常安全，作者仍在考虑）。
 
 以下问题在愿景中提出，留待将来重新审视：
 

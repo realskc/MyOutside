@@ -48,7 +48,28 @@ interface AppModule {
 - 函数用 `defineTx(schema, handler)` / `defineRead(schema, handler)` 定义（`packages/kernel/src/api.ts`）。
 - 宿主在启动时 `kernel.registerApp(...)` 注册全部子应用，再 `kernel.start()`；注册必须在 start 之前。
 - 子应用界面目录由宿主硬编码登记（`apps/host/src/main/index.ts` 的 `uiDirs`）。
-- 尚未实现：声明式 Manifest（协议版本、界面入口、公开 API 列表），见 §11。
+- 尚未实现：独立的应用清单（D-0056），见 §11。
+
+### 2.1 应用清单（规划，D-0056）
+
+每个子应用一份 `apps/<id>/manifest.json`：
+
+```json
+{
+  "id": "dialog",
+  "name": "对话",
+  "protocolVersion": 1,
+  "ui": "ui/index.html",
+  "backend": "backend/src/index.ts",
+  "owns": ["conversation", "message"],
+  "uses": ["platform.ai.chat", "platform.web.search", "platform.web.fetch"]
+}
+```
+
+- 描述性字段：宿主据此自动发现与装载应用（替代硬编码的导入、注册与 `uiDirs`）；协议版本不兼容时拒绝装载；
+- `owns`：登记表的归属（供临时函数作用域检查、删除应用时清理数据等使用）；应用访问数据的限制本身由 AppDb 的表名前缀在结构上保证（§5.1），不依赖 `owns`；
+- `uses`：内核按调用者检查跨应用调用（D-0053，`docs/agent.md` §7.2）；
+- API 函数与迁移仍由后台代码（AppModule）提供。
 
 ## 3. 函数与调用（D-0006、D-0007）
 
@@ -168,8 +189,8 @@ get(table, where) / all(table, where?, { orderBy?, limit?, offset? }) / count(ta
 
 ## 11. 未实现 / 待定
 
-1. 声明式 Manifest：协议版本协商（不兼容时拒绝装载）、界面入口、公开 API 列表。
-2. 调用者身份与公开 API 白名单（§3.4）。
+1. 应用清单（§2.1，D-0056）：自动装载、协议版本、`owns` 登记。
+2. 调用者身份与 `uses` 权限检查（§3.4，D-0053）；被调用方是否需要声明「哪些函数允许别人调用」，暂不做。
 3. 按子应用热重载 `reloadApp`（D-0017）：每个子应用独立产出后台模块，运行时只重载一个应用。
 4. API 函数的版本策略。
 5. 写函数的副作用：如需要，走提交后钩子（post-commit）或补偿，不得混入事务。

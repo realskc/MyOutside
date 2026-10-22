@@ -62,7 +62,7 @@
 | [D-0006](0006-cross-app-calls-via-owner-api.md) | 跨应用通道：只能调用对方的 API 函数，分事务内与事务外两种语义 | 有效 |
 | [D-0007](0007-sync-pure-tx-functions.md) | 函数分读、写两类；写函数必须同步、纯数据 | 有效 |
 | [D-0008](0008-resolve-then-commit.md) | AI 辅助的写操作：先解析、后提交 | 有效 |
-| [D-0009](0009-refresh-on-activate.md) | 不做实时推送：面板激活时比对数据版本再刷新 | 有效 |
+| [D-0009](0009-refresh-on-activate.md) | 不做实时推送：面板激活时比对数据版本再刷新 | 有效（「不推送」部分被 D-0051 取代） |
 | [D-0010](0010-single-window-single-active-panel.md) | 单窗口，同一时刻只有一个活动面板 | 有效 |
 | [D-0011](0011-static-js-app-ui.md) | 子应用界面：零构建的静态 HTML / JS | 有效（计划改为 TS） |
 | [D-0012](0012-runtime-agnostic-kernel.md) | 内核、契约与子应用后台保持运行时无关 | 有效 |
@@ -101,3 +101,12 @@
 | [D-0045](0045-commit-and-test-conventions.md) | 提交信息与测试规范 | 有效 |
 | [D-0046](0046-smoke-on-temp-data-copy.md) | 冒烟测试在真实数据的临时副本上运行 | 有效 |
 | [D-0047](0047-current-stage-non-goals.md) | 现阶段不做的事 | 有效 |
+| [D-0048](0048-self-built-agent-library.md) | agent 框架自研，不引入开源 agent 框架 | 有效 |
+| [D-0049](0049-agent-layering.md) | agent 能力分四部分：执行层承载循环，循环调用模型层与工具层 | 有效 |
+| [D-0050](0050-web-tools-as-platform-api.md) | 搜索与抓取做成平台 API | 有效（未实现） |
+| [D-0051](0051-event-centric-agent-runs.md) | agent 运行以事件为中心；流式输出与进度显示共用推送通道 | 有效（未实现） |
+| [D-0052](0052-agent-execution-modes.md) | agent 的两种运行模式：调用内运行先行，后台任务后置 | 有效（后台任务未实现） |
+| [D-0053](0053-kernel-enforced-call-permissions.md) | 调用权限：应用声明自己会调用哪些函数，内核强制检查 | 有效（未实现） |
+| [D-0054](0054-dialog-search-v1-with-progress.md) | 对话搜索第一版就做进度推送 | 有效（未实现） |
+| [D-0055](0055-web-search-toggle.md) | 对话的「联网搜索」开关：默认打开，打开时由模型决定搜不搜 | 有效（未实现） |
+| [D-0056](0056-app-manifest.md) | 应用清单（manifest）的内容与形式：每个子应用一份 JSON 文件 | 有效（未实现） |
