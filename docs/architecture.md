@@ -12,8 +12,8 @@ Electron IPC "kernel:call"
    ▼
 内核 kernel.handle({ call, payload })
    ├─ 参数校验（zod）
-   ├─ 读函数：直接执行（可异步）
-   └─ 写函数：串行队列 → 单个数据库事务 → 提交后 DataVersion + 1
+   ├─ 只读 API：直接执行（可异步）
+   └─ 事务 API：串行队列 → 单个数据库事务 → 提交后 DataVersion + 1
    ▼
 SQLite 单文件（<userData>/myoutside.db）
 ```
@@ -87,15 +87,15 @@ interface AppModule {
   | { ok: true; result: unknown; dataVersion: number }
   | { ok: false; error: { code; message; details? }; dataVersion: number }
   ```
-- 写函数内：`ctx.call(name, payload)`——同步，只能调用写函数，与本次写入同属一个事务（跨应用原子落账）。
-- 读函数内：`await ctx.call(name, payload)`——只能调用读函数。
+- 事务 API 内：`ctx.call(name, payload)`——同步，只能调用事务 API，与本次写入同属一个事务（跨应用原子落账）。
+- 只读 API 内：`await ctx.call(name, payload)`——只能调用只读 API。
 - 每次调用都会按目标函数的 schema 校验参数；嵌套调用深度上限 8（`CALL_DEPTH_EXCEEDED`）。
-- 判断规则：这次调用需要与我的写入同生共死吗？需要 → 写函数里 `ctx.call`；不需要 → 读函数 / 界面调用。
+- 判断规则：这次调用需要与我的写入同生共死吗？需要 → 事务 API 里 `ctx.call`；不需要 → 只读 API / 界面调用。
 - 没有通用的跨应用查询接口：读别人的数据 = 调用对方暴露的查询函数。
 
 ### 3.3 错误
 
-错误码（`packages/kernel/src/errors.ts`）：`UNKNOWN_FUNCTION`、`VALIDATION`、`TX_CALL_INVALID`、`CALL_DEPTH_EXCEEDED`、`NOT_FOUND`、`PRECONDITION`、`UPSTREAM`、`INTERNAL`。写函数抛错 → 整个事务回滚。
+错误码（`packages/kernel/src/errors.ts`）：`UNKNOWN_FUNCTION`、`VALIDATION`、`TX_CALL_INVALID`、`CALL_DEPTH_EXCEEDED`、`NOT_FOUND`、`PRECONDITION`、`UPSTREAM`、`INTERNAL`。事务 API 抛错 → 整个事务回滚。
 
 ### 3.4 已知差距
 
@@ -106,7 +106,7 @@ interface AppModule {
 - `enqueue`：所有写调用排成一条 Promise 链，顺序执行；
 - 每个写调用：`storage.transaction(() => runTx(...))`，成功后 `dataVersion += 1`；
 - DataVersion 只在内存中计数（进程重启后从 0 开始），用于刷新比对；
-- 「一次事件多处落账」：发起方的写函数内 `ctx.call` 其他应用的写函数，全部在同一事务中提交，不需要两阶段提交。
+- 「一次事件多处落账」：发起方的事务 API 内 `ctx.call` 其他应用的事务 API，全部在同一事务中提交，不需要两阶段提交。
 
 示例（规划中的抓词，见 `docs/apps/dialog.md` §8）：
 
@@ -161,7 +161,17 @@ get(table, where) / all(table, where?, { orderBy?, limit?, offset? }) / count(ta
 
 ## 7. AI 辅助的写操作（D-0008）
 
-先解析（读函数，异步，可调平台 AI，不落库）→ 再提交（写函数）；两步之间由界面编排。实例：`vocab.resolveCard → vocab.addCard`、`dialog.generateReply → dialog.appendMessage`。
+先解析（只读 API，异步，可调平台 AI，不落库）→ 再提交（事务 API）；两步之间由前端编排。实例：`vocab.resolveCard → vocab.addCard`、`dialog.generateReply → dialog.appendMessage`。
+
+### 7.1 编写子应用时的指引：又慢、又需要原子性的操作
+
+原子的单位永远是**一个短事务**（一次事务 API 调用）。事务 API 不能等外部，否则会挡住所有其他写入；外部动作（调 AI、发请求）也无法回滚。需要「慢的外部操作 + 原子写入」时：
+
+- **先慢后快，提交时校验**：慢的外部操作先做（在只读 API 里，不在事务内）；最后用一个短事务提交，**提交时重新检查前提是否仍成立**（例如「这个词仍然没有卡片吗」），不成立就报错或让用户决定。当前 `vocab.addCard` 尚未做这一步校验。
+- **拆成多个短事务，失败时补偿**：长流程拆成一串各自原子的短事务；后续步骤失败或用户反悔时，撤销前面已完成的步骤。将来的后台任务可由内核自动撤销整次任务写过的数据（`docs/agent.md` §8.2）。
+- 慢的部分如果本身不写数据（例如抓词时先让 AI 生成卡片草稿），直接「先生成、后一次事务写入」即可。
+
+这些属于编写子应用与 API 时的考虑；系统层只提供「事务 API 同步执行、只读 API 可以异步」这一基础（D-0007）。
 
 ## 8. 刷新模型（D-0009）
 
@@ -193,7 +203,7 @@ get(table, where) / all(table, where?, { orderBy?, limit?, offset? }) / count(ta
 2. 调用者身份与 `uses` 权限检查（§3.4，D-0053）；被调用方是否需要声明「哪些函数允许别人调用」，暂不做。
 3. 按子应用热重载 `reloadApp`（D-0017）：每个子应用独立产出后端模块，运行时只重载一个应用。
 4. API 函数的版本策略。
-5. 写函数的副作用：如需要，走提交后钩子（post-commit）或补偿，不得混入事务。
+5. 事务 API 的副作用：如需要，走提交后钩子（post-commit）或补偿，不得混入事务。
 6. agent 循环中途写库的能力（D-0007「什么时候应该重新考虑」）。
 7. 事件 / 消息总线（暂缓）。
 8. 子应用形态允许混合（Web 内容 / 将来进程化 / WASM），呈现层统一为 Web。

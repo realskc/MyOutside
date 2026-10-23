@@ -33,6 +33,8 @@
 
 实现见 [D-0004](decisions/0004-sqlite-single-writer-queue.md)、[D-0007](decisions/0007-sync-pure-tx-functions.md)、[D-0008](decisions/0008-resolve-then-commit.md)。
 
+**系统层关于 API 与事务的设计非常重要**：将来各种人都可能 vibe coding 自己的产品，系统的设计格外关键。现行方案（API 分为在事务里同步执行的、与可以异步但不能写的两类）暂时可行；以后可能修改（例如引入锁机制），目前没有研究新设计的必要。
+
 ## 开发时的更新
 
 - 开发中更新某个子应用，**不能靠整机重启**——整机重启会连带重启所有子应用、丢失正在进行的会话（实现见 [D-0017](decisions/0017-per-app-hot-reload.md)，尚未实现）。

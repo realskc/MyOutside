@@ -49,7 +49,7 @@
 3. 循环调用 `platform.ai.chat`（**模型层**）→ 模型回答「我要搜索 DeepSeek V4」；
 4. 循环执行搜索工具（**工具层**）→ 工具内部 `ctx.call("platform.web.search")` → **内核**检查 dialog 是否声明过这个调用 → 执行 → 推送「正在搜索 DeepSeek V4」；
 5. 结果回到循环 → 再调用模型 → 模型给出最终回答 → 循环结束；
-6. `generateReply` 返回 → 界面调用 `dialog.appendMessage` 落库（写函数）。
+6. `generateReply` 返回 → 界面调用 `dialog.appendMessage` 落库（事务 API）。
 
 分层见 D-0049。
 
@@ -73,7 +73,7 @@
 // 界面
 const { runId } = await outside.call("dialog.generateReply", { conversationId, stream: true });
 outside.subscribe(runId, (event) => { ... });   // 事件见 §5.3
-// 内核侧（读函数里）
+// 内核侧（只读 API 里）
 ctx.emit(event)   // 推送给本次调用的发起方
 ```
 
@@ -148,7 +148,7 @@ runAgent(ctx, {
 callStructured(ctx, { system?, messages, schema: ZodType<T>, name, description }) → T
 ```
 
-- `ctx` 只需要能 `call("platform.ai.chat", ...)` 与 `emit(event)`：读函数的上下文即可，循环库不依赖 Electron；
+- `ctx` 只需要能 `call("platform.ai.chat", ...)` 与 `emit(event)`：只读 API 的上下文即可，循环库不依赖 Electron；
 - `callStructured`：强制模型调用一次名为 `name` 的工具，按 `schema` 校验参数；校验失败把错误告诉模型重试一次。学英语的去重判断与卡片草稿迁移到它。
 
 ### 6.2 循环
@@ -232,7 +232,7 @@ type AgentEvent =
 
 ### 7.3 写操作
 
-- 调用内运行（§8.1）里，工具只能调用**读函数**（读上下文本来就不能调用写函数，D-0007）——对话搜索满足；
+- 调用内运行（§8.1）里，工具只能调用**只读 API**（读上下文本来就不能调用事务 API，D-0007）——对话搜索满足；
 - 需要中途写数据的 agent 走后台任务（§8.2），写操作经 `task.commit(txFn, payload)` 进入内核队列。
 
 ### 7.4 不可信内容
@@ -246,8 +246,8 @@ type AgentEvent =
 
 ### 8.1 模式一：调用内运行（v1）
 
-- 循环跑在某个读函数里（例如 `dialog.generateReply`），生命周期 = 这次调用；
-- 工具只读；结果返回给界面后，再由写函数落库（沿用 D-0008）；
+- 循环跑在某个只读 API 里（例如 `dialog.generateReply`），生命周期 = 这次调用；
+- 工具只读；结果返回给界面后，再由事务 API 落库（沿用 D-0008）；
 - 窗口关闭或进程退出 → 这次运行丢失（对话里用户消息仍在，可以重试）；
 - 足够支撑对话搜索。
 
@@ -265,7 +265,7 @@ platform.task.get({ taskId }) / list / cancel
 - **中途落库**：`task.commit(txFn, payload)` 把「这一步的数据写入」与「这一步的日志」放进**同一个事务**——数据写入恰好一次，重放时不会重复；
 - **撤销**：内核为任务记录每次写入前的数据（变更日志），`platform.task.revert(taskId)` 把这次任务改过的数据恢复原样。网络请求等外部副作用撤不回；builder 改的代码文件用 git 兜底；
 - **批准**：任务可以暂停等待用户批准（例如不可信内容之后的写操作），用户在界面上同意后继续；
-- 写函数仍然同步、纯数据（D-0007 不变）：后台任务是新增的异步编排者，它调用写函数，而不是让写函数变异步。
+- 事务 API 仍然同步、纯数据（D-0007 不变）：后台任务是新增的异步编排者，它调用事务 API，而不是让事务 API 变异步。
 
 运行模式的划分见 D-0052。
 

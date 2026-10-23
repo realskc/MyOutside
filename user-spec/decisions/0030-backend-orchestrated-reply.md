@@ -9,7 +9,7 @@
 
 ## 决策
 
-- `dialog.generateReply`（读函数）在后端计算当前路径、按预算截断、拼上系统提示词，调用平台 AI，返回结果但**不落库**；前端再调用 `dialog.appendMessage` 保存；前端不直接调用 AI；
+- `dialog.generateReply`（只读 API）在后端计算当前路径、按预算截断、拼上系统提示词，调用平台 AI，返回结果但**不落库**；前端再调用 `dialog.appendMessage` 保存；前端不直接调用 AI；
 - 生成失败不留半截状态，用户消息保留，可以重试；
 - 不做流式输出（需要改造内核与传输层）。
 

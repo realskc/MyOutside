@@ -60,7 +60,7 @@
 | [D-0004](0004-sqlite-single-writer-queue.md) | 数据存储：SQLite 单文件，内核是唯一写入者，写操作串行排队 | 有效 |
 | [D-0005](0005-data-ownership-by-table-prefix.md) | 数据归属：按应用划分表，禁止跨应用共用表 | 有效 |
 | [D-0006](0006-cross-app-calls-via-owner-api.md) | 跨应用通道：只能调用对方的 API 函数，分事务内与事务外两种语义 | 有效 |
-| [D-0007](0007-sync-pure-tx-functions.md) | 函数分读、写两类；写函数必须同步、纯数据 | 有效 |
+| [D-0007](0007-sync-pure-tx-functions.md) | API 分事务 API 与只读 API 两类；事务 API 必须同步、纯数据 | 有效 |
 | [D-0008](0008-resolve-then-commit.md) | AI 辅助的写操作：先解析、后提交 | 有效 |
 | [D-0009](0009-refresh-on-activate.md) | 不做实时推送：面板激活时比对数据版本再刷新 | 有效（「不推送」部分被 D-0051 取代） |
 | [D-0010](0010-single-window-single-active-panel.md) | 单窗口，同一时刻只有一个活动面板 | 有效 |
