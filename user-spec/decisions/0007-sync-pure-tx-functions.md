@@ -4,7 +4,7 @@
 - 日期：2026-09-30
 - 决策者：讨论
 - 服务于：
-  - 用户预期：[platform.md「数据一致性」](../platform.md)
+  - 作者预期：[platform.md「数据一致性」](../platform.md)
   - 上游决策：[D-0004](0004-sqlite-single-writer-queue.md)
 
 ## 决策

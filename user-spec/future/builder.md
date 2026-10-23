@@ -9,7 +9,7 @@
 
 ## 服从作者定义的 vibe coding 层级
 
-作者定义的 vibe coding 有两个层级：**user spec 层**（用户的预期）与**技术实现层**（见 `principles.md`「新的 vibe coding：user spec」）。builder 做 vibe coding 时要**服从这个层级设计**——和本项目自身的开发方式一样（见 `README.md`）。
+作者定义的 vibe coding 有两个层级：**user spec 层**（预期）与**技术实现层**（见 `principles.md`「新的 vibe coding：user spec」）。builder 做 vibe coding 时要**服从这个层级设计**——和本项目自身的开发方式一样（见 `README.md`）。
 
 ## 边界
 

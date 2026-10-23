@@ -4,8 +4,8 @@
 - 日期：2026-10-21
 - 决策者：agent
 - 服务于：
-  - 用户预期：[platform.md「数据一致性」](../platform.md)
-  - 用户预期：[product.md「使用者与阶段」](../product.md)（先推进实用的功能）
+  - 作者预期：[platform.md「数据一致性」](../platform.md)
+  - 作者预期：[product.md「用户与阶段」](../product.md)（先推进实用的功能）
   - 上游决策：[D-0007](0007-sync-pure-tx-functions.md)、[D-0049](0049-agent-layering.md)
 
 ## 决策

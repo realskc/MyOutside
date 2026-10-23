@@ -1,7 +1,7 @@
 # agent 框架（共享库）设计
 
 > 技术文档：层次设计与接口形状。具体实现随产品功能逐步推进，本文随之修订。
-> 用户的预期：`user-spec/platform.md`「平台 AI」（agent 框架必须共享、硬约束在框架层面）、`user-spec/principles.md`「约束：软约束与硬约束都要」。
+> 作者的预期：`user-spec/platform.md`「平台 AI」（agent 框架必须共享、硬约束在框架层面）、`user-spec/principles.md`「约束：软约束与硬约束都要」。
 > 自研、不引入开源框架：D-0048。
 
 ## 1. 目标与使用者
@@ -59,11 +59,11 @@
 
 每一次调用都要知道**是谁发起的**——这是权限检查与按子应用计量的前提。
 
-- 后台发起：`ctx.call` 的调用者就是 `ctx.appId`（已知）；
+- 后端发起：`ctx.call` 的调用者就是 `ctx.appId`（已知）；
 - 界面发起：IPC 事件的 `event.senderFrame.url`（如 `app://vocab/index.html`）→ 调用者 `vocab`；外壳页面（`app://shell/`）→ 调用者 `shell`（平台自身，拥有平台设置等特权）；
 - 内核 `handle(request, caller)` 把调用者传入上下文：`ctx.caller`（直接调用方）。嵌套调用时，调用者是发起这一层 `ctx.call` 的应用。
 
-顺带解决：子应用界面不再能读取 `ai.deepseek.apiKey`（D-0019「代价」）——平台设置只允许 `shell` 读写。
+顺带解决：子应用不再能读取 `ai.deepseek.apiKey`（D-0019「代价」）——平台设置子应用可读、不可改，只有 `shell` 可以修改；凭据类设置（如 API Key）任何调用者都读不到值，外壳只能知道「是否已设置」（D-0053）。
 
 ### 3.2 推送通道
 
@@ -77,7 +77,7 @@ outside.subscribe(runId, (event) => { ... });   // 事件见 §5.3
 ctx.emit(event)   // 推送给本次调用的发起方
 ```
 
-- 本地：宿主经 `event.senderFrame.send("kernel:event", { runId, event })` 推回发起调用的 iframe；
+- 本地：Electron 主进程经 `event.senderFrame.send("kernel:event", { runId, event })` 推回发起调用的 iframe；
 - 多端：WebSocket 天然支持推送（`docs/future/multi-device.md`）；
 - 推送只是「附带的进度」，调用的最终结果仍按原来的请求-响应返回；推送丢失不影响正确性。
 
@@ -260,7 +260,7 @@ platform.task.start({ kind, input }) → { taskId }      // 由某个应用发�
 platform.task.get({ taskId }) / list / cancel
 ```
 
-- 任务在后台异步运行，不依赖界面调用是否还在；
+- 任务由内核异步运行，不依赖前端的调用是否还在；
 - **日志**：每一步（模型调用结果、工具结果）写入任务日志；崩溃或重启后按日志重放，已完成的步骤不再执行；
 - **中途落库**：`task.commit(txFn, payload)` 把「这一步的数据写入」与「这一步的日志」放进**同一个事务**——数据写入恰好一次，重放时不会重复；
 - **撤销**：内核为任务记录每次写入前的数据（变更日志），`platform.task.revert(taskId)` 把这次任务改过的数据恢复原样。网络请求等外部副作用撤不回；builder 改的代码文件用 git 兜底；

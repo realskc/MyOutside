@@ -4,7 +4,7 @@
 - 日期：2026-10-01
 - 决策者：讨论
 - 服务于：
-  - 用户预期：[platform.md「多端」](../platform.md)
+  - 作者预期：[platform.md「多端」](../platform.md)
   - 上游决策：[D-0013](0013-cloud-kernel-for-multi-device.md)
 
 ## 决策

@@ -4,7 +4,7 @@
 - 日期：2026-10-07
 - 决策者：讨论
 - 服务于：
-  - 用户预期：[apps/dialog.md「定位」](../apps/dialog.md)（使用 DeepSeek 的完整能力）
+  - 作者预期：[apps/dialog.md「定位」](../apps/dialog.md)（使用 DeepSeek 的完整能力）
 
 ## 决策
 

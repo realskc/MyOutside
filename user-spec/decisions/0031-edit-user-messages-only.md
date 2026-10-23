@@ -4,7 +4,7 @@
 - 日期：2026-10-07
 - 决策者：讨论
 - 服务于：
-  - 用户预期：[apps/dialog.md「对话历史」](../apps/dialog.md)
+  - 作者预期：[apps/dialog.md「对话历史」](../apps/dialog.md)
 
 ## 决策
 

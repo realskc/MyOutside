@@ -1,6 +1,6 @@
 # 架构与协议（v0）
 
-> 技术文档：描述当前实现与已定的技术设计。用户的预期见 `user-spec/`，设计依据见 `user-spec/decisions/`（文中以 D-NNNN 引用）。
+> 技术文档：描述当前实现与已定的技术设计。作者的预期见 `user-spec/`，设计依据见 `user-spec/decisions/`（文中以 D-NNNN 引用）。
 
 ## 1. 总览
 
@@ -18,10 +18,10 @@ Electron IPC "kernel:call"
 SQLite 单文件（<userData>/myoutside.db）
 ```
 
-- 全部持久状态 = 一个 SQLite 数据库（+ 将来的文件仓库目录，见 §9）。宿主是唯一写入者，所有写操作串行执行（D-0004）。
-- 每个子应用 = 后台模块（拥有私有数据、对外提供 API 函数，运行在宿主进程内）+ 前台界面（Web，只经自己的后台访问数据）。
+- 全部持久状态 = 一个 SQLite 数据库（+ 将来的文件仓库目录，见 §9）。内核是唯一写入者，所有写操作串行执行（D-0004）。
+- 每个子应用 = 后端（拥有私有数据、对外提供 API 函数，运行在 Electron 主进程内）+ 前端（Web，只经自己的后端访问数据）。
 - 子应用之间只能调用对方的 API 函数（D-0006）；数据按应用划分，禁止共用表（D-0005）。
-- 内核、契约与子应用后台不依赖 Electron / 浏览器专有 API（D-0012）。
+- 内核、契约与子应用后端不依赖 Electron / 浏览器专有 API（D-0012）。
 
 ### 包结构（pnpm workspace）
 
@@ -31,7 +31,7 @@ SQLite 单文件（<userData>/myoutside.db）
 | `packages/kernel` | 内核：注册、迁移、调用路由、串行队列、AppDb、平台内置 API（含平台 AI） |
 | `packages/kernel-node` | Node 存储适配器（`node:sqlite` 的 `DatabaseSync`） |
 | `apps/vocab`、`apps/dialog` | 子应用：`backend/`（AppModule）、`ui/`（静态界面，D-0011）、`test/` |
-| `apps/host` | Electron 宿主：主进程、preload、外壳界面（`renderer/`） |
+| `apps/host` | Electron 程序：主进程、preload、外壳界面（`renderer/`） |
 
 ## 2. 子应用模块（AppModule）
 
@@ -46,8 +46,8 @@ interface AppModule {
 ```
 
 - 函数用 `defineTx(schema, handler)` / `defineRead(schema, handler)` 定义（`packages/kernel/src/api.ts`）。
-- 宿主在启动时 `kernel.registerApp(...)` 注册全部子应用，再 `kernel.start()`；注册必须在 start 之前。
-- 子应用界面目录由宿主硬编码登记（`apps/host/src/main/index.ts` 的 `uiDirs`）。
+- Electron 主进程在启动时 `kernel.registerApp(...)` 注册全部子应用，再 `kernel.start()`；注册必须在 start 之前。
+- 子应用界面目录由 Electron 主进程硬编码登记（`apps/host/src/main/index.ts` 的 `uiDirs`）。
 - 尚未实现：独立的应用清单（D-0056），见 §11。
 
 ### 2.1 应用清单（规划，D-0056）
@@ -66,10 +66,10 @@ interface AppModule {
 }
 ```
 
-- 描述性字段：宿主据此自动发现与装载应用（替代硬编码的导入、注册与 `uiDirs`）；协议版本不兼容时拒绝装载；
+- 描述性字段：平台据此自动发现与装载应用（替代硬编码的导入、注册与 `uiDirs`）；协议版本不兼容时拒绝装载；
 - `owns`：登记表的归属（供临时函数作用域检查、删除应用时清理数据等使用）；应用访问数据的限制本身由 AppDb 的表名前缀在结构上保证（§5.1），不依赖 `owns`；
 - `uses`：内核按调用者检查跨应用调用（D-0053，`docs/agent.md` §7.2）；
-- API 函数与迁移仍由后台代码（AppModule）提供。
+- API 函数与迁移仍由后端代码（AppModule）提供。
 
 ## 3. 函数与调用（D-0006、D-0007）
 
@@ -99,7 +99,7 @@ interface AppModule {
 
 ### 3.4 已知差距
 
-- 宿主不区分调用者：任何界面都能调用任何函数（包括 `platform.settings.get` 读取密钥）。见 D-0006、D-0019「代价」。
+- 内核不区分调用者：任何界面都能调用任何函数（包括 `platform.settings.get` 读取密钥）。见 D-0006、D-0019「代价」。
 
 ## 4. 事务与数据版本（D-0004）
 
@@ -176,7 +176,7 @@ get(table, where) / all(table, where?, { orderBy?, limit?, offset? }) / count(ta
 - 删除：事务内删元数据并写入 `files.pending_delete`，后台任务删物理文件；
 - 原则：**先库后文件，允许孤儿文件，禁止幽灵引用**（库里有记录、盘上无文件）；启动时清理待删队列与临时文件。
 
-## 10. 宿主（apps/host）
+## 10. Electron 程序（apps/host）
 
 - 主进程（`src/main/index.ts`）：创建内核与存储、注册子应用、IPC（`kernel:call`、`host:openExternal`）、`app://` 协议、菜单、冒烟模式；
 - 界面（D-0018）：外壳页面 `app://shell/index.html`，一个 iframe 作为面板，切换时改 `src`；`app://<id>/` 映射到各应用 `ui/` 目录，带路径穿越检查；
@@ -191,7 +191,7 @@ get(table, where) / all(table, where?, { orderBy?, limit?, offset? }) / count(ta
 
 1. 应用清单（§2.1，D-0056）：自动装载、协议版本、`owns` 登记。
 2. 调用者身份与 `uses` 权限检查（§3.4，D-0053）；被调用方是否需要声明「哪些函数允许别人调用」，暂不做。
-3. 按子应用热重载 `reloadApp`（D-0017）：每个子应用独立产出后台模块，运行时只重载一个应用。
+3. 按子应用热重载 `reloadApp`（D-0017）：每个子应用独立产出后端模块，运行时只重载一个应用。
 4. API 函数的版本策略。
 5. 写函数的副作用：如需要，走提交后钩子（post-commit）或补偿，不得混入事务。
 6. agent 循环中途写库的能力（D-0007「什么时候应该重新考虑」）。
