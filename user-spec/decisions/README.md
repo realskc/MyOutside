@@ -110,3 +110,4 @@
 | [D-0054](0054-dialog-search-v1-with-progress.md) | 对话搜索第一版就做进度推送 | 有效（未实现） |
 | [D-0055](0055-web-search-toggle.md) | 对话的「联网搜索」开关：默认打开，打开时由模型决定搜不搜 | 有效（未实现） |
 | [D-0056](0056-app-manifest.md) | 应用清单（manifest）的内容与形式：每个子应用一份 JSON 文件 | 有效（未实现） |
+| [D-0057](0057-track-word-levels-data.md) | 参考词表数据随仓库提交；`.gitignore` 只忽略根目录 `data/` | 有效 |

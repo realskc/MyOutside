@@ -37,7 +37,7 @@ term   TEXT PK    -- 归一化拼写
 level  TEXT       -- 'A' | 'B' | 'C' | 'D'
 ```
 
-参考数据（不是用户数据），迁移 `0002_word_level` 一次性种入。数据文件由 `pnpm build:toefl [源文件]`（`scripts/build-toefl-levels.ts`）生成：输出 `[term, level]` 数组；同一词跨分类 / 级别时取最高优先级 A > B > C > D。
+参考数据（不是用户数据），迁移 `0002_word_level` 一次性种入。数据文件由 `pnpm build:toefl [源文件]`（`scripts/build-toefl-levels.ts`）生成并**随仓库提交**（见 D-0057）：输出 `[term, level]` 数组；同一词跨分类 / 级别时取最高优先级 A > B > C > D。
 
 ### 迁移
 
