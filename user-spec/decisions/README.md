@@ -119,3 +119,6 @@
 | [D-0056](0056-app-manifest.md) | 应用清单（manifest）的内容与形式：每个子应用一份 JSON 文件 | 有效（未实现） |
 | [D-0057](0057-track-word-levels-data.md) | 参考词表数据随仓库提交；`.gitignore` 只忽略根目录 `data/` | 有效 |
 | [D-0058](0058-public-and-internal-functions.md) | 前端调用后端也经过内核；函数分公开与内部 | 有效（「公开 / 内部」未实现） |
+| [D-0059](0059-no-tool-choice.md) | 不使用 `tool_choice` 的强制调用 | 有效 |
+| [D-0060](0060-tool-loop-ends-without-tool-calls.md) | 工具循环在模型不调用工具时结束 | 有效（暂时） |
+| [D-0061](0061-agent-structures-as-platform-base-classes.md) | 通用 agent 结构以平台基类提供，数据存在子应用自己的表空间 | 有效（未实现） |
