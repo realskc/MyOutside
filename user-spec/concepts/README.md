@@ -20,4 +20,4 @@
 | [actors.md](actors.md) | 主体：社会主体（作者、用户、子应用作者）与技术主体（开发者、builder、子应用） | 已确定 |
 | [structure.md](structure.md) | 平台结构：平台、内核、外壳（「宿主」不作为概念，现阶段用 Electron 指代） | 已确定 |
 | [subapp.md](subapp.md) | 子应用的组成：前端、后端、清单、API（公开 / 内部；事务 / 只读）、平台 API | 已确定 |
-| [agent.md](agent.md) | agent：工作流、工具循环 | 讨论中 |
+| [agent.md](agent.md) | agent：工作流、LLM 步骤、工具循环（内部的「轮」） | 已确定 |

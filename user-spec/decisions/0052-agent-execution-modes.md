@@ -1,6 +1,6 @@
 # D-0052 agent 的两种运行模式：调用内运行先行，后台任务后置
 
-- 状态：有效（后台任务未实现）
+- 状态：已取代（→ [D-0061](0061-agent-structures-as-platform-base-classes.md)、[D-0062](0062-workflow-persistence-is-app-responsibility.md)、[D-0063](0063-internal-apis-may-be-async-functions.md)）。「运行方式 / 执行层」的划分是在一次错误理解（把一次运行绑在一次 API 调用上）下提出的；持久的状态改由平台基类维护的子应用数据承载（D-0061），恢复由子应用负责（D-0062），「边等边写」由内部的异步函数解决（D-0063）
 - 日期：2026-10-21
 - 决策者：agent
 - 服务于：

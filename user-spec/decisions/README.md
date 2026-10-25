@@ -67,8 +67,8 @@
 | [D-0004](0004-sqlite-single-writer-queue.md) | 数据存储：SQLite 单文件，内核是唯一写入者，写操作串行排队 | 有效 |
 | [D-0005](0005-data-ownership-by-table-prefix.md) | 数据归属：按应用划分表，禁止跨应用共用表 | 有效 |
 | [D-0006](0006-cross-app-calls-via-owner-api.md) | 跨应用通道：只能调用对方的 API 函数，分事务内与事务外两种语义 | 有效 |
-| [D-0007](0007-sync-pure-tx-functions.md) | API 分事务 API 与只读 API 两类；事务 API 必须同步、纯数据 | 有效 |
-| [D-0008](0008-resolve-then-commit.md) | AI 辅助的写操作：先解析、后提交 | 有效 |
+| [D-0007](0007-sync-pure-tx-functions.md) | API 分事务 API 与只读 API 两类；事务 API 必须同步、纯数据 | 部分被取代（→ D-0063） |
+| [D-0008](0008-resolve-then-commit.md) | AI 辅助的写操作：先解析、后提交 | 部分被取代（→ D-0063） |
 | [D-0009](0009-refresh-on-activate.md) | 不做实时推送：面板激活时比对数据版本再刷新 | 有效（「不推送」部分被 D-0051 取代） |
 | [D-0010](0010-single-window-single-active-panel.md) | 单窗口，同一时刻只有一个活动面板 | 有效 |
 | [D-0011](0011-static-js-app-ui.md) | 子应用界面：零构建的静态 HTML / JS | 有效（计划改为 TS） |
@@ -112,7 +112,7 @@
 | [D-0049](0049-agent-layering.md) | agent 能力分四部分：执行层承载循环，循环调用模型层与工具层 | 有效 |
 | [D-0050](0050-web-tools-as-platform-api.md) | 搜索与抓取做成平台 API | 有效（未实现） |
 | [D-0051](0051-event-centric-agent-runs.md) | agent 运行以事件为中心；流式输出与进度显示共用推送通道 | 有效（未实现） |
-| [D-0052](0052-agent-execution-modes.md) | agent 的两种运行模式：调用内运行先行，后台任务后置 | 有效（后台任务未实现） |
+| [D-0052](0052-agent-execution-modes.md) | agent 的两种运行模式：调用内运行先行，后台任务后置 | 已取代（→ D-0061、D-0062、D-0063） |
 | [D-0053](0053-kernel-enforced-call-permissions.md) | 调用权限：应用声明自己会调用哪些函数，内核强制检查 | 有效（未实现） |
 | [D-0054](0054-dialog-search-v1-with-progress.md) | 对话搜索第一版就做进度推送 | 有效（未实现） |
 | [D-0055](0055-web-search-toggle.md) | 对话的「联网搜索」开关：默认打开，打开时由模型决定搜不搜 | 有效（未实现） |
@@ -122,3 +122,5 @@
 | [D-0059](0059-no-tool-choice.md) | 不使用 `tool_choice` 的强制调用 | 有效 |
 | [D-0060](0060-tool-loop-ends-without-tool-calls.md) | 工具循环在模型不调用工具时结束 | 有效（暂时） |
 | [D-0061](0061-agent-structures-as-platform-base-classes.md) | 通用 agent 结构以平台基类提供，数据存在子应用自己的表空间 | 有效（未实现） |
+| [D-0062](0062-workflow-persistence-is-app-responsibility.md) | 工作流的暂停与恢复由子应用自己解决，平台不提供通用的重放机制 | 有效 |
+| [D-0063](0063-internal-apis-may-be-async-functions.md) | 写数据只能通过事务 API；公开 API 只能是只读或事务，内部 API 还可以是普通的异步函数 | 有效（异步函数形式未实现） |
