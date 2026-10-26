@@ -59,6 +59,8 @@ export interface Migration {
 
 /** 一次调用的运行期附带信息：进度事件的出口与取消信号（沿嵌套调用向下传递） */
 export interface RunContext {
+  /** 直接调用方：子应用 id、"shell"，或 undefined（平台内部）。平台 API 用它按调用者计量 */
+  readonly caller: string | undefined;
   /** 把事件推送给发起这次调用的一方；没有推送通道时为空操作 */
   emit(event: unknown): void;
   /** 发起方取消这次调用时触发 */

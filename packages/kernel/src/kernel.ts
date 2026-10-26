@@ -1,7 +1,8 @@
 import { z } from "zod";
 import { createAppDb, createMigrationCtx, createReadonlyAppDb } from "./appdb.js";
 import { KernelError } from "./errors.js";
-import { createPlatformAiDefinition } from "./platform-ai.js";
+import { createPlatformAiDefinition, type UsageRecord } from "./platform-ai.js";
+import { createWebFetchDefinition, createWebSearchDefinition } from "./platform-web.js";
 import type {
   ApiDefinition,
   AppManifest,
@@ -123,7 +124,33 @@ export function createKernel({ storage }: KernelOptions) {
       return { ok: true as const };
     },
   });
-  definePlatform("platform.ai.chat", "apps", createPlatformAiDefinition(storage));
+  /** 平台用量按调用者记录（经写队列写入；不改变 DataVersion） */
+  function recordUsage(record: UsageRecord): void {
+    const usage = record.usage ?? null;
+    void enqueue(() =>
+      storage.execute(
+        `INSERT INTO platform_usage
+           (caller, kind, model, prompt_tokens, completion_tokens, reasoning_tokens, cache_hit_tokens, created_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+        [
+          record.caller ?? PLATFORM,
+          record.kind,
+          record.model ?? null,
+          usage?.promptTokens ?? null,
+          usage?.completionTokens ?? null,
+          usage?.reasoningTokens ?? null,
+          usage?.cacheHitTokens ?? null,
+          Date.now(),
+        ],
+      ),
+    ).catch(() => {
+      /* 计量失败不影响调用结果 */
+    });
+  }
+
+  definePlatform("platform.ai.chat", "apps", createPlatformAiDefinition(storage, recordUsage));
+  definePlatform("platform.web.search", "apps", createWebSearchDefinition(storage, recordUsage));
+  definePlatform("platform.web.fetch", "apps", createWebFetchDefinition(storage, recordUsage));
 
   function registerApp(app: AppModule, manifest?: AppManifest): void {
     if (started) throw new Error("内核已启动，应用必须在 start() 之前注册");
@@ -162,6 +189,19 @@ export function createKernel({ storage }: KernelOptions) {
          key TEXT PRIMARY KEY,
          value TEXT NOT NULL,
          updated_at INTEGER NOT NULL
+       )`,
+    );
+    storage.execute(
+      `CREATE TABLE IF NOT EXISTS platform_usage (
+         id INTEGER PRIMARY KEY AUTOINCREMENT,
+         caller TEXT NOT NULL,
+         kind TEXT NOT NULL,
+         model TEXT,
+         prompt_tokens INTEGER,
+         completion_tokens INTEGER,
+         reasoning_tokens INTEGER,
+         cache_hit_tokens INTEGER,
+         created_at INTEGER NOT NULL
        )`,
     );
     storage.transaction(() => {
@@ -228,6 +268,7 @@ export function createKernel({ storage }: KernelOptions) {
   function makeReadContext(fn: RegisteredFunction, frame: CallFrame): ReadContext {
     return {
       appId: fn.appId,
+      caller: frame.caller,
       db: createReadonlyAppDb(storage, fn.appId),
       emit: frame.emit,
       signal: frame.signal,
@@ -244,6 +285,7 @@ export function createKernel({ storage }: KernelOptions) {
   function makeAsyncContext(fn: RegisteredFunction, frame: CallFrame): AsyncContext {
     return {
       appId: fn.appId,
+      caller: frame.caller,
       db: createReadonlyAppDb(storage, fn.appId),
       emit: frame.emit,
       signal: frame.signal,

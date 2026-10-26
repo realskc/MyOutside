@@ -159,22 +159,42 @@ get(table, where) / all(table, where?, { orderBy?, limit?, offset? }) / count(ta
 - `platform_migration`：迁移记录；
 - `platform_setting(key, value JSON, updated_at)`：平台设置（界面语言 `ui.language`、`ai.deepseek.apiKey` / `baseUrl` / `model`）。
 
-## 6. 平台内置 API
+## 6. 平台 API
 
-| 函数 | 类别 | 说明 |
-|---|---|---|
-| `platform.dataVersion` | 读 | 当前 DataVersion |
-| `platform.listApps` | 读 | 已注册子应用 `{ id, name }[]` |
-| `platform.settings.get` / `set` | 读 / 写 | 平台设置（D-0019） |
-| `platform.ai.chat` | 读 | DeepSeek 代理（D-0014） |
+| 函数 | 类别 | 访问 | 说明 |
+|---|---|---|---|
+| `platform.dataVersion` | 只读 | 子应用（需声明） | 当前 DataVersion |
+| `platform.listApps` | 只读 | 子应用（需声明） | 已注册子应用 `{ id, name }[]` |
+| `platform.settings.get` | 只读 | 子应用（需声明） | 平台设置；凭据返回 `{ value: null, isSet }`（D-0053） |
+| `platform.settings.set` | 事务 | 只给外壳 | 修改平台设置 |
+| `platform.ai.chat` | 只读 | 子应用（需声明） | DeepSeek 对话（D-0014） |
+| `platform.web.search` | 只读 | 子应用（需声明） | DeepSeek 网页搜索（D-0050） |
+| `platform.web.fetch` | 只读 | 子应用（需声明） | DeepSeek 网页抓取，返回 Markdown 正文（D-0050） |
+
+实现：`packages/kernel/src/platform-ai.ts`、`platform-web.ts`、`deepseek.ts`（密钥读取、请求、错误整理、SSE 解析）。
 
 ### 6.1 `platform.ai.chat`
 
-- 输入：`messages`（OpenAI 形状，支持 `assistant.tool_calls` 与 `tool` 角色）、`tools?`（透传）、`model?`、`temperature?`、`reasoningEffort?`（none / low / high / max）；
-- 输出：`{ content, reasoning, toolCalls, model, usage }`，`usage` 含 reasoning tokens；
-- 密钥从平台设置读取；未配置 → `PRECONDITION`；网络 / HTTP 错误 → `UPSTREAM`；
-- 默认 base URL `https://api.deepseek.com`，默认模型 `deepseek-flash`；
-- **注意**：消息 schema 目前没有 `reasoning_content` 字段，会被校验丢弃。DeepSeek 在请求带 `tools` 的思考模式下要求回传历史 `reasoning_content`，否则 400——做 agent 循环前必须补上（D-0032）。
+- 输入：`messages`（OpenAI 形状：`assistant.tool_calls`、`tool` 角色、**`assistant.reasoning_content` 回传**）、`tools?`（透传）、`model?`、`temperature?`、`reasoningEffort?`（none / low / high / max；`none` 即关闭思考）、`stream?`；
+- 输出：`{ content, reasoning, toolCalls, model, usage, finishReason, message }`；`message` 是可直接追加进历史的 assistant 消息（含 `reasoning_content`）；`usage` 含 reasoning tokens 与缓存命中 tokens；
+- **流式**（`stream: true`）：经 SSE 接收，增量经推送通道发出 `{ type: "ai_delta", content?, reasoning? }`；工具调用参数分片到达时按 index 拼装；最终仍返回完整结果；
+- **DeepSeek 规则**：请求带 `tools` 时，历史中每一轮的 `reasoning_content` 都必须回传，否则 400（已用真实接口验证两轮工具调用可行）；思考模式下不支持 `tool_choice` 的强制调用（D-0059，不使用）；
+- 默认 base URL `https://api.deepseek.com`，默认模型 `deepseek-flash`。
+
+### 6.2 `platform.web.search` / `platform.web.fetch`
+
+- 搜索输入：`query`（1～128 字符，支持 `site:` / `lang:` / `after:` / `before:` 等语法）、`count?`（默认 8）、`needContent?`、`oriQuestion?`；输出 `results[]`：`title`、`url`、`snippet`（短摘要，给界面）、`summary`（长摘要，给模型）、`content`、`siteName`、`date`、`score`（0～3，≥1.5 优质）、`authority`（0～4）；
+- 抓取输入：`url`（http/https）；输出 `{ title, content }`（Markdown）；
+- 计费：各 5 元 / 千次成功请求（搜索无结果不计费）；QPS 100 / 25。
+
+### 6.3 错误与取消
+
+- 网络错误、408 / 429 / 5xx → `UPSTREAM`，`details.retryable = true`；其余 HTTP 错误 → `UPSTREAM`，`details.status`、`retryable = false`；401 → `PRECONDITION`（密钥无效）；未配置密钥 → `PRECONDITION`；
+- 调用被取消时中止发往 DeepSeek 的请求（流式请求断开后 DeepSeek 会停止生成），以 `ABORTED` 结束。
+
+### 6.4 用量计量
+
+每次成功调用按**调用者**记一条到 `platform_usage`（`caller`、`kind`：`ai.chat` / `web.search` / `web.fetch`、`model`、各类 token 数、时间），经写队列写入，不改变 DataVersion。为将来按子应用的用量显示与管控打基础。
 
 ## 7. AI 辅助的写操作（D-0008）
 

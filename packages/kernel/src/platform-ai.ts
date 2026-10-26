@@ -1,8 +1,8 @@
 import { z } from "zod";
+import { deepseekPost, readSse, readStringSetting } from "./deepseek.js";
 import { KernelError } from "./errors.js";
-import type { ApiDefinition, DbAdapter } from "./types.js";
+import type { ApiDefinition, DbAdapter, ReadContext } from "./types.js";
 
-const DEFAULT_BASE_URL = "https://api.deepseek.com";
 const DEFAULT_MODEL = "deepseek-flash";
 
 const AiToolCallSchema = z.object({
@@ -14,13 +14,15 @@ const AiToolCallSchema = z.object({
 /**
  * 聊天消息（OpenAI 形状）：
  * - system / user：必须带字符串 content；
- * - assistant：content 可为 null 或省略（配 tool_calls）——2026-10-07 支持工具循环；
+ * - assistant：content 可为 null 或省略（配 tool_calls）；可带 reasoning_content（思考过程）——
+ *   DeepSeek 规定：请求带 tools 时，历史中每一轮的 reasoning_content 都必须回传，否则 400；
  * - tool：工具结果，必须带 tool_call_id 与字符串 content。
  */
 export const AiMessageSchema = z
   .object({
     role: z.enum(["system", "user", "assistant", "tool"]),
     content: z.string().nullable().optional(),
+    reasoning_content: z.string().nullable().optional(),
     tool_calls: z.array(AiToolCallSchema).optional(),
     tool_call_id: z.string().optional(),
   })
@@ -45,119 +47,179 @@ export const AiChatInputSchema = z.object({
   tools: z.array(z.record(z.unknown())).optional(),
   model: z.string().optional(),
   temperature: z.number().optional(),
-  /** 思考强度（none / low / high / max；不传 = 服务默认） */
+  /** 思考强度（none 关闭思考；不传 = 服务默认 high） */
   reasoningEffort: z.enum(["none", "low", "high", "max"]).optional(),
+  /** 流式：增量经推送通道发出（事件 ai_delta），最终仍返回完整结果 */
+  stream: z.boolean().optional(),
 });
 
 export type AiChatInput = z.infer<typeof AiChatInputSchema>;
 
-interface DeepSeekChoice {
-  message?: {
-    content?: string | null;
-    reasoning_content?: string | null;
-    tool_calls?: Array<{
-      id: string;
-      type: string;
-      function: { name: string; arguments: string };
-    }>;
-  };
+interface ToolCall {
+  id: string;
+  type: "function";
+  function: { name: string; arguments: string };
 }
 
 interface DeepSeekUsage {
   prompt_tokens?: number;
   completion_tokens?: number;
   total_tokens?: number;
+  prompt_cache_hit_tokens?: number;
   completion_tokens_details?: { reasoning_tokens?: number };
 }
 
-function readSetting(storage: DbAdapter, key: string): unknown {
-  const row = storage.select<{ value: string }>("SELECT value FROM platform_setting WHERE key = ?", [key])[0];
-  return row ? (JSON.parse(row.value) as unknown) : null;
+export interface AiUsage {
+  promptTokens: number;
+  completionTokens: number;
+  totalTokens: number;
+  reasoningTokens?: number;
+  cacheHitTokens?: number;
 }
 
-function readStringSetting(storage: DbAdapter, key: string): string | null {
-  const value = readSetting(storage, key);
-  return typeof value === "string" && value.trim() !== "" ? value.trim() : null;
+function mapUsage(usage: DeepSeekUsage | undefined): AiUsage | null {
+  if (!usage) return null;
+  return {
+    promptTokens: usage.prompt_tokens ?? 0,
+    completionTokens: usage.completion_tokens ?? 0,
+    totalTokens: usage.total_tokens ?? 0,
+    ...(typeof usage.completion_tokens_details?.reasoning_tokens === "number"
+      ? { reasoningTokens: usage.completion_tokens_details.reasoning_tokens }
+      : {}),
+    ...(typeof usage.prompt_cache_hit_tokens === "number" ? { cacheHitTokens: usage.prompt_cache_hit_tokens } : {}),
+  };
 }
+
+/** 平台用量记录（按调用者）：由内核经写队列写入 */
+export interface UsageRecord {
+  caller: string | undefined;
+  kind: string;
+  model?: string | null;
+  usage?: AiUsage | null;
+}
+
+export type RecordUsage = (record: UsageRecord) => void;
 
 /**
  * 平台 AI 服务（DeepSeek 代理）：
  * - API key 由平台保管，子应用拿不到；
- * - 请求透传 messages / tools / 思考强度（reasoning_effort）；
- * - 响应返回 content、tool calls、思考过程（reasoning_content）与 usage。
+ * - 请求透传 messages（含 reasoning_content 回传）/ tools / 思考强度；
+ * - 响应返回内容、思考过程、工具调用、可直接追加进历史的 assistant 消息、结束原因与 usage；
+ * - stream = true 时，增量经 ctx.emit 推送：{ type: "ai_delta", content?, reasoning? }；
+ * - 每次成功调用按调用者记一条用量。
  */
-export function createPlatformAiDefinition(storage: DbAdapter): ApiDefinition {
+export function createPlatformAiDefinition(storage: DbAdapter, recordUsage: RecordUsage = () => {}): ApiDefinition {
   return {
     kind: "read",
     visibility: "public",
     input: AiChatInputSchema,
-    handler: async (_ctx, input: AiChatInput) => {
-      const apiKey = readStringSetting(storage, "ai.deepseek.apiKey");
-      if (!apiKey) {
-        throw new KernelError("PRECONDITION", "尚未配置 DeepSeek API Key（设置 → DeepSeek API Key）");
-      }
-      const baseUrl = readStringSetting(storage, "ai.deepseek.baseUrl") ?? DEFAULT_BASE_URL;
+    handler: async (ctx: ReadContext, input: AiChatInput) => {
       const model = input.model ?? readStringSetting(storage, "ai.deepseek.model") ?? DEFAULT_MODEL;
 
       // assistant 带 tool_calls 而省略 content 时，显式补 null（OpenAI 形状）
       const messages = input.messages.map((message) =>
         message.role === "assistant" && message.content === undefined ? { ...message, content: null } : message,
       );
-
-      let response: Response;
-      try {
-        response = await fetch(`${baseUrl.replace(/\/+$/, "")}/chat/completions`, {
-          method: "POST",
-          headers: {
-            "content-type": "application/json",
-            authorization: `Bearer ${apiKey}`,
-          },
-          body: JSON.stringify({
-            model,
-            messages,
-            ...(input.tools ? { tools: input.tools } : {}),
-            ...(input.temperature !== undefined ? { temperature: input.temperature } : {}),
-            ...(input.reasoningEffort ? { reasoning_effort: input.reasoningEffort } : {}),
-          }),
-        });
-      } catch (cause) {
-        throw new KernelError(
-          "UPSTREAM",
-          `AI 请求失败（网络）：${cause instanceof Error ? cause.message : String(cause)}`,
-        );
-      }
-
-      if (!response.ok) {
-        const text = await response.text().catch(() => "");
-        throw new KernelError("UPSTREAM", `AI 请求失败（HTTP ${response.status}）：${text.slice(0, 300)}`);
-      }
-
-      const data = (await response.json()) as {
-        model?: string;
-        choices?: DeepSeekChoice[];
-        usage?: DeepSeekUsage;
+      const body = {
+        model,
+        messages,
+        ...(input.tools ? { tools: input.tools } : {}),
+        ...(input.temperature !== undefined ? { temperature: input.temperature } : {}),
+        ...(input.reasoningEffort ? { reasoning_effort: input.reasoningEffort } : {}),
+        ...(input.stream ? { stream: true, stream_options: { include_usage: true } } : {}),
       };
-      const message = data.choices?.[0]?.message;
-      const usage = data.usage
-        ? {
-            promptTokens: data.usage.prompt_tokens ?? 0,
-            completionTokens: data.usage.completion_tokens ?? 0,
-            totalTokens: data.usage.total_tokens ?? 0,
-            ...(typeof data.usage.completion_tokens_details?.reasoning_tokens === "number"
-              ? { reasoningTokens: data.usage.completion_tokens_details.reasoning_tokens }
-              : {}),
+      const response = await deepseekPost(storage, "/chat/completions", body, ctx.signal, "AI 请求");
+
+      let content = "";
+      let reasoning = "";
+      let toolCalls: ToolCall[] = [];
+      let finishReason: string | null = null;
+      let usage: AiUsage | null = null;
+      let responseModel = model;
+
+      if (input.stream) {
+        const partial: Array<{ id: string; name: string; arguments: string }> = [];
+        for await (const raw of readSse(response, ctx.signal)) {
+          const chunk = raw as {
+            model?: string;
+            choices?: Array<{
+              delta?: {
+                content?: string | null;
+                reasoning_content?: string | null;
+                tool_calls?: Array<{ index: number; id?: string; function?: { name?: string; arguments?: string } }>;
+              };
+              finish_reason?: string | null;
+            }>;
+            usage?: DeepSeekUsage;
+          };
+          if (chunk.model) responseModel = chunk.model;
+          if (chunk.usage) usage = mapUsage(chunk.usage);
+          const choice = chunk.choices?.[0];
+          if (!choice) continue;
+          const delta = choice.delta ?? {};
+          if (delta.reasoning_content) {
+            reasoning += delta.reasoning_content;
+            ctx.emit({ type: "ai_delta", reasoning: delta.reasoning_content });
           }
-        : null;
-      return {
-        content: message?.content ?? "",
-        reasoning: message?.reasoning_content ?? null,
-        toolCalls: (message?.tool_calls ?? []).map((call) => ({
+          if (delta.content) {
+            content += delta.content;
+            ctx.emit({ type: "ai_delta", content: delta.content });
+          }
+          // 流式下工具调用的参数分片到达：按 index 拼装
+          for (const piece of delta.tool_calls ?? []) {
+            const slot = (partial[piece.index] ??= { id: "", name: "", arguments: "" });
+            if (piece.id) slot.id = piece.id;
+            if (piece.function?.name) slot.name += piece.function.name;
+            if (piece.function?.arguments) slot.arguments += piece.function.arguments;
+          }
+          if (choice.finish_reason) finishReason = choice.finish_reason;
+        }
+        toolCalls = partial
+          .filter((slot) => slot && slot.name)
+          .map((slot) => ({ id: slot.id, type: "function" as const, function: { name: slot.name, arguments: slot.arguments } }));
+      } else {
+        const data = (await response.json()) as {
+          model?: string;
+          choices?: Array<{
+            message?: {
+              content?: string | null;
+              reasoning_content?: string | null;
+              tool_calls?: Array<{ id: string; type: string; function: { name: string; arguments: string } }>;
+            };
+            finish_reason?: string | null;
+          }>;
+          usage?: DeepSeekUsage;
+        };
+        const message = data.choices?.[0]?.message;
+        content = message?.content ?? "";
+        reasoning = message?.reasoning_content ?? "";
+        toolCalls = (message?.tool_calls ?? []).map((call) => ({
           id: call.id,
           type: "function" as const,
           function: call.function,
-        })),
-        model: data.model ?? model,
+        }));
+        finishReason = data.choices?.[0]?.finish_reason ?? null;
+        usage = mapUsage(data.usage);
+        responseModel = data.model ?? model;
+      }
+
+      if (ctx.signal.aborted) throw new KernelError("ABORTED", "调用已取消");
+      recordUsage({ caller: ctx.caller, kind: "ai.chat", model: responseModel, usage });
+
+      return {
+        content,
+        reasoning: reasoning === "" ? null : reasoning,
+        toolCalls,
+        model: responseModel,
         usage,
+        finishReason,
+        /** 可直接追加进历史的 assistant 消息（含 reasoning_content，满足 DeepSeek 的回传规则） */
+        message: {
+          role: "assistant" as const,
+          content: content === "" && toolCalls.length > 0 ? null : content,
+          ...(reasoning !== "" ? { reasoning_content: reasoning } : {}),
+          ...(toolCalls.length > 0 ? { tool_calls: toolCalls } : {}),
+        },
       };
     },
   };
