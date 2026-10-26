@@ -23,3 +23,4 @@
 | [VOCAB-0007](VOCAB-0007-ai-lookup.md) | 查词：AI 翻译解说并生成卡片草稿 | 有效 |
 | [VOCAB-0008](VOCAB-0008-review-screen.md) | 复习界面：三个评分按钮 +「完全学会」 | 有效 |
 | [VOCAB-0009](VOCAB-0009-track-word-levels-data.md) | 参考词表数据随仓库提交；`.gitignore` 只忽略根目录 `data/` | 有效 |
+| [VOCAB-0010](VOCAB-0010-general-american-phonetic.md) | 音标统一使用美式 IPA（General American） | 有效 |

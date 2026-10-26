@@ -12,6 +12,7 @@
 
 - **同一个单词的两个本质不同的释义，就是两个不同的单词。** 所以背单词的单位是「单词 + 一个本质意项」，而不是拼写。例：date 当「椰枣」讲和当「日期 / 约会」讲，是两张卡片（数据模型见 [VOCAB-0001](decisions/VOCAB-0001-card-is-term-plus-sense.md)）。
 - **卡片内容用中文**（例句保持英文），与界面语言无关——如果学英语的卡片也全是英语，容易头晕（见 [VOCAB-0004](decisions/VOCAB-0004-card-content-in-chinese.md)）。
+- **音标统一用美式 IPA（General American）**：一般词给一个最常用读音；词性导致读音不同时可保留多个；短语给整条短语的音标（见 [VOCAB-0010](decisions/VOCAB-0010-general-american-phonetic.md)）。
 
 ## 与其他应用的连接
 

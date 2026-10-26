@@ -18,7 +18,7 @@ id              TEXT PK
 term            TEXT NOT NULL      -- 归一化拼写（trim + 小写 + 折叠空格），只用于机械查重
 display         TEXT NOT NULL      -- 原始写法
 sense           TEXT NOT NULL      -- 本质意项
-phonetic        TEXT               -- 音标（IPA）
+phonetic        TEXT               -- 美式 IPA（General American；VOCAB-0010）
 meaning         TEXT NOT NULL DEFAULT ''
 context         TEXT               -- 例句 / 语境
 source          TEXT               -- 来源（默认 'manual'；将来抓词为 'dialog'）
@@ -76,10 +76,12 @@ vocab.setMastered({ cardId, mastered }) → { ok }
    - `match` → 展示已有卡片，用户选择：替换（`vocab.updateCard`，保留调度）/ 仍新增（`vocab.addCard`）/ 放弃；
 3. 未配置 AI 密钥或调用失败时，界面回退为只做机械检查。
 
-## 5. 查词（VOCAB-0007、VOCAB-0004）
+## 5. 查词（VOCAB-0007、VOCAB-0004、VOCAB-0010）
 
 - 界面直接调用 `platform.ai.chat`，带 `make_card` 工具；AI 返回卡片草稿（单词 / 意项 / 音标 / 释义 / 例句），内容一律中文、例句英文；
+- 音标统一要求 **美式 IPA（General American）**；system prompt 与 `make_card` 的 `phonetic` 字段描述都明确这一点（VOCAB-0010）；
 - 草稿卡用 `draft.term` 调用 `vocab.getWordLevel` 查参考词表，命中时在音标旁显示「托福 A/B/C/D」徽章；
+- 存量卡片已按 VOCAB-0010 做一次性音标清洗；旧 Vocabry 导入若带典型英式标记会警告，导入后仍需检查；
 - 用户确认「加入词库」后走添加流程；结果不缓存。
 
 ## 6. 界面
@@ -87,7 +89,7 @@ vocab.setMastered({ cardId, mastered }) → { ok }
 - **复习**（VOCAB-0008）：剩余张数 → 单词 → 显示答案（音标 / 释义 / 语境 / 分级徽章）→ 评分（重来 / 不错 / 简单，按钮下显示 `previewReview` 的间隔）或「完全学会」（`setMastered`）；
 - **查词**：AI 翻译解说 + 卡片草稿；草稿命中参考词表时显示「托福 A/B/C/D」徽章，确认后走添加流程；
 - **词库**：卡片列表 + 拼写搜索 + 展开编辑 + 标记 / 取消掌握；命中参考词表显示「托福 A/B/C/D」徽章；
-- **添加**：手动填写单词 / 意项 / 释义 / 音标 / 语境，走添加流程；
+- **添加**：手动填写单词 / 意项 / 释义 / 音标 / 语境，走添加流程；音标输入框标明「美式」，不自动转换方言；
 - **统计**：卡片总数 / 学习中 / 已掌握 / 待复习；
 - 文案中英双语（D-0015）。
 

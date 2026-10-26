@@ -40,6 +40,11 @@ interface VocabryCardRow {
   created_at: string;
 }
 
+/** 旧 Vocabry 的音标可能混有英式写法；导入后需按 VOCAB-0010 清洗。 */
+function looksBritishPhonetic(phonetic: string): boolean {
+  return /ɒ|əʊ|ɪə|eə|ʊə|zj/.test(phonetic);
+}
+
 interface AnkiCardRow {
   id: number;
   type: number;
@@ -178,13 +183,20 @@ for (const card of cards) {
     continue;
   }
 
+  const phonetic = fields.phonetic ?? "";
+  if (phonetic && looksBritishPhonetic(phonetic)) {
+    console.warn(
+      `[import-vocabry] 音标可能不是美式（按 VOCAB-0010 清洗）：${word} ${phonetic}`,
+    );
+  }
+
   const scheduling = buildScheduling(card.card_id);
   const payload = {
     term: word,
     display: word,
     sense: definition,
     meaning: fields.notes ?? "",
-    phonetic: fields.phonetic ?? "",
+    phonetic,
     context: fields.example ?? "",
     source: "vocabry-import",
     ...(scheduling ? { scheduling } : {}),

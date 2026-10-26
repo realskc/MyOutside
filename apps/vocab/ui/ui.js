@@ -51,8 +51,9 @@
       fTerm: "单词",
       fSense: "本质意项",
       fMeaning: "释义",
-      fPhonetic: "音标",
+      fPhonetic: "音标（美式）",
       fContext: "例句 / 语境",
+      phoneticPlaceholder: "美式音标，如 /rʌn/",
       sensePlaceholder: "例：椰枣（食物）",
       add: "添加",
       toastCreated: "已创建卡片",
@@ -69,7 +70,7 @@
       abandon: "放弃",
       eSense: "本质意项",
       eMeaning: "释义",
-      ePhonetic: "音标",
+      ePhonetic: "音标（美式）",
       eContext: "例句 / 语境",
       save: "保存",
       markMastered: "标记已掌握",
@@ -124,8 +125,9 @@
       fTerm: "Word",
       fSense: "Essential sense",
       fMeaning: "Meaning",
-      fPhonetic: "Phonetic",
+      fPhonetic: "Phonetic (US)",
       fContext: "Context",
+      phoneticPlaceholder: "US IPA, e.g. /rʌn/",
       sensePlaceholder: "e.g. date fruit (food)",
       add: "Add",
       toastCreated: "Card created",
@@ -142,7 +144,7 @@
       abandon: "Discard",
       eSense: "Essential sense",
       eMeaning: "Meaning",
-      ePhonetic: "Phonetic",
+      ePhonetic: "Phonetic (US)",
       eContext: "Context",
       save: "Save",
       markMastered: "Mark mastered",
@@ -498,7 +500,11 @@
         properties: {
           term: { type: "string", description: "单词原形（小写）" },
           sense: { type: "string", description: "本质意项的简短描述（一律用中文）" },
-          phonetic: { type: "string", description: "IPA 音标，含斜杠，如 /rʌn/" },
+          phonetic: {
+            type: "string",
+            description:
+              "General American（美式）IPA 音标，含斜杠，如 /rʌn/；不要用英式音标，避免 ɒ、əʊ、ɪə、eə、ʊə、zj 等写法",
+          },
           meaning: { type: "string", description: "释义与解说（一律用中文）" },
           example: { type: "string", description: "一个英文例句" },
         },
@@ -508,7 +514,9 @@
   };
 
   const lookupSystemPrompt = () =>
-    "你是英语学习助手。用户给你一个英语单词或短语：先用中文给出翻译与简明解说（可含常见搭配），然后必须调用 make_card 工具生成一张学习卡片草稿——卡片内容一律使用中文（例句除外）。若该词有多种本质不同的意项，只针对最常见的一种生成，并在解说里简要提及其它意项。";
+    "你是英语学习助手。用户给你一个英语单词或短语：先用中文给出翻译与简明解说（可含常见搭配），然后必须调用 make_card 工具生成一张学习卡片草稿——卡片内容一律使用中文（例句除外）。" +
+    "音标必须使用 General American（美式）IPA，写在斜杠内；只给最常用的美式读音，不要使用英式音标（避免 ɒ、əʊ、ɪə、eə、ʊə、zj 等写法）。短语给整条短语的音标，不要只给其中一个单词。" +
+    "若该词有多种本质不同的意项，只针对最常见的一种生成，并在解说里简要提及其它意项。";
 
   async function runLookup() {
     const input = document.getElementById("lookup-term");
