@@ -4,8 +4,9 @@
 
 ## 约定
 
-- **一条决策一个文件**：`NNNN-简短英文标识.md`，编号四位、递增、永不复用。
-- **引用写法**：`D-0001`，在文档中链接到对应文件，如 `[D-0001](decisions/0001-electron-typescript.md)`。
+- **全局决策**用 `D-NNNN`，只记录跨应用/平台的决策；**应用专属决策**放在 `apps/<app>/user-spec/decisions/`，编号 `<APP>-NNNN`（如 `GO-0001`），由各应用的 `user-spec/decisions/README.md` 建索引。
+- **一条决策一个文件**：`NNNN-简短英文标识.md`（全局）或 `GO-NNNN-...md`（应用）；编号四位、递增、永不复用。
+- **引用写法**：全局 `D-0001`，链接到对应文件；应用决策用 `GO-0001`，链接到 `apps/<app>/user-spec/decisions/`。
 - **状态**：`有效` / `已取代（→ D-xxxx）` / `已废弃`。决策文件不删除；被取代时，旧决策标注取代者，新决策标注取代了谁。
 - **决策者**：`用户` / `讨论`（用户与 agent 讨论后确定）/ `agent`（agent 基于用户需求自行决定，用户不一定看过）。
 - 决策可以引用上游决策。
@@ -111,3 +112,11 @@
 | [D-0055](0055-web-search-toggle.md) | 对话的「联网搜索」开关：默认打开，打开时由模型决定搜不搜 | 有效（未实现） |
 | [D-0056](0056-app-manifest.md) | 应用清单（manifest）的内容与形式：每个子应用一份 JSON 文件 | 有效（未实现） |
 | [D-0057](0057-track-word-levels-data.md) | 参考词表数据随仓库提交；`.gitignore` 只忽略根目录 `data/` | 有效 |
+| [D-0071](0071-dev-lan-preview.md) | 开发用 LAN 预览：Electron 主进程内加可选 HTTP 宿主 | 有效 |
+| [D-0072](0072-app-local-decisions.md) | 应用自包含：spec/docs/decisions 在 apps/<app>/ 内按层组织 | 有效 |
+
+## 应用专属决策
+
+| 应用 | 目录 |
+|---|---|
+| 围棋（go） | [`apps/go/user-spec/`](../../apps/go/user-spec/README.md) · [decisions](../../apps/go/user-spec/decisions/README.md) · [docs](../../apps/go/docs/README.md) |

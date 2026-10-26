@@ -189,3 +189,64 @@ body {
 .hidden {
   display: none !important;
 }
+
+/* LAN 预览主要给手机用：窄屏时侧栏变成顶部条。 */
+@media (max-width: 720px) {
+  body {
+    flex-direction: column;
+  }
+
+  .sidebar {
+    position: relative;
+    width: 100%;
+    flex: 0 0 auto;
+    padding: 8px 10px;
+    gap: 6px;
+  }
+
+  .brand {
+    padding: 2px 120px 6px 6px;
+    border-bottom: 0;
+  }
+
+  .apps {
+    flex-direction: row;
+    flex: 0 0 auto;
+    overflow-x: auto;
+    gap: 4px;
+  }
+
+  .app-item {
+    white-space: nowrap;
+    padding: 7px 10px;
+  }
+
+  .version {
+    display: none;
+  }
+
+  .side-footer {
+    position: absolute;
+    top: 6px;
+    right: 8px;
+    padding: 0;
+  }
+
+  .side-btn {
+    padding: 6px 10px;
+    font-size: 12px;
+  }
+
+  .lang-toggle {
+    width: 48px;
+  }
+
+  .workspace {
+    flex: 1;
+    min-height: 0;
+  }
+
+  .settings-view {
+    padding: 14px;
+  }
+}

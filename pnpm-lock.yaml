@@ -219,11 +219,39 @@ importers:
         specifier: ^3.0.0
         version: 3.2.7(@types/node@24.19.0)(tsx@4.23.15)
 
+  apps/go:
+    dependencies:
+      '@myoutside/contracts':
+        specifier: workspace:*
+        version: link:../../packages/contracts
+      '@myoutside/kernel':
+        specifier: workspace:*
+        version: link:../../packages/kernel
+      zod:
+        specifier: ^3.24.0
+        version: 3.25.76
+    devDependencies:
+      '@myoutside/kernel-node':
+        specifier: workspace:*
+        version: link:../../packages/kernel-node
+      '@types/node':
+        specifier: ^24.0.0
+        version: 24.19.0
+      typescript:
+        specifier: ^5.6.0
+        version: 5.9.3
+      vitest:
+        specifier: ^3.0.0
+        version: 3.2.7(@types/node@24.19.0)(tsx@4.23.15)
+
   apps/host:
     dependencies:
       '@myoutside/dialog':
         specifier: workspace:*
         version: link:../dialog
+      '@myoutside/go':
+        specifier: workspace:*
+        version: link:../go
       '@myoutside/kernel':
         specifier: workspace:*
         version: link:../../packages/kernel

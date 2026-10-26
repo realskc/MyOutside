@@ -181,6 +181,7 @@ get(table, where) / all(table, where?, { orderBy?, limit?, offset? }) / count(ta
 - 主进程（`src/main/index.ts`）：创建内核与存储、注册子应用、IPC（`kernel:call`、`host:openExternal`）、`app://` 协议、菜单、冒烟模式；
 - 界面（D-0018）：外壳页面 `app://shell/index.html`，一个 iframe 作为面板，切换时改 `src`；`app://<id>/` 映射到各应用 `ui/` 目录，带路径穿越检查；
 - preload（`src/preload/index.ts`）：`window.outside = { call, openExternal }`；
+- LAN 预览（`pnpm dev:lan`，D-0071）：主进程额外启动 HTTP 宿主，服务外壳与 `apps/<id>/ui`，并注入浏览器版 `window.outside`（`POST /__myoutside/call` → `kernel.handle`）；默认不启用，无鉴权，仅供可信热点上的临时多设备调试；不是正式多端方案（正式方向见 D-0013）；
 - 外链：`host.openExternal` 只接受 http/https，用系统浏览器打开；
 - 菜单：文件 / 编辑 / 视图；「编辑」菜单让 macOS 上的剪贴板快捷键生效；中英文跟随 `ui.language`；
 - 单实例锁（D-0016）；数据目录：`app.getPath("userData")`（应用名 MyOutside）；
