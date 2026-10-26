@@ -23,7 +23,7 @@
 | [DIALOG-0007](DIALOG-0007-dialog-ui-details.md) | 对话界面细节 | 部分被取代（→ DIALOG-0015） |
 | [DIALOG-0008](DIALOG-0008-dialog-search-v1-with-progress.md) | 对话搜索第一版就做进度推送 | 有效 |
 | [DIALOG-0009](DIALOG-0009-web-search-toggle.md) | 对话的「联网搜索」开关：默认打开，打开时由模型决定搜不搜 | 有效 |
-| [DIALOG-0010](DIALOG-0010-search-results-presentation.md) | 搜索结果的呈现：正文标注引用、下方列出来源、搜索过程折叠 | 有效 |
+| [DIALOG-0010](DIALOG-0010-search-results-presentation.md) | 搜索结果的呈现：正文标注引用、下方列出来源（默认折叠）、搜索过程折叠 | 有效 |
 | [DIALOG-0011](DIALOG-0011-streaming-output.md) | 对话回复逐字流式输出 | 有效 |
 | [DIALOG-0012](DIALOG-0012-regenerate-reply.md) | 支持重新生成助手回复（在回复这一层分叉） | 有效 |
 | [DIALOG-0013](DIALOG-0013-flash-only.md) | 对话固定使用 deepseek-flash，不提供模型选择 | 有效 |

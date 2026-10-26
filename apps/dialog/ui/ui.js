@@ -43,7 +43,7 @@
       reasoning: "思考过程",
       thinking: "思考中…",
       searchProcess: (n) => `搜索过程（${n} 步）`,
-      sources: "来源",
+      sourcesCount: (n) => `来源（${n}）`,
       retry: "重试",
       generateNow: "生成回复",
       noReply: "这条消息还没有回复（上次生成被中断）。",
@@ -96,7 +96,7 @@
       reasoning: "Reasoning",
       thinking: "Thinking…",
       searchProcess: (n) => `Search process (${n} steps)`,
-      sources: "Sources",
+      sourcesCount: (n) => `Sources (${n})`,
       retry: "Retry",
       generateNow: "Generate reply",
       noReply: "This message has no reply yet (the last generation was interrupted).",
@@ -567,13 +567,8 @@
     return body;
   }
 
+  /** 来源：全部列出，默认折叠（DIALOG-0010） */
   function buildSources(sources) {
-    const box = document.createElement("div");
-    box.className = "sources";
-    const label = document.createElement("div");
-    label.className = "sources-label";
-    label.textContent = t("sources");
-    box.appendChild(label);
     const list = document.createElement("ol");
     for (const source of sources) {
       const item = document.createElement("li");
@@ -593,8 +588,10 @@
       }
       list.appendChild(item);
     }
-    box.appendChild(list);
-    return box;
+    const body = document.createElement("div");
+    body.className = "sources";
+    body.appendChild(list);
+    return buildCollapsible(t("sourcesCount", sources.length), body);
   }
 
   function renderPendingUser(text) {

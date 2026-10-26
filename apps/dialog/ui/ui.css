@@ -451,11 +451,6 @@ textarea {
   color: var(--muted);
 }
 
-.sources-label {
-  font-weight: 600;
-  margin-bottom: 2px;
-}
-
 .sources ol {
   margin: 0;
   padding-left: 22px;

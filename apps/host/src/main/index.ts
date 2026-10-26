@@ -23,9 +23,14 @@ import { startLanServer } from "./lan-server";
 // 数据目录使用正式名称：%APPDATA%/MyOutside
 app.setName("MyOutside");
 
-// 冒烟模式下关闭站点隔离：capturePage 对跨源 iframe（OOPIF）拍不到内容，仅测试用
+/** 真实的数据目录（冒烟模式改用临时目录前先记下，用来复制数据库） */
+const REAL_USER_DATA = app.getPath("userData");
+
 if (process.env.MYOUTSIDE_SMOKE === "1") {
+  // 关闭站点隔离：capturePage 对跨源 iframe（OOPIF）拍不到内容，仅测试用
   app.commandLine.appendSwitch("disable-site-isolation-trials");
+  // 独立的浏览器配置目录：不和正在运行的 MyOutside 抢单实例锁、不共用配置
+  app.setPath("userData", join(app.getPath("temp"), "myoutside-smoke-profile"));
 }
 
 protocol.registerSchemesAsPrivileged([
@@ -451,9 +456,9 @@ app.whenReady().then(async () => {
     }
   });
 
-  let dataDir = app.getPath("userData");
+  let dataDir = REAL_USER_DATA;
   if (process.env.MYOUTSIDE_SMOKE === "1") {
-    dataDir = prepareSmokeDataDir(dataDir);
+    dataDir = prepareSmokeDataDir(REAL_USER_DATA);
     console.log("[smoke] 临时数据副本:", dataDir);
   }
   mkdirSync(dataDir, { recursive: true });
