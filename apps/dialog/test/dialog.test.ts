@@ -414,7 +414,7 @@ describe("dialog backend", () => {
     expect(list[0]!.webSearch).toBe(false);
   });
 
-  it("重新生成：为同一条用户消息生成新回复，成为原回复的兄弟并被选中（D-0066）", async () => {
+  it("重新生成：为同一条用户消息生成新回复，成为原回复的兄弟并被选中（DIALOG-0012）", async () => {
     const kernel = await setupWithKey();
     const conversationId = await createConversation(kernel, { webSearch: false });
     vi.stubGlobal("fetch", fakeDeepSeek([{ content: "第一版" }, { content: "第二版" }]).fetch);

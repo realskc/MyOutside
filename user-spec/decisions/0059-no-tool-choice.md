@@ -4,7 +4,7 @@
 - 日期：2026-10-24
 - 决策者：作者
 - 服务于：
-  - 作者预期：[apps/dialog.md「定位」](../apps/dialog.md)（使用 DeepSeek 的完整能力）
+  - 作者预期：[对话 user spec「定位」](../../apps/dialog/user-spec/README.md)（使用 DeepSeek 的完整能力）
   - 上游决策：[D-0014](0014-deepseek-as-ai-provider.md)
 
 ## 决策

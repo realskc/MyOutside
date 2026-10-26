@@ -128,7 +128,7 @@ interface AppModule {
 - DataVersion 只在内存中计数（进程重启后从 0 开始），用于刷新比对；
 - 「一次事件多处落账」：发起方的事务 API 内 `ctx.call` 其他应用的事务 API，全部在同一事务中提交，不需要两阶段提交。
 
-示例（规划中的抓词，见 `docs/apps/dialog.md` §8）：
+示例（规划中的抓词，见 `apps/dialog/docs/README.md` §8）：
 
 ```
 dialog.captureWord（写）
@@ -155,7 +155,7 @@ get(table, where) / all(table, where?, { orderBy?, limit?, offset? }) / count(ta
 
 - 每个应用携带有序的迁移列表，只操作自己的表；
 - `kernel.start()` 时在**一个事务**内执行全部未执行过的迁移，记录到 `platform_migration(app_id, migration_id, applied_at)`；失败整体回滚；
-- `MigrationCtx`：`createTable`、`createIndex`（自动加前缀）、`insert`（种子 / 参考数据，例：vocab 的托福词表，D-0025）、`exec`（逃生口，不加前缀，谨慎使用）。
+- `MigrationCtx`：`createTable`、`createIndex`（自动加前缀）、`insert`（种子 / 参考数据，例：vocab 的托福词表，VOCAB-0005）、`exec`（逃生口，不加前缀，谨慎使用）。
 
 ### 5.3 平台自己的表
 

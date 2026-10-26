@@ -24,7 +24,7 @@
 - 决策**可以被推翻**，而且**在符合作者预期的前提下，我们鼓励推翻**：有更合理的改进方案，或环境发生重大变化时，就选择另一种实现——推翻的方式是写一条新决策取代旧决策，而不是删除。很多决策本身就是随手的选择，会如实标注「随时可以」重新考虑。
 - 决策不要求作者看过。它的价值是**记录与溯源**：将来想了解历史或推翻时，能知道哪些是作者的预期，哪些是当时思考出来的方案。
 - **全局/跨应用决策**放在 `decisions/`，编号 `D-NNNN`；**应用专属决策**放在 `apps/<app>/user-spec/decisions/`，编号 `<APP>-NNNN`（如 `GO-0001`），由应用自己的 `user-spec/README.md` 与决策索引维护。
-- **应用专属 user spec** 也放在 `apps/<app>/user-spec/`，与 decisions 一起；目前只迁移了 `apps/go`，其它应用仍暂时在 `user-spec/apps/`。
+- **应用专属 user spec** 也放在 `apps/<app>/user-spec/`，与 decisions 一起（[D-0073](decisions/0073-app-local-decisions.md)）。
 - 写法与模板见 [decisions/README.md](decisions/README.md)；应用决策沿用同一模板。
 
 ## 引用关系
@@ -78,9 +78,8 @@ agent 发现 spec 与需求或现状冲突时，正确的反应不是覆盖，�
 | `product.md` | 产品是什么、为谁、使命、阶段路线 |
 | `principles.md` | 贯穿全局的原则 |
 | `platform.md` | 平台层的预期 |
-| `apps/` | 尚未迁移的子应用预期（vocab / dialog / zheye） |
 | `future/` | 尚未实现的方向：`builder.md`、`user-spec.md`（user spec 作为产品能力的构想） |
 | `workflow.md` | 对开发方式的预期 |
 | `concepts/` | 概念：给项目里的东西起明确的名字 |
 | `decisions/` | 全局/跨应用决策（`D-NNNN`） |
-| `apps/<app>/user-spec/` | 已迁移应用的 spec + decisions（目前是 `apps/go/user-spec/`） |
+| `apps/<app>/user-spec/`（仓库根目录下） | 各子应用的预期与决策：学英语、对话、围棋、哲野 |

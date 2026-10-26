@@ -1,6 +1,6 @@
 # 学英语（vocab）技术文档
 
-> 应用 id：`vocab`；显示名「学英语」。作者的预期见 `user-spec/apps/vocab.md`。
+> 应用 id：`vocab`；显示名「学英语」。作者的预期见 [`../user-spec/README.md`](../user-spec/README.md)，决策见 [`../user-spec/decisions/`](../user-spec/decisions/README.md)。
 
 ## 1. 结构
 
@@ -11,7 +11,7 @@
 
 ## 2. 数据模型
 
-### `vocab__card`（D-0021）
+### `vocab__card`（VOCAB-0001）
 
 ```
 id              TEXT PK
@@ -22,22 +22,22 @@ phonetic        TEXT               -- 音标（IPA）
 meaning         TEXT NOT NULL DEFAULT ''
 context         TEXT               -- 例句 / 语境
 source          TEXT               -- 来源（默认 'manual'；将来抓词为 'dialog'）
-status          TEXT NOT NULL DEFAULT 'learning'   -- 'learning' | 'mastered'（D-0023）
+status          TEXT NOT NULL DEFAULT 'learning'   -- 'learning' | 'mastered'（VOCAB-0003）
 due, stability, difficulty, elapsed_days, scheduled_days,
-learning_steps, reps, lapses, state, last_review   -- ts-fsrs Card 字段（D-0026）
+learning_steps, reps, lapses, state, last_review   -- ts-fsrs Card 字段（VOCAB-0006）
 created_at      INTEGER NOT NULL
 ```
 
 索引：`term`、`due`、`status`。
 
-### `vocab__word_level`（D-0025）
+### `vocab__word_level`（VOCAB-0005）
 
 ```
 term   TEXT PK    -- 归一化拼写
 level  TEXT       -- 'A' | 'B' | 'C' | 'D'
 ```
 
-参考数据（不是用户数据），迁移 `0002_word_level` 一次性种入。数据文件由 `pnpm build:toefl [源文件]`（`scripts/build-toefl-levels.ts`）生成并**随仓库提交**（见 D-0057）：输出 `[term, level]` 数组；同一词跨分类 / 级别时取最高优先级 A > B > C > D。
+参考数据（不是用户数据），迁移 `0002_word_level` 一次性种入。数据文件由 `pnpm build:toefl [源文件]`（`scripts/build-toefl-levels.ts`）生成并**随仓库提交**（见 VOCAB-0009）：输出 `[term, level]` 数组；同一词跨分类 / 级别时取最高优先级 A > B > C > D。
 
 ### 迁移
 
@@ -66,7 +66,7 @@ vocab.setMastered({ cardId, mastered }) → { ok }
 - `addCard` 只负责新建，不查重；`scheduling` 用于导入 / 恢复调度状态，普通添加不传；
 - `previewReview` 只读；ts-fsrs fuzz 关闭，预览与实际结果一致。
 
-## 4. 添加流程（D-0022、D-0008）
+## 4. 添加流程（VOCAB-0002、D-0008）
 
 1. `vocab.resolveCard`：按 `term` 查已有卡片；没有 → `new`；有 → 调用 `platform.ai.chat`，提供已有卡片的「单词 + 意项 + 释义」列表，强制调用 `submit_decision` 工具返回 `matchIndex`（temperature 0）；解析失败视为无同类；
 2. 界面根据结果：
@@ -74,14 +74,14 @@ vocab.setMastered({ cardId, mastered }) → { ok }
    - `match` → 展示已有卡片，用户选择：替换（`vocab.updateCard`，保留调度）/ 仍新增（`vocab.addCard`）/ 放弃；
 3. 未配置 AI 密钥或调用失败时，界面回退为只做机械检查。
 
-## 5. 查词（D-0027、D-0024）
+## 5. 查词（VOCAB-0007、VOCAB-0004）
 
 - 界面直接调用 `platform.ai.chat`，带 `make_card` 工具；AI 返回卡片草稿（单词 / 意项 / 音标 / 释义 / 例句），内容一律中文、例句英文；
 - 用户确认「加入词库」后走添加流程；结果不缓存。
 
 ## 6. 界面
 
-- **复习**（D-0028）：剩余张数 → 单词 → 显示答案（音标 / 释义 / 语境 / 分级徽章）→ 评分（重来 / 不错 / 简单，按钮下显示 `previewReview` 的间隔）或「完全学会」（`setMastered`）；
+- **复习**（VOCAB-0008）：剩余张数 → 单词 → 显示答案（音标 / 释义 / 语境 / 分级徽章）→ 评分（重来 / 不错 / 简单，按钮下显示 `previewReview` 的间隔）或「完全学会」（`setMastered`）；
 - **词库**：卡片列表 + 拼写搜索 + 展开编辑 + 标记 / 取消掌握；命中参考词表显示「托福 A/B/C/D」徽章；
 - **添加**：手动填写单词 / 意项 / 释义 / 音标 / 语境，走添加流程；
 - **统计**：卡片总数 / 学习中 / 已掌握 / 待复习；

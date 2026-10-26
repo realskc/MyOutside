@@ -82,29 +82,29 @@
 | [D-0018](0018-iframe-panel-and-app-protocol.md) | 子应用面板：一个 iframe + app:// 自定义协议 | 有效 |
 | [D-0019](0019-api-key-in-platform-settings.md) | AI 密钥存在平台设置里（明文） | 有效（临时方案） |
 | [D-0020](0020-mobile-via-web-ui.md) | 移动端用同一套 Web 界面承载，不做原生 App | 有效（未实施） |
-| [D-0021](0021-card-is-term-plus-sense.md) | 卡片数据模型：一张卡片 = 单词 + 本质意项 | 有效 |
-| [D-0022](0022-dedup-on-add.md) | 添加卡片时的查重：机械检查拼写 + AI 判断是否同义，不自动合并 | 有效 |
-| [D-0023](0023-mastery-is-manual.md) | 「已掌握」完全由用户手动标记 | 有效 |
-| [D-0024](0024-card-content-in-chinese.md) | AI 生成的卡片内容一律用中文，例句保持英文 | 有效 |
-| [D-0025](0025-toefl-word-levels.md) | 导入《词以类记》托福分级作为参考词表 | 有效 |
-| [D-0026](0026-fsrs-scheduling.md) | 复习调度使用 FSRS（ts-fsrs） | 有效 |
-| [D-0027](0027-ai-lookup.md) | 查词：AI 翻译解说并生成卡片草稿 | 有效 |
-| [D-0028](0028-review-screen.md) | 复习界面：三个评分按钮 +「完全学会」 | 有效 |
-| [D-0029](0029-message-tree.md) | 对话消息树：父指针 + 当前选中的分叉指针 | 有效 |
-| [D-0030](0030-backend-orchestrated-reply.md) | 回复由对话应用的后端生成，整段返回，不做流式 | 部分被取代（→ D-0065、D-0071） |
-| [D-0031](0031-edit-user-messages-only.md) | 只能编辑用户消息；暂不支持重新生成助手回复 | 部分被取代（→ D-0066） |
-| [D-0032](0032-reasoning-display.md) | 思考强度按会话设置；思考过程折叠显示、不放进后续上下文 | 有效（加搜索时必须修改） |
-| [D-0033](0033-context-budget.md) | 发给 AI 的上下文按约 100 万 token 的预算截断 | 有效 |
-| [D-0034](0034-usage-display.md) | 用量显示：每条回复的明细 + 会话累计 | 已取代（→ D-0068） |
-| [D-0035](0035-dialog-ui-details.md) | 对话界面细节 | 部分被取代（→ D-0069） |
-| [D-0036](0036-zheye-explanation-units.md) | 哲野的讲解单元：词 / 句 / 文三种，三种来源 | 有效（未实现） |
-| [D-0037](0037-zheye-prerequisites.md) | 哲野的前置检查：轻 / 重前置，只问重前置，全递归 | 有效（未实现） |
-| [D-0038](0038-zheye-generation.md) | 哲野的生成：自动开始，全局串行，按依赖顺序，生成后固定 | 有效（未实现） |
-| [D-0039](0039-zheye-article-templates.md) | 哲野的三类文章模板 | 有效（未实现） |
-| [D-0040](0040-zheye-rubric.md) | 哲野的质量标准（rubric） | 有效（未实现） |
-| [D-0041](0041-zheye-no-profiling.md) | 哲野不做口味档案、不做应用内反馈；不要求高保真 | 有效 |
-| [D-0042](0042-zheye-recipes-in-repo.md) | 哲野的配方以人可读文件随仓库版本化 | 有效（未实现） |
-| [D-0043](0043-zheye-v1-scope.md) | 哲野 v1 的范围 | 有效（未实现） |
+| [D-0021](0021-card-is-term-plus-sense.md) | 卡片数据模型：一张卡片 = 单词 + 本质意项 | 弃用（→ VOCAB-0001） |
+| [D-0022](0022-dedup-on-add.md) | 添加卡片时的查重：机械检查拼写 + AI 判断是否同义，不自动合并 | 弃用（→ VOCAB-0002） |
+| [D-0023](0023-mastery-is-manual.md) | 「已掌握」完全由用户手动标记 | 弃用（→ VOCAB-0003） |
+| [D-0024](0024-card-content-in-chinese.md) | AI 生成的卡片内容一律用中文，例句保持英文 | 弃用（→ VOCAB-0004） |
+| [D-0025](0025-toefl-word-levels.md) | 导入《词以类记》托福分级作为参考词表 | 弃用（→ VOCAB-0005） |
+| [D-0026](0026-fsrs-scheduling.md) | 复习调度使用 FSRS（ts-fsrs） | 弃用（→ VOCAB-0006） |
+| [D-0027](0027-ai-lookup.md) | 查词：AI 翻译解说并生成卡片草稿 | 弃用（→ VOCAB-0007） |
+| [D-0028](0028-review-screen.md) | 复习界面：三个评分按钮 +「完全学会」 | 弃用（→ VOCAB-0008） |
+| [D-0029](0029-message-tree.md) | 对话消息树：父指针 + 当前选中的分叉指针 | 弃用（→ DIALOG-0001） |
+| [D-0030](0030-backend-orchestrated-reply.md) | 回复由对话应用的后端生成，整段返回，不做流式 | 弃用（→ DIALOG-0002） |
+| [D-0031](0031-edit-user-messages-only.md) | 只能编辑用户消息；暂不支持重新生成助手回复 | 弃用（→ DIALOG-0003） |
+| [D-0032](0032-reasoning-display.md) | 思考强度按会话设置；思考过程折叠显示、不放进后续上下文 | 弃用（→ DIALOG-0004） |
+| [D-0033](0033-context-budget.md) | 发给 AI 的上下文按约 100 万 token 的预算截断 | 弃用（→ DIALOG-0005） |
+| [D-0034](0034-usage-display.md) | 用量显示：每条回复的明细 + 会话累计 | 弃用（→ DIALOG-0006） |
+| [D-0035](0035-dialog-ui-details.md) | 对话界面细节 | 弃用（→ DIALOG-0007） |
+| [D-0036](0036-zheye-explanation-units.md) | 哲野的讲解单元：词 / 句 / 文三种，三种来源 | 弃用（→ ZHEYE-0001） |
+| [D-0037](0037-zheye-prerequisites.md) | 哲野的前置检查：轻 / 重前置，只问重前置，全递归 | 弃用（→ ZHEYE-0002） |
+| [D-0038](0038-zheye-generation.md) | 哲野的生成：自动开始，全局串行，按依赖顺序，生成后固定 | 弃用（→ ZHEYE-0003） |
+| [D-0039](0039-zheye-article-templates.md) | 哲野的三类文章模板 | 弃用（→ ZHEYE-0004） |
+| [D-0040](0040-zheye-rubric.md) | 哲野的质量标准（rubric） | 弃用（→ ZHEYE-0005） |
+| [D-0041](0041-zheye-no-profiling.md) | 哲野不做口味档案、不做应用内反馈；不要求高保真 | 弃用（→ ZHEYE-0006） |
+| [D-0042](0042-zheye-recipes-in-repo.md) | 哲野的配方以人可读文件随仓库版本化 | 弃用（→ ZHEYE-0007） |
+| [D-0043](0043-zheye-v1-scope.md) | 哲野 v1 的范围 | 弃用（→ ZHEYE-0008） |
 | [D-0044](0044-docs-sync-with-features.md) | 功能提交时同步更新 README 与相关文档 | 有效 |
 | [D-0045](0045-commit-and-test-conventions.md) | 提交信息与测试规范 | 有效 |
 | [D-0046](0046-smoke-on-temp-data-copy.md) | 冒烟测试在真实数据的临时副本上运行 | 有效 |
@@ -115,24 +115,24 @@
 | [D-0051](0051-event-centric-agent-runs.md) | agent 运行以事件为中心；流式输出与进度显示共用推送通道 | 有效 |
 | [D-0052](0052-agent-execution-modes.md) | agent 的两种运行模式：调用内运行先行，后台任务后置 | 已取代（→ D-0061、D-0062、D-0063） |
 | [D-0053](0053-kernel-enforced-call-permissions.md) | 调用权限：应用声明自己会调用哪些函数，内核强制检查 | 有效 |
-| [D-0054](0054-dialog-search-v1-with-progress.md) | 对话搜索第一版就做进度推送 | 有效 |
-| [D-0055](0055-web-search-toggle.md) | 对话的「联网搜索」开关：默认打开，打开时由模型决定搜不搜 | 有效 |
+| [D-0054](0054-dialog-search-v1-with-progress.md) | 对话搜索第一版就做进度推送 | 弃用（→ DIALOG-0008） |
+| [D-0055](0055-web-search-toggle.md) | 对话的「联网搜索」开关：默认打开，打开时由模型决定搜不搜 | 弃用（→ DIALOG-0009） |
 | [D-0056](0056-app-manifest.md) | 应用清单（manifest）的内容与形式：每个子应用一份 JSON 文件 | 有效 |
-| [D-0057](0057-track-word-levels-data.md) | 参考词表数据随仓库提交；`.gitignore` 只忽略根目录 `data/` | 有效 |
+| [D-0057](0057-track-word-levels-data.md) | 参考词表数据随仓库提交；`.gitignore` 只忽略根目录 `data/` | 弃用（→ VOCAB-0009） |
 | [D-0058](0058-public-and-internal-functions.md) | 前端调用后端也经过内核；函数分公开与内部 | 有效 |
 | [D-0059](0059-no-tool-choice.md) | 不使用 `tool_choice` 的强制调用 | 有效 |
 | [D-0060](0060-tool-loop-ends-without-tool-calls.md) | 工具循环在模型不调用工具时结束 | 有效（暂时） |
 | [D-0061](0061-agent-structures-as-platform-base-classes.md) | 通用 agent 结构以平台基类提供，数据存在子应用自己的表空间 | 有效（未实现） |
 | [D-0062](0062-workflow-persistence-is-app-responsibility.md) | 工作流的暂停与恢复由子应用自己解决，平台不提供通用的重放机制 | 有效 |
 | [D-0063](0063-internal-apis-may-be-async-functions.md) | 写数据只能通过事务 API；公开 API 只能是只读或事务，内部 API 还可以是普通的异步函数 | 有效 |
-| [D-0064](0064-search-results-presentation.md) | 搜索结果的呈现：正文标注引用、下方列出来源、搜索过程折叠 | 有效 |
-| [D-0065](0065-streaming-output.md) | 对话回复逐字流式输出 | 有效 |
-| [D-0066](0066-regenerate-reply.md) | 支持重新生成助手回复（在回复这一层分叉） | 有效 |
-| [D-0067](0067-flash-only.md) | 对话固定使用 deepseek-flash，不提供模型选择 | 有效 |
-| [D-0068](0068-show-current-context-length.md) | 用量显示改为突出当前上下文长度 | 有效 |
-| [D-0069](0069-markdown-and-latex.md) | 对话回复渲染完整的 Markdown 与 LaTeX 公式 | 有效 |
+| [D-0064](0064-search-results-presentation.md) | 搜索结果的呈现：正文标注引用、下方列出来源、搜索过程折叠 | 弃用（→ DIALOG-0010） |
+| [D-0065](0065-streaming-output.md) | 对话回复逐字流式输出 | 弃用（→ DIALOG-0011） |
+| [D-0066](0066-regenerate-reply.md) | 支持重新生成助手回复（在回复这一层分叉） | 弃用（→ DIALOG-0012） |
+| [D-0067](0067-flash-only.md) | 对话固定使用 deepseek-flash，不提供模型选择 | 弃用（→ DIALOG-0013） |
+| [D-0068](0068-show-current-context-length.md) | 用量显示改为突出当前上下文长度 | 弃用（→ DIALOG-0014） |
+| [D-0069](0069-markdown-and-latex.md) | 对话回复渲染完整的 Markdown 与 LaTeX 公式 | 弃用（→ DIALOG-0015） |
 | [D-0070](0070-kernel-permissions-implementation.md) | 调用者识别、权限检查与清单的实现方式 | 有效 |
-| [D-0071](0071-dialog-generation-implementation.md) | 对话回复的生成与保存方式 | 有效 |
+| [D-0071](0071-dialog-generation-implementation.md) | 对话回复的生成与保存方式 | 弃用（→ DIALOG-0016） |
 | [D-0072](0072-dev-lan-preview.md) | 开发用 LAN 预览：Electron 主进程内加可选 HTTP 宿主 | 有效 |
 | [D-0073](0073-app-local-decisions.md) | 应用自包含：spec/docs/decisions 在 apps/<app>/ 内按层组织 | 有效 |
 
@@ -141,3 +141,6 @@
 | 应用 | 目录 |
 |---|---|
 | 围棋（go） | [`apps/go/user-spec/`](../../apps/go/user-spec/README.md) · [decisions](../../apps/go/user-spec/decisions/README.md) · [docs](../../apps/go/docs/README.md) |
+| 学英语（vocab） | [`apps/vocab/user-spec/`](../../apps/vocab/user-spec/README.md) · [decisions](../../apps/vocab/user-spec/decisions/README.md) · [docs](../../apps/vocab/docs/README.md) |
+| 对话（dialog） | [`apps/dialog/user-spec/`](../../apps/dialog/user-spec/README.md) · [decisions](../../apps/dialog/user-spec/decisions/README.md) · [docs](../../apps/dialog/docs/README.md) |
+| 哲野（zheye） | [`apps/zheye/user-spec/`](../../apps/zheye/user-spec/README.md) · [decisions](../../apps/zheye/user-spec/decisions/README.md) · [docs](../../apps/zheye/docs/README.md) |

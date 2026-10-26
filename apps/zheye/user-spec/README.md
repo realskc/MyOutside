@@ -1,5 +1,7 @@
 # 哲野（zheye）
 
+> 这是哲野自己的作者预期。技术文档见 [`../docs/README.md`](../docs/README.md)；决策见 [`decisions/`](decisions/README.md)。
+
 命名：取「之乎者也」，与知乎相呼应；意取「哲理的海洋 / 知识的原野」。
 
 一句话：**把「一个点」讲透的个人讲解系统——材料由你投递，内容为学会服务。**
@@ -33,14 +35,14 @@
 
 以下决策都是作者认真思考后敲定的：
 
-- 讲解单元与来源：[D-0036](../decisions/0036-zheye-explanation-units.md)
-- 前置检查：[D-0037](../decisions/0037-zheye-prerequisites.md)
-- 生成方式：[D-0038](../decisions/0038-zheye-generation.md)
-- 三类文章模板：[D-0039](../decisions/0039-zheye-article-templates.md)
-- 质量标准：[D-0040](../decisions/0040-zheye-rubric.md)
-- 不做画像与应用内反馈；不要求高保真：[D-0041](../decisions/0041-zheye-no-profiling.md)
-- 配方的管理方式：[D-0042](../decisions/0042-zheye-recipes-in-repo.md)
-- v1 的范围：[D-0043](../decisions/0043-zheye-v1-scope.md)
+- 讲解单元与来源：[ZHEYE-0001](decisions/ZHEYE-0001-zheye-explanation-units.md)
+- 前置检查：[ZHEYE-0002](decisions/ZHEYE-0002-zheye-prerequisites.md)
+- 生成方式：[ZHEYE-0003](decisions/ZHEYE-0003-zheye-generation.md)
+- 三类文章模板：[ZHEYE-0004](decisions/ZHEYE-0004-zheye-article-templates.md)
+- 质量标准：[ZHEYE-0005](decisions/ZHEYE-0005-zheye-rubric.md)
+- 不做画像与应用内反馈；不要求高保真：[ZHEYE-0006](decisions/ZHEYE-0006-zheye-no-profiling.md)
+- 配方的管理方式：[ZHEYE-0007](decisions/ZHEYE-0007-zheye-recipes-in-repo.md)
+- v1 的范围：[ZHEYE-0008](decisions/ZHEYE-0008-zheye-v1-scope.md)
 
 ## 未定
 

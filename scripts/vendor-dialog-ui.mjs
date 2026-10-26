@@ -1,5 +1,5 @@
 /**
- * 把对话前端用到的第三方库复制到 apps/dialog/ui/vendor/（前端不经构建，直接加载，D-0069）。
+ * 把对话前端用到的第三方库复制到 apps/dialog/ui/vendor/（前端不经构建，直接加载，DIALOG-0015）。
  * 版本由 apps/dialog/package.json 的 devDependencies 决定；升级后重新运行：node scripts/vendor-dialog-ui.mjs
  */
 import { copyFileSync, mkdirSync, readdirSync, rmSync, writeFileSync, readFileSync } from "node:fs";

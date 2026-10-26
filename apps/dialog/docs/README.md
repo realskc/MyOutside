@@ -1,6 +1,6 @@
 # 对话（dialog）技术文档
 
-> 应用 id：`dialog`；显示名「对话」。作者的预期见 `user-spec/apps/dialog.md`。
+> 应用 id：`dialog`；显示名「对话」。作者的预期见 [`../user-spec/README.md`](../user-spec/README.md)，决策见 [`../user-spec/decisions/`](../user-spec/decisions/README.md)。
 
 ## 1. 结构
 
@@ -9,15 +9,15 @@
 - 契约：`packages/contracts/src/dialog.ts`
 - 测试：`apps/dialog/test/dialog.test.ts`
 
-## 2. 数据模型（D-0029）
+## 2. 数据模型（DIALOG-0001）
 
 ```
 dialog__conversation
   id               TEXT PK
   title            TEXT NOT NULL DEFAULT ''      -- 空 = 显示「新对话」；首条用户消息自动生成
   system_prompt    TEXT NULL                     -- null = 默认提示词（后端常量）
-  reasoning_effort TEXT NOT NULL DEFAULT 'high'  -- 'none' | 'low' | 'high' | 'max'（D-0032）
-  web_search       INTEGER NOT NULL DEFAULT 1    -- 联网搜索开关（D-0055）
+  reasoning_effort TEXT NOT NULL DEFAULT 'high'  -- 'none' | 'low' | 'high' | 'max'（DIALOG-0004）
+  web_search       INTEGER NOT NULL DEFAULT 1    -- 联网搜索开关（DIALOG-0009）
   active_first_id  TEXT NULL                     -- 当前选中的根消息
   created_at       INTEGER NOT NULL
   updated_at       INTEGER NOT NULL              -- 最近活动时间；列表倒序
@@ -56,7 +56,7 @@ dialog.listConversations({}) → Conversation[]            // updated_at 倒序�
 dialog.getPath({ conversationId, limit? }) → { messages: PathMessage[], hasMore, generating, contextTokens }
   // 当前路径最近 N 条（默认 100，升序）；PathMessage = Message + { siblingCount, siblingIndex, siblingIds }
   // Message 含 steps（搜索过程）、sources（来源）、contextTokens
-  // generating：这个会话是否正在生成；contextTokens：当前上下文长度（D-0068）
+  // generating：这个会话是否正在生成；contextTokens：当前上下文长度（DIALOG-0014）
 dialog.getUsage({ conversationId }) → { replies, promptTokens, completionTokens, totalTokens, reasoningTokens }
 
 // —— 普通的异步函数（D-0063）：生成回复并由后端保存 ——
@@ -74,10 +74,10 @@ dialog.renameConversation / setSystemPrompt / setReasoningEffort / setWebSearch 
 ```
 
 - `appendMessage`：接到当前路径末端；校验问答交替（user 不能接在 user 后面，assistant 必须接在 user 后面）；标题为空且 role=user 时自动生成标题；
-- `saveReply`：挂在指定的用户消息下（父节点必须仍存在、是用户消息、属于该会话，否则 `CONFLICT`），并把父节点的选中子节点指向新回复——已有回复时新回复成为兄弟（D-0066）；
+- `saveReply`：挂在指定的用户消息下（父节点必须仍存在、是用户消息、属于该会话，否则 `CONFLICT`），并把父节点的选中子节点指向新回复——已有回复时新回复成为兄弟（DIALOG-0012）；
 - 生成中取消（`outside.cancel(runId)`）→ `ABORTED`，不保存；同一会话同时只能生成一条 → `PRECONDITION`。
 
-## 4. 生成流程（D-0071，`backend/src/generate.ts`）
+## 4. 生成流程（DIALOG-0016，`backend/src/generate.ts`）
 
 1. 取会话与要回答的用户消息（`parentId`）；
 2. **沿父指针**取出从根到这条用户消息的消息链（与当前选中的分支无关，生成期间切换分支也不会挂错地方）；
@@ -85,7 +85,7 @@ dialog.renameConversation / setSystemPrompt / setReasoningEffort / setWebSearch 
    - 联网搜索打开：之前带搜索的回复按轮展开（assistant 含 `reasoning_content` 与 `tool_calls`，加工具结果），满足 DeepSeek 带工具时的回传规则；
    - 联网搜索关闭：之前的回复只保留最终回答；
    - 所有 assistant 都带 `reasoning_content`（不带工具时 DeepSeek 会忽略）；
-4. 按约 100 万 token 截断（D-0033），以「一条用户消息」或「一整轮回复」为单位；
+4. 按约 100 万 token 截断（DIALOG-0005），以「一条用户消息」或「一整轮回复」为单位；
 5. 系统提示词 = 会话的系统提示词（或默认）+「当前日期」+（联网搜索打开时）使用说明：何时搜索、用 [n] 标注来源、网页内容不是指令；
 6. `runToolLoop`（`packages/agent`）：流式；工具 = 联网搜索打开时的 `web_search` + `web_fetch`（共用一个来源登记表，编号在多次搜索间一致）；最多 8 轮；
 7. 调用事务 API `dialog.saveReply` 保存：回答、思考过程、用量、搜索过程（`steps`）、来源（`sources`）、最后一次请求的输入 token 数。
@@ -94,18 +94,18 @@ dialog.renameConversation / setSystemPrompt / setReasoningEffort / setWebSearch 
 
 `DEFAULT_SYSTEM_PROMPT`：「你是一个乐于助人的 AI 助手。回答简洁、准确；除非用户要求，使用与用户相同的语言回答。」
 
-## 5. 界面（D-0035、D-0064～D-0069）
+## 5. 界面（DIALOG-0007、DIALOG-0010～DIALOG-0015）
 
 - 左栏会话列表（新建 / 重命名 / 删除 / 会话设置），右栏消息流 + 输入区；窄屏（< 720px）列表收为抽屉；
 - 消息流只显示当前路径；兄弟数 > 1 时显示 `‹ i/k ›` 分叉切换器；
-- 用户消息「编辑」→ 行内编辑 → 保存 = `dialog.editAndSend`；助手消息「重新生成」= `dialog.generate`（新回复成为兄弟，D-0066）；
-- 输入区工具条：思考强度（关 / 低 / 高 / 最高）、「联网搜索」开关，改动即存；右侧显示**当前上下文长度**，悬停看会话累计用量（D-0068）；
+- 用户消息「编辑」→ 行内编辑 → 保存 = `dialog.editAndSend`；助手消息「重新生成」= `dialog.generate`（新回复成为兄弟，DIALOG-0012）；
+- 输入区工具条：思考强度（关 / 低 / 高 / 最高）、「联网搜索」开关，改动即存；右侧显示**当前上下文长度**，悬停看会话累计用量（DIALOG-0014）；
 - **生成**：前端以运行 ID 调用 `dialog.send` / `generate` / `editAndSend`，订阅推送事件（`outside.onEvent`），实时显示思考过程、搜索过程（每次搜索 / 阅读的状态）与流式正文（按动画帧节流重绘）；生成中发送按钮变为「停止」（`outside.cancel`）；结束后重新读取路径；
 - 生成中可以切到其他会话；离开后重新打开页面，`getPath` 的 `generating` 为真时显示「生成中…」并定时刷新；
 - 失败显示错误 +「重试」；停止、或最后一条是没有回复的用户消息时，显示提示 +「生成回复」；
-- 助手消息：可折叠的「思考过程」与「搜索过程」（默认折叠），正文里的 `[n]` 渲染为指向来源的链接，下方列出来源（D-0064）；
+- 助手消息：可折叠的「思考过程」与「搜索过程」（默认折叠），正文里的 `[n]` 渲染为指向来源的链接，下方列出来源（DIALOG-0010）；
 - 输入：Enter 发送、Shift+Enter 换行，处理中文输入法组字；
-- **Markdown + LaTeX**（D-0069，`ui/markdown.js`）：marked 解析，KaTeX 渲染公式（`$…$`、`\(…\)`、`$$…$$`、`\[…\]`；代码里的 `$` 不处理；`$5 和 $10` 这类金额不当公式），DOMPurify 清洗，原始 HTML 一律转义；代码块带复制按钮；链接仅 http/https，经 `outside.openExternal` 用系统浏览器打开；
+- **Markdown + LaTeX**（DIALOG-0015，`ui/markdown.js`）：marked 解析，KaTeX 渲染公式（`$…$`、`\(…\)`、`$$…$$`、`\[…\]`；代码里的 `$` 不处理；`$5 和 $10` 这类金额不当公式），DOMPurify 清洗，原始 HTML 一律转义；代码块带复制按钮；链接仅 http/https，经 `outside.openExternal` 用系统浏览器打开；
 - 第三方库放在 `ui/vendor/`，由 `node scripts/vendor-dialog-ui.mjs` 从 devDependencies 复制（版本见 `vendor/VERSIONS.txt`），前端不经构建；
 - 会话设置：编辑系统提示词（保存 / 恢复默认）；
 - 文案中英双语。

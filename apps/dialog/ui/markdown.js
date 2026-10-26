@@ -1,6 +1,6 @@
-/* Markdown + LaTeX 渲染（D-0069）：marked 解析 Markdown，KaTeX 渲染公式，DOMPurify 清洗。
+/* Markdown + LaTeX 渲染（DIALOG-0015）：marked 解析 Markdown，KaTeX 渲染公式，DOMPurify 清洗。
    - 公式：$…$、\(…\) 行内；$$…$$、\[…\] 独立成行；代码里的 $ 不处理；
-   - 引用：正文里的 [n]（n 是本条回复的来源编号）渲染为指向来源的链接（D-0064）；
+   - 引用：正文里的 [n]（n 是本条回复的来源编号）渲染为指向来源的链接（DIALOG-0010）；
    - 安全：原始 HTML 一律转义；只保留 http/https 链接，交给系统浏览器打开。 */
 (() => {
   "use strict";

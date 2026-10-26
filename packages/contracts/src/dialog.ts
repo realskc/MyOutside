@@ -11,7 +11,7 @@ export const ConversationSchema = z.object({
   title: z.string(),
   systemPrompt: z.string().nullable(),
   reasoningEffort: ReasoningEffort,
-  /** 联网搜索开关（D-0055）：打开时把搜索 / 抓取工具交给模型 */
+  /** 联网搜索开关（DIALOG-0009）：打开时把搜索 / 抓取工具交给模型 */
   webSearch: z.boolean(),
   activeFirstId: z.string().nullable(),
   createdAt: z.number().int(),
@@ -40,7 +40,7 @@ export const ReplyStepSchema = z.object({
 });
 export type ReplyStep = z.infer<typeof ReplyStepSchema>;
 
-/** 回复引用的来源（正文用 [n] 标注，D-0064） */
+/** 回复引用的来源（正文用 [n] 标注，DIALOG-0010） */
 export const ReplySourceSchema = z.object({
   index: z.number().int(),
   url: z.string(),
@@ -95,7 +95,7 @@ export const GetPathOutput = z.object({
   hasMore: z.boolean(),
   /** 这个会话是否正在生成回复 */
   generating: z.boolean(),
-  /** 当前上下文长度（token）：最近一条回复的实际输入 token 数，加上其后消息的估算；无回复时整体估算（D-0068） */
+  /** 当前上下文长度（token）：最近一条回复的实际输入 token 数，加上其后消息的估算；无回复时整体估算（DIALOG-0014） */
   contextTokens: z.number().int(),
 });
 export type GetPathOutput = z.infer<typeof GetPathOutput>;
@@ -120,7 +120,7 @@ export const SendMessageInput = z.object({
 });
 export type SendMessageInput = z.infer<typeof SendMessageInput>;
 
-/** 为某条用户消息生成一条回复（内部 API）：重新生成、失败后重试都用它；新回复成为已有回复的兄弟（D-0066） */
+/** 为某条用户消息生成一条回复（内部 API）：重新生成、失败后重试都用它；新回复成为已有回复的兄弟（DIALOG-0012） */
 export const GenerateInput = z.object({
   conversationId: z.string(),
   /** 要回答的那条用户消息 */

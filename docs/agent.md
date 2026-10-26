@@ -309,12 +309,12 @@ class AnnotationThread extends MessageTree {
 
 ## 11. 第一个落地：对话搜索
 
-1. **内核**：应用清单（D-0056）；调用者身份与 `uses` 权限检查（§3.1、§7.2）；推送通道（§3.2，D-0054）；
+1. **内核**：应用清单（D-0056）；调用者身份与 `uses` 权限检查（§3.1、§7.2）；推送通道（§3.2，DIALOG-0008）；
 2. **模型层**：`reasoning_content` 回传、`message` 输出、结构化错误、按调用者计量；确认「关」档的参数；
 3. **平台工具**：`platform.web.search` / `platform.web.fetch`；
 4. **循环库**：`packages/agent` 的 `runAgent`（不含流式）与 `callStructured`；
 5. **对话应用**：
-   - `generateReply` 改用 `runAgent`；会话的「联网搜索」开关打开时工具 = 搜索 + 抓取，关闭时不给工具（D-0055）；
+   - `generateReply` 改用 `runAgent`；会话的「联网搜索」开关打开时工具 = 搜索 + 抓取，关闭时不给工具（DIALOG-0009）；
    - 消息表增加本轮的工具步骤记录（工具调用与截断后的结果），重建历史时连同 `reasoning_content` 一起回传；
    - 界面实时显示搜索步骤（推送），结束后显示来源；输入区增加「联网搜索」开关；
 6. **学英语**：去重判断与卡片草稿迁移到 `callStructured`（可以晚一点）。

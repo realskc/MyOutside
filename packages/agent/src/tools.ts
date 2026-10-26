@@ -16,7 +16,7 @@ export function apiTool(
   };
 }
 
-/** 一次回复里引用的来源：编号在多次搜索 / 抓取之间保持一致，供正文用 [n] 标注（D-0064） */
+/** 一次回复里引用的来源：编号在多次搜索 / 抓取之间保持一致，供正文用 [n] 标注（DIALOG-0010） */
 export interface Source {
   index: number;
   url: string;

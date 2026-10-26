@@ -27,8 +27,8 @@
 ## 什么时候应该重新考虑
 
 - agent 框架落地时（需要在后端完成多步流程）；
-- `docs/apps/vocab.md` §8 提到的「异步写」函数类别被引入时。
+- `apps/vocab/docs/README.md` §8 提到的「异步写」函数类别被引入时。
 
 ## 相关文档
 
-- `docs/architecture.md` §7；`docs/apps/vocab.md` §4
+- `docs/architecture.md` §7；`apps/vocab/docs/README.md` §4

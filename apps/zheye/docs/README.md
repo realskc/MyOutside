@@ -1,14 +1,14 @@
 # 哲野（zheye）技术文档
 
 > 应用 id：`zheye`；显示名「哲野」。**未实现**，本文是技术设计草案。
-> 作者的预期见 `user-spec/apps/zheye.md`；核心机制见 D-0036 ~ D-0043。
+> 作者的预期见 [`../user-spec/README.md`](../user-spec/README.md)，决策见 [`../user-spec/decisions/`](../user-spec/decisions/README.md)；核心机制见 ZHEYE-0001 ~ ZHEYE-0008。
 
 ## 1. 核心概念
 
-- **源材料（source）**：用户投递的原始内容（v1 = 一段粘贴的文本，D-0043）；
-- **讲解单元（unit）**：应用的中心对象，三种类型（词 concept / 句 statement / 文 doc），「单元 → 文章」一对一（D-0036）；
-- **前置（prerequisite）**：单元到前置要素的边（词 / 句文本 + 轻 / 重 + 用户的回答，D-0037）；
-- **文章（article）**：讲解成果，生成后固定（D-0038）。
+- **源材料（source）**：用户投递的原始内容（v1 = 一段粘贴的文本，ZHEYE-0008）；
+- **讲解单元（unit）**：应用的中心对象，三种类型（词 concept / 句 statement / 文 doc），「单元 → 文章」一对一（ZHEYE-0001）；
+- **前置（prerequisite）**：单元到前置要素的边（词 / 句文本 + 轻 / 重 + 用户的回答，ZHEYE-0002）；
+- **文章（article）**：讲解成果，生成后固定（ZHEYE-0003）。
 
 ## 2. 数据模型（草案）
 
@@ -43,7 +43,7 @@ zheye__article
   id              TEXT PK
   unit_id         TEXT NOT NULL             -- 1:1
   content_md      TEXT NOT NULL
-  recipe_version  TEXT NOT NULL             -- 所用配方版本（D-0042）
+  recipe_version  TEXT NOT NULL             -- 所用配方版本（ZHEYE-0007）
   model           TEXT NULL
   usage           TEXT NULL                 -- JSON
   created_at      INTEGER NOT NULL
@@ -115,10 +115,10 @@ zheye.deleteSource({ sourceId }) → { ok }
 串行生成：从最深的前置开始，一篇一篇（generating → ready）
 ```
 
-- 文章模板：D-0039；质量标准：D-0040；
-- 读者模型、真实性约束：`user-spec/apps/zheye.md`。
+- 文章模板：ZHEYE-0004；质量标准：ZHEYE-0005；
+- 读者模型、真实性约束：`apps/zheye/user-spec/README.md`。
 
-## 6. 配方（D-0042）
+## 6. 配方（ZHEYE-0007）
 
 - 模板、质量标准、各阶段提示词放在人可读文件中（位置实现时定，如 `apps/zheye/pipeline/`）；
 - 每篇文章记录配方版本（git 修订或显式版本号）；

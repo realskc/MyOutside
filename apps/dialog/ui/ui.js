@@ -1,5 +1,5 @@
 /* 对话：多会话 + 树形历史分叉 + 联网搜索 + 流式输出 + Markdown / LaTeX（中英文）
-   生成在后端（dialog.send / generate / editAndSend），前端只负责发起、显示进度与结果（D-0071）。 */
+   生成在后端（dialog.send / generate / editAndSend），前端只负责发起、显示进度与结果（DIALOG-0016）。 */
 (() => {
   const bridge = window.outside;
   if (!bridge) {
@@ -188,7 +188,7 @@
 
   const formatNumber = (value) => value.toLocaleString(lang === "zh" ? "zh-CN" : "en-US");
 
-  // ---- 上下文长度与用量（D-0068） ----
+  // ---- 上下文长度与用量（DIALOG-0014） ----
 
   function renderUsage() {
     const conversation = currentConversation();

@@ -133,7 +133,7 @@ export const dialogApp: AppModule = {
     {
       id: "0002_search_and_steps",
       up: (ctx) => {
-        ctx.addColumn("conversation", "web_search INTEGER NOT NULL DEFAULT 1"); // 联网搜索开关，默认打开（D-0055）
+        ctx.addColumn("conversation", "web_search INTEGER NOT NULL DEFAULT 1"); // 联网搜索开关，默认打开（DIALOG-0009）
         ctx.addColumn("message", "steps TEXT"); // JSON：回复过程中调用了工具的各轮
         ctx.addColumn("message", "sources TEXT"); // JSON：引用的来源
         ctx.addColumn("message", "context_tokens INTEGER"); // 生成时最后一次请求的输入 token 数
@@ -325,7 +325,7 @@ export const dialogApp: AppModule = {
       return summary;
     }),
 
-    /** 保存一条回复，挂在指定的用户消息下，并选中它（D-0066：已有回复时成为兄弟） */
+    /** 保存一条回复，挂在指定的用户消息下，并选中它（DIALOG-0012：已有回复时成为兄弟） */
     saveReply: defineTx(SaveReplyInput, (ctx, input) => {
       const conversation = getConversationOrThrow(ctx.db, input.conversationId);
       const parent = getMessageOrThrow(ctx.db, input.parentId);
@@ -371,7 +371,7 @@ export const dialogApp: AppModule = {
       return generateReply(ctx, input.conversationId, messageId);
     }),
 
-    /** 为一条用户消息生成回复：重新生成（D-0066）、失败或中断后重试 */
+    /** 为一条用户消息生成回复：重新生成（DIALOG-0012）、失败或中断后重试 */
     generate: defineAsync(GenerateInput, (ctx, input) => generateReply(ctx, input.conversationId, input.parentId)),
 
     /** 编辑一条用户消息（产生新分叉）并生成回复 */

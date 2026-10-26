@@ -1,0 +1,22 @@
+# DIALOG-0002 回复由对话应用的后端生成，整段返回，不做流式
+
+- 状态：部分被取代：「不做流式」被 [DIALOG-0011](DIALOG-0011-streaming-output.md) 取代；「生成与保存分两步、由前端串起来」被 [DIALOG-0016](DIALOG-0016-dialog-generation-implementation.md) 取代
+- 日期：2026-10-07
+- 决策者：讨论
+- 服务于：
+  - 作者预期：[对话 user spec「定位」](../README.md)
+  - 上游决策：[D-0008](../../../../user-spec/decisions/0008-resolve-then-commit.md)
+
+## 决策
+
+- `dialog.generateReply`（只读 API）在后端计算当前路径、按预算截断、拼上系统提示词，调用平台 AI，返回结果但**不落库**；前端再调用 `dialog.appendMessage` 保存；前端不直接调用 AI；
+- 生成失败不留半截状态，用户消息保留，可以重试；
+- 不做流式输出（需要改造内核与传输层）。
+
+## 什么时候应该重新考虑
+
+随时可以。加搜索、agent 循环时大概率要重新设计（见 D-0007、D-0008）。
+
+## 相关文档
+
+- `apps/dialog/docs/README.md` §4
