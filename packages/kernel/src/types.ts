@@ -134,6 +134,11 @@ export interface KernelRequest {
 /** 发起调用的一方：子应用 id、"shell"（外壳，平台自身）；不传 = 平台内部（受信任） */
 export interface HandleOptions {
   caller?: string;
+  /**
+   * 来自本机以外的调用（例如局域网预览）：必须带调用者，且不能调用只给外壳的平台 API（例如修改平台设置）——
+   * 远程的身份是对方报上来的，没有鉴权时可以伪造。
+   */
+  remote?: boolean;
   emit?: (event: unknown) => void;
   signal?: AbortSignal;
 }

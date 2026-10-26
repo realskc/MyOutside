@@ -358,6 +358,12 @@ export function createKernel({ storage }: KernelOptions) {
     };
     try {
       const fn = lookup(request.call);
+      if (options.remote) {
+        if (frame.caller === undefined) throw new KernelError("FORBIDDEN", "远程调用必须带调用者");
+        if (fn.appId === PLATFORM && fn.access === "shell") {
+          throw new KernelError("FORBIDDEN", `远程调用不能使用只给外壳的 API：${request.call}`);
+        }
+      }
       checkAccess(frame.caller, request.call, fn);
       const input = validate(fn, request.call, request.payload);
       const result = await dispatch(fn, input, frame);

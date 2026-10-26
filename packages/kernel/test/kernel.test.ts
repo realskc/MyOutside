@@ -523,4 +523,27 @@ describe("kernel", () => {
     expect(() => kernel.registerApp(notesApp, { id: "other", name: "X", protocolVersion: 1 })).toThrow();
     expect(() => kernel.registerApp(seedApp, { id: "seed", name: "Seed", protocolVersion: 99 })).toThrow();
   });
+  it("远程调用：必须带调用者；即使自称外壳也不能修改平台设置；其余照常按调用者检查", async () => {
+    const { kernel } = setup();
+    const anonymous = await kernel.handle({ call: "notes.listNotes", payload: {} }, { remote: true });
+    expect(anonymous.ok).toBe(false);
+    if (!anonymous.ok) expect(anonymous.error.code).toBe("FORBIDDEN");
+
+    const set = await kernel.handle(
+      { call: "platform.settings.set", payload: { key: "ui.language", value: "en" } },
+      { caller: "shell", remote: true },
+    );
+    expect(set.ok).toBe(false);
+    if (!set.ok) expect(set.error.code).toBe("FORBIDDEN");
+
+    const get = await kernel.handle(
+      { call: "platform.settings.get", payload: { key: "ui.language" } },
+      { caller: "shell", remote: true },
+    );
+    expect(get.ok).toBe(true);
+    const own = await kernel.handle({ call: "notes.secret", payload: {} }, { caller: "notes", remote: true });
+    expect(own.ok).toBe(true);
+    const other = await kernel.handle({ call: "notes.secret", payload: {} }, { caller: "seed", remote: true });
+    expect(other.ok).toBe(false);
+  });
 });

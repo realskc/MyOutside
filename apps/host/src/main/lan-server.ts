@@ -16,6 +16,8 @@ const BRIDGE_JS = `(() => {
   const call = async (name, payload) => {
     const response = await fetch("${CALL_PATH}", {
       method: "POST",
+      // 服务端按 Referer 识别调用者（发起调用的页面），显式要求同源时带上
+      referrerPolicy: "same-origin",
       headers: { "content-type": "application/json" },
       body: JSON.stringify({ call: name, payload }),
     });
@@ -127,6 +129,25 @@ export async function startLanServer(options: LanServerOptions): Promise<Server>
   return server;
 }
 
+/**
+ * 局域网调用的调用者：按发起调用的页面（Referer）确定——/shell/ 为外壳，/apps/<id>/ 为该子应用；
+ * 认不出的一律拒绝。没有鉴权时 Referer 可以伪造，所以内核还会按远程调用收紧（不能修改平台设置）。
+ */
+export function lanCallerOf(referer: string | undefined, appIds: Set<string>): string | null {
+  if (!referer) return null;
+  let path: string;
+  try {
+    path = new URL(referer).pathname;
+  } catch {
+    return null;
+  }
+  if (path === "/shell" || path.startsWith("/shell/")) return "shell";
+  const match = /^\/apps\/([^/]+)\//.exec(path);
+  if (!match) return null;
+  const id = decodeURIComponent(match[1]!);
+  return id !== "shell" && appIds.has(id) ? id : null;
+}
+
 async function handleRequest(
   req: IncomingMessage,
   res: ServerResponse,
@@ -164,8 +185,16 @@ async function handleRequest(
         dataVersion: 0,
       });
     }
+    const caller = lanCallerOf(req.headers.referer, new Set(Object.keys(uiDirs).filter((id) => id !== "shell")));
+    if (!caller) {
+      return sendJson(res, 403, {
+        ok: false,
+        error: { code: "FORBIDDEN", message: "无法识别调用者（只接受从 /shell/ 或 /apps/<id>/ 页面发起的调用）" },
+        dataVersion: kernel.dataVersion,
+      });
+    }
     try {
-      const result = await kernel.handle({ call: body.call, payload: body.payload });
+      const result = await kernel.handle({ call: body.call, payload: body.payload }, { caller, remote: true });
       return sendJson(res, 200, result);
     } catch (error) {
       console.error(`[lan] kernel.handle(${body.call}) 失败：`, error);

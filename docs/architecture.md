@@ -119,6 +119,8 @@ interface AppModule {
 
 拒绝时错误码 `FORBIDDEN`。平台设置中的凭据（`ai.deepseek.apiKey`）任何调用者读到的都是 `{ value: null, isSet }`。
 
+**远程调用**（`handle(request, { caller, remote: true })`，目前只有局域网预览，D-0072）：必须带调用者；不能调用只给外壳的平台 API（身份是对方报上来的，可以伪造）。局域网预览按 Referer 确定调用者（`/shell/` → 外壳，`/apps/<id>/` → 子应用）。
+
 ## 4. 事务与数据版本（D-0004）
 
 - `enqueue`：所有写调用排成一条 Promise 链，顺序执行；
