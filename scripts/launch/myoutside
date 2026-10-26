@@ -1,0 +1,37 @@
+#!/bin/zsh
+# MyOutside 启动命令（macOS / Linux，开发期）：在任意目录输入 myoutside 即可启动。
+# 安装：ln -s "<仓库>/scripts/launch/myoutside" ~/.local/bin/myoutside（~/.local/bin 需在 PATH 中）
+# 用法：myoutside          后台启动，终端立即可用；已在运行时聚焦已有窗口（D-0016 单实例）
+#       myoutside --lan    同时开启局域网预览（D-0072）
+# 日志：~/Library/Logs/MyOutside/launch.log
+set -e
+
+repo="${0:A:h:h:h}" # 解析符号链接后的仓库根目录
+host="$repo/apps/host"
+log_dir="$HOME/Library/Logs/MyOutside"
+log="$log_dir/launch.log"
+mkdir -p "$log_dir"
+
+cd "$host"
+if ! electron_bin="$(node -p 'require("electron")' 2>/dev/null)"; then
+  echo "myoutside: Electron 没有装好（node_modules/electron 缺少可执行文件），请先修复后再启动。" >&2
+  exit 1
+fi
+
+if pgrep -f "$electron_bin" >/dev/null 2>&1; then
+  # 已在运行：不重新构建（构建会先清空 dist/），交给单实例锁聚焦已有窗口
+  nohup "$electron_bin" . >>"$log" 2>&1 &
+  disown
+  echo "MyOutside 已在运行，已切换到它的窗口"
+  exit 0
+fi
+
+# 先构建主进程与 preload（拉取新代码后需要；耗时约一秒）
+if ! node scripts/build.mjs >"$log" 2>&1; then
+  echo "myoutside: 构建失败，详见 $log" >&2
+  exit 1
+fi
+
+nohup node scripts/run.mjs "$@" >>"$log" 2>&1 &
+disown
+echo "MyOutside 已启动（日志：$log）"
