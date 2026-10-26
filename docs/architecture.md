@@ -31,6 +31,7 @@ SQLite 单文件（<userData>/myoutside.db）
 | `packages/kernel` | 内核：注册、迁移、调用路由、串行队列、AppDb、平台内置 API（含平台 AI） |
 | `packages/kernel-node` | Node 存储适配器（`node:sqlite` 的 `DatabaseSync`） |
 | `apps/vocab`、`apps/dialog` | 子应用：`backend/`（AppModule）、`ui/`（静态界面，D-0011）、`test/` |
+| `apps/go` | 围棋子应用：`backend/`（9 路规则、联机、悔棋、棋谱）、`ui/`（Canvas 棋盘 + 聊天）、`user-spec/`、`docs/`；应用自包含，见 D-0073 |
 | `apps/host` | Electron 程序：主进程、preload、外壳界面（`renderer/`） |
 
 ## 2. 子应用模块（AppModule）
@@ -232,6 +233,7 @@ get(table, where) / all(table, where?, { orderBy?, limit?, offset? }) / count(ta
 - 菜单：文件 / 编辑 / 视图；「编辑」菜单让 macOS 上的剪贴板快捷键生效；中英文跟随 `ui.language`；
 - 单实例锁（D-0016）；数据目录：`app.getPath("userData")`（应用名 MyOutside）；
 - 冒烟模式（`pnpm smoke`，`MYOUTSIDE_SMOKE=1`）：复制真实数据库到临时目录，自检外壳与各子应用、做演示写入、截图后退出（D-0046）；
+- LAN 预览（`pnpm dev:lan`，D-0072）：主进程额外启动 HTTP 宿主，服务外壳与 `apps/<id>/ui`，并注入浏览器版 `window.outside`（`POST /__myoutside/call` → `kernel.handle`）；默认不启用，无鉴权，仅供可信热点上的临时多设备调试；不是正式多端方案（正式方向见 D-0013）；
 - 构建：`scripts/build.mjs`（esbuild 打包主进程与 preload）、`scripts/run.mjs`（启动 Electron）。
 
 ## 11. 未实现 / 待定

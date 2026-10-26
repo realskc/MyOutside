@@ -4,8 +4,9 @@
 
 ## 约定
 
-- **一条决策一个文件**：`NNNN-简短英文标识.md`，编号四位、递增、永不复用。
-- **引用写法**：`D-0001`，在文档中链接到对应文件，如 `[D-0001](decisions/0001-electron-typescript.md)`。
+- **全局决策**用 `D-NNNN`，只记录跨应用/平台的决策；**应用专属决策**放在 `apps/<app>/user-spec/decisions/`，编号 `<APP>-NNNN`（如 `GO-0001`），由各应用的 `user-spec/decisions/README.md` 建索引。
+- **一条决策一个文件**：`NNNN-简短英文标识.md`（全局）或 `GO-NNNN-...md`（应用）；编号四位、递增、永不复用。
+- **引用写法**：全局 `D-0001`，链接到对应文件；应用决策用 `GO-0001`，链接到 `apps/<app>/user-spec/decisions/`。
 - **状态**：`有效` / `已取代（→ D-xxxx）` / `已废弃`。决策文件不删除；被取代时，旧决策标注取代者，新决策标注取代了谁。
 - **修改还是新建**：
   - **推翻决策**（换了方案、方向反转——按旧版本实现会做出不同的东西）→ **新建决策**取代旧的；
@@ -132,3 +133,11 @@
 | [D-0069](0069-markdown-and-latex.md) | 对话回复渲染完整的 Markdown 与 LaTeX 公式 | 有效 |
 | [D-0070](0070-kernel-permissions-implementation.md) | 调用者识别、权限检查与清单的实现方式 | 有效 |
 | [D-0071](0071-dialog-generation-implementation.md) | 对话回复的生成与保存方式 | 有效 |
+| [D-0072](0072-dev-lan-preview.md) | 开发用 LAN 预览：Electron 主进程内加可选 HTTP 宿主 | 有效 |
+| [D-0073](0073-app-local-decisions.md) | 应用自包含：spec/docs/decisions 在 apps/<app>/ 内按层组织 | 有效 |
+
+## 应用专属决策
+
+| 应用 | 目录 |
+|---|---|
+| 围棋（go） | [`apps/go/user-spec/`](../../apps/go/user-spec/README.md) · [decisions](../../apps/go/user-spec/decisions/README.md) · [docs](../../apps/go/docs/README.md) |

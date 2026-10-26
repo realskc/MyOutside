@@ -48,6 +48,19 @@ let settingsOpen = false;
 
 const t = (key) => DICT[lang][key];
 
+// Electron 用 app:// 自定义协议；局域网预览用同源的 /apps/<id>/。
+const IS_WEB = location.protocol === "http:" || location.protocol === "https:";
+
+function appUrl(id) {
+  return IS_WEB ? `/apps/${encodeURIComponent(id)}/index.html` : `app://${id}/index.html`;
+}
+
+function appIdFromSrc(src) {
+  if (src.startsWith("app://")) return src.slice("app://".length).split("/")[0] || null;
+  if (src.startsWith("/apps/")) return src.slice("/apps/".length).split("/")[0] || null;
+  return null;
+}
+
 async function call(name, payload) {
   return window.outside.call(name, payload);
 }
@@ -88,7 +101,7 @@ async function setLanguage(next) {
 
 function reloadPanel() {
   const src = panel.getAttribute("src") || "";
-  if (src.startsWith("app://")) {
+  if (src.startsWith("app://") || src.startsWith("/apps/")) {
     panel.src = src.replace(/\?.*$/, "") + "?l=" + Date.now();
   }
 }
@@ -118,14 +131,14 @@ async function loadApps() {
       button.textContent = app.name;
       button.addEventListener("click", () => {
         closeSettings();
-        panel.src = `app://${app.id}/index.html`;
+        panel.src = appUrl(app.id);
         setActive(button);
       });
       appsEl.appendChild(button);
     }
-    const currentId = (panel.getAttribute("src") || "").match(/^app:\/\/([^/]+)\//);
+    const currentId = appIdFromSrc(panel.getAttribute("src") || "");
     if (currentId) {
-      const active = appsEl.querySelector(`[data-app-id="${currentId[1]}"]`);
+      const active = appsEl.querySelector(`[data-app-id="${currentId}"]`);
       if (active) setActive(active);
     }
     if (!bootstrapped) {

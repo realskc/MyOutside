@@ -1,0 +1,121 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>围棋</title>
+    <link rel="stylesheet" href="ui.css" />
+  </head>
+  <body>
+    <div class="app">
+      <header class="topbar">
+        <div class="title-wrap">
+          <h1 data-i18n="appTitle">围棋</h1>
+          <span id="you" class="you"></span>
+        </div>
+        <div id="status" class="status"></div>
+      </header>
+
+      <main class="layout">
+        <section class="board-column">
+          <div class="board-shell">
+            <canvas id="board" aria-label="9 路围棋棋盘"></canvas>
+          </div>
+          <div class="turnbar">
+            <span id="turn"></span>
+            <span id="move-count"></span>
+          </div>
+          <div class="actions">
+            <button id="btn-pass" class="primary" data-i18n="pass">Pass</button>
+            <button id="btn-resign" class="danger" data-i18n="resign">认输</button>
+            <button id="btn-undo" data-i18n="undo">悔棋</button>
+            <button id="btn-new" data-i18n="newGame">新对局</button>
+            <button id="btn-swap" data-i18n="swapColors">交换黑白</button>
+            <button id="btn-records" data-i18n="records">棋谱</button>
+            <button id="btn-reset" class="danger hidden" data-i18n="resetSeats">重置座位</button>
+          </div>
+        </section>
+
+        <aside class="side">
+          <section class="panel players">
+            <div class="player-row">
+              <span class="stone-dot black"></span>
+              <span data-i18n="black">黑方</span>
+              <span id="black-state" class="player-state"></span>
+            </div>
+            <div class="player-row">
+              <span class="stone-dot white"></span>
+              <span data-i18n="white">白方</span>
+              <span id="white-state" class="player-state"></span>
+            </div>
+          </section>
+
+          <section id="undo-panel" class="panel undo-panel hidden">
+            <p id="undo-text"></p>
+            <div class="undo-actions">
+              <button id="btn-undo-accept" class="primary hidden" data-i18n="acceptUndo">同意</button>
+              <button id="btn-undo-reject" class="hidden" data-i18n="rejectUndo">拒绝</button>
+              <button id="btn-undo-cancel" class="hidden" data-i18n="cancelUndo">取消请求</button>
+            </div>
+          </section>
+
+          <section id="result" class="panel result hidden">
+            <h2 data-i18n="resultTitle">结果</h2>
+            <p id="result-text"></p>
+            <p id="result-detail" class="muted"></p>
+          </section>
+
+          <section class="panel chat">
+            <header class="chat-head">
+              <h2 data-i18n="chat">聊天</h2>
+              <span id="chat-hint" class="muted"></span>
+            </header>
+            <div id="chat-messages" class="chat-messages"></div>
+            <form id="chat-form" class="chat-form">
+              <input
+                id="chat-input"
+                data-i18n-placeholder="chatPlaceholder"
+                placeholder="发消息…"
+                maxlength="500"
+                autocomplete="off"
+              />
+              <button type="submit" class="primary" data-i18n="send">发送</button>
+            </form>
+          </section>
+        </aside>
+      </main>
+    </div>
+
+    <div id="records-modal" class="modal hidden">
+      <div class="modal-card">
+        <header class="modal-head">
+          <h2 data-i18n="records">棋谱</h2>
+          <button id="records-close" class="modal-close" aria-label="close">×</button>
+        </header>
+
+        <div id="records-list" class="records-list"></div>
+
+        <div id="record-view" class="record-view hidden">
+          <div class="record-toolbar">
+            <button id="record-back" data-i18n="recordBack">返回列表</button>
+            <span id="record-title" class="record-title"></span>
+          </div>
+          <div class="replay-shell">
+            <canvas id="replay-board"></canvas>
+          </div>
+          <div class="replay-controls">
+            <button id="replay-prev" data-i18n="replayPrev">上一手</button>
+            <span id="replay-step"></span>
+            <button id="replay-next" data-i18n="replayNext">下一手</button>
+          </div>
+          <p id="replay-move" class="muted"></p>
+        </div>
+      </div>
+    </div>
+
+    <div id="toast" class="toast hidden"></div>
+
+    <script src="board.js"></script>
+    <script src="ui.js"></script>
+  </body>
+</html>

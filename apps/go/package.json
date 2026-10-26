@@ -1,0 +1,26 @@
+{
+  "name": "@myoutside/go",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "main": "./backend/src/index.ts",
+  "exports": {
+    ".": "./backend/src/index.ts",
+    "./manifest.json": "./manifest.json"
+  },
+  "scripts": {
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit -p tsconfig.json"
+  },
+  "dependencies": {
+    "@myoutside/contracts": "workspace:*",
+    "@myoutside/kernel": "workspace:*",
+    "zod": "^3.24.0"
+  },
+  "devDependencies": {
+    "@myoutside/kernel-node": "workspace:*",
+    "@types/node": "^24.0.0",
+    "typescript": "^5.6.0",
+    "vitest": "^3.0.0"
+  }
+}

@@ -6,7 +6,7 @@
 
 ## 动手之前：先读 user spec
 
-`user-spec/` 记录作者对 MyOutside 的预期，是整个项目的源头；`docs/` 下是技术文档（派生物）。
+`user-spec/` 记录作者对 MyOutside 的预期，是整个项目的源头；已迁移的应用（目前是 `apps/go`）把作者预期放在 `apps/<app>/user-spec/`；`docs/` 与 `apps/<app>/docs/` 下是技术文档（派生物）。
 
 1. 先读 `user-spec/README.md`，了解两层内容（spec 文档 / 决策）与变更规则；
 2. 改动之前，读与改动相关的 spec 文档与决策：
@@ -25,6 +25,6 @@
 
 ## 动手之后：记录决策
 
-- 基于作者需求做出的实现决定，记进 `user-spec/decisions/`（写法见 `user-spec/decisions/README.md`），决策者填 `agent`；
-- 作者亲自规定的细节，决策者填 `作者`，并把背后的高层次考量写进 spec 文档；
-- 技术文档与代码注释说明设计依据时，引用对应的决策（`D-NNNN`）。
+- 基于作者需求做出的实现决定：全局/跨应用的记进 `user-spec/decisions/`（`D-NNNN`）；应用专属的记进 `apps/<app>/user-spec/decisions/`（如 `apps/go/user-spec/decisions/`，`GO-0001`）。写法见对应目录的 `README.md`，决策者填 `agent`；
+- 作者亲自规定的细节，决策者填 `作者`，并把背后的高层次考量写进 spec 文档（已迁移应用写进 `apps/<app>/user-spec/`）；
+- 技术文档与代码注释说明设计依据时，引用对应的决策（全局 `D-NNNN`，应用 `GO-0001` 等）。

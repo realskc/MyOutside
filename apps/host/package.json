@@ -7,6 +7,7 @@
   "scripts": {
     "build": "node scripts/build.mjs",
     "dev": "node scripts/build.mjs && node scripts/run.mjs",
+    "dev:lan": "node scripts/build.mjs && node scripts/run.mjs --lan",
     "smoke": "node scripts/build.mjs && node scripts/run.mjs --smoke",
     "typecheck": "tsc --noEmit -p tsconfig.json"
   },
@@ -14,7 +15,8 @@
     "@myoutside/kernel": "workspace:*",
     "@myoutside/kernel-node": "workspace:*",
     "@myoutside/vocab": "workspace:*",
-    "@myoutside/dialog": "workspace:*"
+    "@myoutside/dialog": "workspace:*",
+    "@myoutside/go": "workspace:*"
   },
   "devDependencies": {
     "@types/node": "^24.0.0",

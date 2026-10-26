@@ -16,6 +16,9 @@ import { vocabApp } from "@myoutside/vocab";
 import vocabManifest from "@myoutside/vocab/manifest.json";
 import { dialogApp } from "@myoutside/dialog";
 import dialogManifest from "@myoutside/dialog/manifest.json";
+import { goApp } from "@myoutside/go";
+import goManifest from "@myoutside/go/manifest.json";
+import { startLanServer } from "./lan-server";
 
 // 数据目录使用正式名称：%APPDATA%/MyOutside
 app.setName("MyOutside");
@@ -50,14 +53,22 @@ function mimeFor(file: string): string {
   }
 }
 
-function registerAppProtocol(): void {
+function buildUiDirs(kernel: Kernel): Record<string, string> {
   const appPath = app.getAppPath(); // apps/host
   const uiDirs: Record<string, string> = {
     shell: resolve(appPath, "renderer"),
-    vocab: resolve(appPath, "..", "vocab", "ui"),
-    dialog: resolve(appPath, "..", "dialog", "ui"),
   };
+  for (const { id } of kernel.listApps()) {
+    if (!/^[a-z0-9][a-z0-9-]*$/i.test(id)) {
+      console.warn(`[host] 跳过非法应用 id 的 UI 目录：${id}`);
+      continue;
+    }
+    uiDirs[id] = resolve(appPath, "..", id, "ui");
+  }
+  return uiDirs;
+}
 
+function registerAppProtocol(uiDirs: Record<string, string>): void {
   protocol.handle("app", async (request) => {
     const url = new URL(request.url);
     const base = uiDirs[url.hostname];
@@ -385,6 +396,39 @@ async function runSmoke(win: BrowserWindow): Promise<void> {
       const finalShot = await captureWindow(win, 6, 300);
       writeFileSync(join(app.getPath("temp"), "myoutside-dialog-final.png"), finalShot);
     }
+    // 围棋：验证 app://go 能加载、bridge 可用、9 路状态能返回
+    await win.loadURL("app://go/index.html");
+    for (let i = 0; i < 24; i += 1) {
+      const ready = (await win.webContents.executeJavaScript(
+        'document.readyState === "complete" && typeof window.outside === "object" && typeof window.GoBoard === "function"',
+      )) as boolean;
+      if (ready) break;
+      await new Promise((resolve) => setTimeout(resolve, 250));
+    }
+    const goCheck = await win.webContents.executeJavaScript(
+      `(async () => {
+        const a = await window.outside.call("go.join", { token: "smoke-go-a" });
+        const b = await window.outside.call("go.join", { token: "smoke-go-b" });
+        const s = await window.outside.call("go.getState", { token: "smoke-go-a" });
+        const lang = await window.outside.call("platform.settings.get", { key: "ui.language" });
+        return {
+          hasBoard: typeof window.GoBoard === "function",
+          joinA: a.ok ? a.result : null,
+          joinB: b.ok ? b.result : null,
+          stateOk: s.ok,
+          board: s.ok ? s.result.board.length : null,
+          status: s.ok ? s.result.status : null,
+          langOk: lang.ok,
+          lang: lang.ok ? lang.result.value : null,
+        };
+      })()`,
+    );
+    console.log("[smoke] go:", JSON.stringify(goCheck));
+    const goShotPath = join(app.getPath("temp"), "myoutside-go.png");
+    const goPng = await captureWindow(win, 10, 400);
+    writeFileSync(goShotPath, goPng);
+    console.log("[smoke] go screenshot:", goShotPath, `(${goPng.length} bytes)`);
+
   } catch (error) {
     console.error("[smoke] 失败：", error);
   } finally {
@@ -419,6 +463,7 @@ app.whenReady().then(async () => {
   const kernel = createKernel({ storage: createNodeSqliteAdapter({ path: dbPath }) });
   kernel.registerApp(vocabApp, vocabManifest);
   kernel.registerApp(dialogApp, dialogManifest);
+  kernel.registerApp(goApp, goManifest);
   kernel.start();
   const appIds = new Set(kernel.listApps().map((item) => item.id));
 
@@ -440,6 +485,20 @@ app.whenReady().then(async () => {
   /** 进行中的调用（按运行 ID）：用于推送事件与取消 */
   const runs = new Map<string, { controller: AbortController; frame: WebFrameMain }>();
   console.log("[host] kernel ready. functions:", kernel.listFunctions().join(", "));
+
+  const uiDirs = buildUiDirs(kernel);
+
+  // 开发用 LAN 预览（D-0072）：默认关闭，只有 dev:lan 才设置 MYOUTSIDE_LAN=1。
+  if (process.env.MYOUTSIDE_LAN === "1") {
+    const port = Number(process.env.MYOUTSIDE_LAN_PORT ?? 3000);
+    if (!Number.isInteger(port) || port <= 0 || port > 65535) {
+      console.error(`[lan] 无效端口：${process.env.MYOUTSIDE_LAN_PORT}`);
+    } else {
+      void startLanServer({ kernel, uiDirs, port }).catch((error) => {
+        console.error("[lan] 启动失败：", error);
+      });
+    }
+  }
 
   let currentLang = await getLanguage(kernel);
   buildMenu(currentLang);
@@ -497,7 +556,7 @@ app.whenReady().then(async () => {
     return true;
   });
 
-  registerAppProtocol();
+  registerAppProtocol(uiDirs);
   const win = await createMainWindow();
   win.setTitle(STRINGS[currentLang].appName);
 
