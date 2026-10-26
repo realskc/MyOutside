@@ -76,6 +76,6 @@
 ## 7. 当前限制
 
 - 不判死活：空区只要边界只出现一种颜色就算该方，即使空区通到棋盘边缘；这是沿用 GoZero `area_ownership` 思路的简化，可能比严格围棋目数大（[GO-0001](../user-spec/decisions/GO-0001-9x9-go-capture-loses.md)「代价」）。
-- 无鉴权；只适合可信热点（[D-0071](../../../user-spec/decisions/0071-dev-lan-preview.md)/[GO-0002](../user-spec/decisions/GO-0002-go-multiplayer-and-chat.md)）。
+- 无鉴权；只适合可信热点（[D-0072](../../../user-spec/decisions/0072-dev-lan-preview.md)/[GO-0002](../user-spec/decisions/GO-0002-go-multiplayer-and-chat.md)）。
 - 悔棋没有超时/次数限制；棋谱只存 SQLite、应用内回放，不导出 SGF；聊天只保留当前对局。
 - 计时、AI、SGF 导入导出仍未做。

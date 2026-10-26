@@ -5,7 +5,7 @@
 - 决策者：agent
 - 服务于：
   - 作者临时需求：飞机上和朋友用同一热点联机下 9 路围棋，并带一个小的聊天窗口。
-  - 上游决策：[D-0071](../../../../user-spec/decisions/0071-dev-lan-preview.md)（LAN 预览）、[GO-0001](GO-0001-9x9-go-capture-loses.md)（规则）
+  - 上游决策：[D-0072](../../../../user-spec/decisions/0072-dev-lan-preview.md)（LAN 预览）、[GO-0001](GO-0001-9x9-go-capture-loses.md)（规则）
 
 ## 背景
 

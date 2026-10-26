@@ -1,4 +1,4 @@
-# D-0072 应用自包含：apps/<app>/ 内按层放 spec/docs/decisions，编号 <APP>-NNNN
+# D-0073 应用自包含：apps/<app>/ 内按层放 spec/docs/decisions，编号 <APP>-NNNN
 
 - 状态：有效
 - 日期：2026-10-26
@@ -28,7 +28,7 @@
   - 原棋谱决策 → GO-0004
   - 技术文档 `docs/apps/go.md` → `apps/go/docs/README.md`
   - 新增 `apps/go/user-spec/README.md`
-  - 迁移前的全局编号已释放，可按全局序列继续复用。
+  - 迁移前的全局编号不再作为 Go 专属编号保留。
 
 ## 考虑过、没有采用
 
