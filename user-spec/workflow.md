@@ -54,7 +54,9 @@
 
 ## 工程规范
 
-- 没有特别的要求。当前的规范见 [D-0044](decisions/0044-docs-sync-with-features.md)、[D-0045](decisions/0045-commit-and-test-conventions.md)。
+- **提交（commit）**：agent 可以自己提交，推荐在完成一项工作后自动提交。
+- **推送（push）**：只有作者提出时才推送，agent 不能擅自推送。
+- 其他没有特别的要求。当前的规范见 [D-0044](decisions/0044-docs-sync-with-features.md)、[D-0045](decisions/0045-commit-and-test-conventions.md)。
 
 ## 冲突处理
 

@@ -18,6 +18,11 @@
 
 按 `user-spec/workflow.md`「和 agent 的合作方式」汇报：每件事标明需要作者做什么（🔴 需要决策 / 同意 / 理解，🟡 只需知道，⚪ 不用管），尽量一同讲清后果；修改了 user spec（不含决策）时，在回答末尾用 🟢 简要说明改了什么。
 
+## 提交与推送
+
+- agent 可以自己 commit，推荐在完成一项工作后自动 commit；
+- **push 只在作者提出时才做，不能擅自 push**（见 `user-spec/workflow.md`「工程规范」）。
+
 ## 动手之后：记录决策
 
 - 基于作者需求做出的实现决定，记进 `user-spec/decisions/`（写法见 `user-spec/decisions/README.md`），决策者填 `agent`；
