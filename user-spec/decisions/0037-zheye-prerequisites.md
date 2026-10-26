@@ -2,10 +2,10 @@
 
 - 状态：有效（未实现）
 - 日期：2026-10-07
-- 决策者：用户（认真思考后敲定）
+- 决策者：作者（认真思考后敲定）
 - 服务于：
-  - 用户预期：[apps/zheye.md「目的」](../apps/zheye.md)（低认知压力，同时真正学到东西）
-  - 用户预期：[apps/zheye.md「读者」](../apps/zheye.md)
+  - 作者预期：[apps/zheye.md「目的」](../apps/zheye.md)（低认知压力，同时真正学到东西）
+  - 作者预期：[apps/zheye.md「读者」](../apps/zheye.md)
 
 ## 决策
 

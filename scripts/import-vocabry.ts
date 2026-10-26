@@ -12,6 +12,7 @@ import { DatabaseSync } from "node:sqlite";
 import { createKernel } from "@myoutside/kernel";
 import { createNodeSqliteAdapter } from "@myoutside/kernel-node";
 import { vocabApp } from "@myoutside/vocab";
+import vocabManifest from "@myoutside/vocab/manifest.json";
 
 const localAppData = process.env.LOCALAPPDATA ?? join(homedir(), ".local", "share");
 const appData = process.env.APPDATA ?? join(homedir(), ".config");
@@ -100,7 +101,7 @@ console.log("[import-vocabry] Anki 集合：", anki ? anki.path : "（未找到�
 console.log(`[import-vocabry] 活动卡片 ${cards.length} 张，Anki 映射 ${mappingRows.length} 条`);
 
 const kernel = createKernel({ storage: createNodeSqliteAdapter({ path: myoutsidePath }) });
-kernel.registerApp(vocabApp);
+kernel.registerApp(vocabApp, vocabManifest);
 kernel.start();
 
 async function call<T>(name: string, payload?: unknown): Promise<T> {

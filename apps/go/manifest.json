@@ -1,0 +1,9 @@
+{
+  "id": "go",
+  "name": "围棋",
+  "protocolVersion": 1,
+  "ui": "ui/index.html",
+  "backend": "backend/src/index.ts",
+  "owns": ["game", "player", "move", "chat", "record"],
+  "uses": ["platform.settings.get"]
+}

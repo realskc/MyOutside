@@ -4,7 +4,7 @@
 - 日期：2026-10-21
 - 决策者：agent
 - 服务于：
-  - 用户预期：[apps/dialog.md「定位」](../apps/dialog.md)（能作为主力对话工具）
+  - 作者预期：[apps/dialog.md「定位」](../apps/dialog.md)（能作为主力对话工具）
   - 上游决策：[D-0049](0049-agent-layering.md)
 
 ## 决策

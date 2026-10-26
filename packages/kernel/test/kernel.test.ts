@@ -2,7 +2,16 @@ import { randomUUID } from "node:crypto";
 import { DatabaseSync } from "node:sqlite";
 import { describe, expect, it, vi } from "vitest";
 import { z } from "zod";
-import { createKernel, defineRead, defineTx, type AppModule, type DbAdapter, type SqlValue } from "../src/index.js";
+import {
+  createKernel,
+  defineAsync,
+  defineRead,
+  defineTx,
+  type AppManifest,
+  type AppModule,
+  type DbAdapter,
+  type SqlValue,
+} from "../src/index.js";
 
 /** 测试用的最小 SQLite 适配器（node:sqlite） */
 function createMemoryAdapter(): DbAdapter {
@@ -51,14 +60,52 @@ const notesApp: AppModule = {
     },
   ],
   api: {
-    createNote: defineTx(z.object({ title: z.string().min(1) }), (ctx, input) => {
-      const id = randomUUID();
-      ctx.db.insert("note", { id, title: input.title, created_at: Date.now() });
-      return { id };
+    createNote: defineTx(
+      z.object({ title: z.string().min(1) }),
+      (ctx, input) => {
+        const id = randomUUID();
+        ctx.db.insert("note", { id, title: input.title, created_at: Date.now() });
+        return { id };
+      },
+      { visibility: "public" },
+    ),
+    listNotes: defineRead(z.object({}), (ctx) => ctx.db.all("note", {}, { orderBy: "created_at" }), {
+      visibility: "public",
     }),
-    listNotes: defineRead(z.object({}), (ctx) => ctx.db.all("note", {}, { orderBy: "created_at" })),
-    fail: defineTx(z.object({}), () => {
-      throw new Error("boom");
+    fail: defineTx(
+      z.object({}),
+      () => {
+        throw new Error("boom");
+      },
+      { visibility: "public" },
+    ),
+    /** 内部 API：其他子应用不能调用 */
+    secret: defineRead(z.object({}), () => "secret"),
+    /** 只读 API 试图直接写数据 */
+    sneakyWrite: defineRead(z.object({}), (ctx) => {
+      ctx.db.insert("note", { id: randomUUID(), title: "sneaky", created_at: Date.now() });
+      return "written";
+    }),
+    /** 普通的异步函数：等一下外部，再调用本应用的事务 API 写入两次（两个短事务） */
+    importTwo: defineAsync(z.object({ title: z.string().min(1) }), async (ctx, input) => {
+      await new Promise((resolve) => setTimeout(resolve, 5));
+      const a = (await ctx.call("notes.createNote", { title: `${input.title}-1` })) as { id: string };
+      ctx.emit({ type: "progress", done: 1 });
+      const b = (await ctx.call("notes.createNote", { title: `${input.title}-2` })) as { id: string };
+      return { ids: [a.id, b.id] };
+    }),
+    /** 普通的异步函数：中途失败，已完成的短事务不回滚 */
+    importThenFail: defineAsync(z.object({}), async (ctx) => {
+      await ctx.call("notes.createNote", { title: "kept" });
+      await ctx.call("notes.fail", {});
+      return "unreachable";
+    }),
+    /** 普通的异步函数：等待取消 */
+    waitForever: defineAsync(z.object({}), async (ctx) => {
+      await new Promise((_resolve, reject) => {
+        ctx.signal.addEventListener("abort", () => reject(new Error("aborted")));
+      });
+      return "unreachable";
     }),
   },
 };
@@ -89,7 +136,17 @@ const tasksApp: AppModule = {
       return { taskId: id };
     }),
     callReadFromTx: defineTx(z.object({}), (ctx) => ctx.call("notes.listNotes", {})),
+    callSecret: defineRead(z.object({}), (ctx) => ctx.call("notes.secret", {})),
+    callUndeclared: defineRead(z.object({}), (ctx) => ctx.call("seed.listItems", {})),
+    callAi: defineRead(z.object({}), (ctx) => ctx.call("platform.ai.chat", { messages: [{ role: "user", content: "hi" }] })),
   },
+};
+
+const tasksManifest: AppManifest = {
+  id: "tasks",
+  name: "Tasks",
+  protocolVersion: 1,
+  uses: ["notes.createNote", "notes.fail", "notes.listNotes", "notes.secret"],
 };
 
 const loopApp: AppModule = {
@@ -124,7 +181,7 @@ function setup() {
   const storage = createMemoryAdapter();
   const kernel = createKernel({ storage });
   kernel.registerApp(notesApp);
-  kernel.registerApp(tasksApp);
+  kernel.registerApp(tasksApp, tasksManifest);
   kernel.registerApp(loopApp);
   kernel.registerApp(seedApp);
   kernel.start();
@@ -349,5 +406,121 @@ describe("kernel", () => {
     expect(after.ok).toBe(true);
     if (!after.ok) return;
     expect((after.result as { value: unknown }).value).toBe("en");
+  });
+  it("权限：调用其他子应用的内部 API → FORBIDDEN（即使在清单里声明了）", async () => {
+    const { kernel } = setup();
+    const r = await kernel.handle({ call: "tasks.callSecret", payload: {} });
+    expect(r.ok).toBe(false);
+    if (r.ok) return;
+    expect(r.error.code).toBe("FORBIDDEN");
+  });
+
+  it("权限：未在清单中声明的跨应用调用 → FORBIDDEN；没有清单的子应用不能调用平台 API", async () => {
+    const { kernel } = setup();
+    const undeclared = await kernel.handle({ call: "tasks.callUndeclared", payload: {} });
+    expect(undeclared.ok).toBe(false);
+    if (undeclared.ok) return;
+    expect(undeclared.error.code).toBe("FORBIDDEN");
+
+    const ai = await kernel.handle({ call: "tasks.callAi", payload: {} });
+    expect(ai.ok).toBe(false);
+    if (ai.ok) return;
+    expect(ai.error.code).toBe("FORBIDDEN");
+  });
+
+  it("权限：前端（调用者 = 子应用）只能调用自己的 API 与清单里声明过的公开 API", async () => {
+    const { kernel } = setup();
+    const own = await kernel.handle({ call: "notes.secret", payload: {} }, { caller: "notes" });
+    expect(own.ok).toBe(true);
+    const other = await kernel.handle({ call: "notes.secret", payload: {} }, { caller: "seed" });
+    expect(other.ok).toBe(false);
+    const declared = await kernel.handle({ call: "notes.listNotes", payload: {} }, { caller: "tasks" });
+    expect(declared.ok).toBe(true);
+  });
+
+  it("权限：平台设置——子应用可读不可改；凭据任何调用者都读不到值；外壳可以修改", async () => {
+    const storage = createMemoryAdapter();
+    const kernel = createKernel({ storage });
+    kernel.registerApp(notesApp, {
+      id: "notes",
+      name: "Notes",
+      protocolVersion: 1,
+      uses: ["platform.settings.get", "platform.settings.set"],
+    });
+    kernel.start();
+
+    const setByShell = await kernel.handle(
+      { call: "platform.settings.set", payload: { key: "ai.deepseek.apiKey", value: "sk-secret" } },
+      { caller: "shell" },
+    );
+    expect(setByShell.ok).toBe(true);
+    await kernel.handle({ call: "platform.settings.set", payload: { key: "ui.language", value: "zh" } }, { caller: "shell" });
+
+    const setByApp = await kernel.handle(
+      { call: "platform.settings.set", payload: { key: "ui.language", value: "en" } },
+      { caller: "notes" },
+    );
+    expect(setByApp.ok).toBe(false);
+
+    const language = await kernel.handle({ call: "platform.settings.get", payload: { key: "ui.language" } }, { caller: "notes" });
+    expect(language.ok && (language.result as { value: unknown }).value).toBe("zh");
+
+    for (const caller of ["notes", "shell", undefined]) {
+      const key = await kernel.handle({ call: "platform.settings.get", payload: { key: "ai.deepseek.apiKey" } }, { caller });
+      expect(key.ok).toBe(true);
+      if (!key.ok) return;
+      expect(key.result).toEqual({ value: null, isSet: true });
+    }
+  });
+
+  it("只读 API 不能直接写数据（只读句柄）", async () => {
+    const { storage, kernel } = setup();
+    const r = await kernel.handle({ call: "notes.sneakyWrite", payload: {} });
+    expect(r.ok).toBe(false);
+    if (r.ok) return;
+    expect(r.error.code).toBe("FORBIDDEN");
+    expect(storage.select<{ c: number }>("SELECT COUNT(*) AS c FROM notes__note")[0]?.c).toBe(0);
+  });
+
+  it("普通的异步函数：等外部后经本应用的事务 API 写入，每次一个短事务；事件经 emit 推出", async () => {
+    const { storage, kernel } = setup();
+    const events: unknown[] = [];
+    const r = await kernel.handle({ call: "notes.importTwo", payload: { title: "a" } }, { emit: (e) => events.push(e) });
+    expect(r.ok).toBe(true);
+    expect(storage.select<{ c: number }>("SELECT COUNT(*) AS c FROM notes__note")[0]?.c).toBe(2);
+    expect(kernel.dataVersion).toBe(2);
+    expect(events).toEqual([{ type: "progress", done: 1 }]);
+  });
+
+  it("普通的异步函数：中途失败时，已完成的短事务保留（整体不保证原子）", async () => {
+    const { storage, kernel } = setup();
+    const r = await kernel.handle({ call: "notes.importThenFail", payload: {} });
+    expect(r.ok).toBe(false);
+    expect(storage.select<{ title: string }>("SELECT title FROM notes__note").map((row) => row.title)).toEqual(["kept"]);
+  });
+
+  it("普通的异步函数只能是内部 API：其他子应用不能调用", async () => {
+    const { kernel } = setup();
+    const r = await kernel.handle({ call: "notes.importTwo", payload: { title: "x" } }, { caller: "tasks" });
+    expect(r.ok).toBe(false);
+    if (r.ok) return;
+    expect(r.error.code).toBe("FORBIDDEN");
+  });
+
+  it("取消：发起方触发 signal → 调用以 ABORTED 结束", async () => {
+    const { kernel } = setup();
+    const controller = new AbortController();
+    const pending = kernel.handle({ call: "notes.waitForever", payload: {} }, { signal: controller.signal });
+    controller.abort();
+    const r = await pending;
+    expect(r.ok).toBe(false);
+    if (r.ok) return;
+    expect(r.error.code).toBe("ABORTED");
+  });
+
+  it("清单：id 不一致或协议版本不支持时拒绝注册", () => {
+    const kernel = createKernel({ storage: createMemoryAdapter() });
+    expect(() => kernel.registerApp(notesApp, { id: "other", name: "X", protocolVersion: 1 })).toThrow();
+    expect(() => kernel.registerApp(seedApp, { id: "seed", name: "Seed", protocolVersion: 99 })).toThrow();
   });
 });

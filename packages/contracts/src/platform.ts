@@ -28,6 +28,8 @@ export const AiMessageSchema = z
   .object({
     role: z.enum(["system", "user", "assistant", "tool"]),
     content: z.string().nullable().optional(),
+    /** 仅 assistant：思考过程。请求带 tools 时，历史中每一轮的思考过程都必须回传（DeepSeek 规定） */
+    reasoning_content: z.string().nullable().optional(),
     /** 仅 assistant：本轮发起的工具调用 */
     tool_calls: z.array(AiToolCallSchema).optional(),
     /** 仅 tool：回应哪一次工具调用 */
@@ -56,6 +58,8 @@ export const AiChatInput = z.object({
   temperature: z.number().optional(),
   /** 思考强度；不传 = 服务默认（high） */
   reasoningEffort: ReasoningEffort.optional(),
+  /** 流式：增量经推送通道发出（事件 { type: "ai_delta", content?, reasoning? }），最终仍返回完整结果 */
+  stream: z.boolean().optional(),
 });
 export type AiChatInput = z.infer<typeof AiChatInput>;
 
@@ -65,6 +69,8 @@ export const AiUsageSchema = z.object({
   completionTokens: z.number().int(),
   totalTokens: z.number().int(),
   reasoningTokens: z.number().int().optional(),
+  /** 命中上下文缓存的输入 token 数 */
+  cacheHitTokens: z.number().int().optional(),
 });
 export type AiUsage = z.infer<typeof AiUsageSchema>;
 
@@ -75,14 +81,54 @@ export const AiChatOutput = z.object({
   toolCalls: z.array(AiToolCallSchema),
   model: z.string(),
   usage: AiUsageSchema.nullable(),
+  /** stop / tool_calls / length / content_filter / insufficient_system_resource / aborted */
+  finishReason: z.string().nullable(),
+  /** 可直接追加进历史的 assistant 消息（含 reasoning_content） */
+  message: AiMessageSchema,
 });
 export type AiChatOutput = z.infer<typeof AiChatOutput>;
+
+// —— 平台 web 服务（DeepSeek 搜索 / 抓取）——
+
+export const WebSearchInput = z.object({
+  query: z.string().min(1).max(128),
+  count: z.number().int().min(1).max(50).optional(),
+  needContent: z.boolean().optional(),
+  oriQuestion: z.string().min(1).max(128).optional(),
+});
+export type WebSearchInput = z.infer<typeof WebSearchInput>;
+
+export const WebSearchResultSchema = z.object({
+  title: z.string(),
+  url: z.string(),
+  /** 短摘要（100～200 字），适合界面展示 */
+  snippet: z.string(),
+  /** 长摘要（600～800 字），适合给模型阅读 */
+  summary: z.string(),
+  content: z.string(),
+  siteName: z.string().nullable(),
+  date: z.string().nullable(),
+  /** 排序分数 0～3，≥ 1.5 为优质 */
+  score: z.number().nullable(),
+  /** 权威性 0～4（-1 未知），≥ 3 为极权威 */
+  authority: z.number().nullable(),
+});
+export type WebSearchResult = z.infer<typeof WebSearchResultSchema>;
+
+export const WebFetchInput = z.object({ url: z.string().min(1) });
+export type WebFetchInput = z.infer<typeof WebFetchInput>;
+
+export const WebFetchOutput = z.object({ title: z.string(), content: z.string() });
+export type WebFetchOutput = z.infer<typeof WebFetchOutput>;
 
 /** 平台内置 API 面 */
 export interface PlatformApi {
   "platform.dataVersion": { input: Record<string, never>; output: number };
   "platform.listApps": { input: Record<string, never>; output: Array<{ id: string; name: string }> };
-  "platform.settings.get": { input: { key: string }; output: { value: unknown } };
+  /** 凭据类设置（如 API Key）的 value 恒为 null，只能通过 isSet 知道是否已设置 */
+  "platform.settings.get": { input: { key: string }; output: { value: unknown; isSet: boolean } };
   "platform.settings.set": { input: { key: string; value: unknown }; output: { ok: true } };
   "platform.ai.chat": { input: AiChatInput; output: AiChatOutput };
+  "platform.web.search": { input: WebSearchInput; output: { results: WebSearchResult[] } };
+  "platform.web.fetch": { input: WebFetchInput; output: WebFetchOutput };
 }

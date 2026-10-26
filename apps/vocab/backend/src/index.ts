@@ -126,7 +126,7 @@ export const vocabApp: AppModule = {
         ...scheduling,
       });
       return { cardId: id };
-    }),
+    }, { visibility: "public" }),
 
     updateCard: defineTx(UpdateCardInput, (ctx, input) => {
       getCardOrThrow(ctx.db, input.cardId);
@@ -139,13 +139,13 @@ export const vocabApp: AppModule = {
         ctx.db.update("card", patch, { id: input.cardId });
       }
       return { ok: true as const };
-    }),
+    }, { visibility: "public" }),
 
     setMastered: defineTx(SetMasteredInput, (ctx, input) => {
       getCardOrThrow(ctx.db, input.cardId);
       ctx.db.update("card", { status: input.mastered ? "mastered" : "learning" }, { id: input.cardId });
       return { ok: true as const };
-    }),
+    }, { visibility: "public" }),
 
     submitReview: defineTx(SubmitReviewInput, (ctx, input) => {
       const row = getCardOrThrow(ctx.db, input.cardId);
@@ -156,7 +156,7 @@ export const vocabApp: AppModule = {
         due: result.card.due.getTime(),
         scheduledDays: result.card.scheduled_days,
       };
-    }),
+    }, { visibility: "public" }),
 
     /** 预览各评分对应的"下一次复习时间"（只读，不写库） */
     previewReview: defineRead(PreviewReviewInput, (ctx, input) => {
@@ -233,7 +233,7 @@ export const vocabApp: AppModule = {
         }
       }
       return { action: "new" as const };
-    }),
+    }, { visibility: "public" }),
 
     getDue: defineRead(GetDueInput, (ctx, input) => {
       const now = input.before ?? Date.now();
@@ -244,7 +244,7 @@ export const vocabApp: AppModule = {
       );
       const levels = loadWordLevels(ctx.db, rows.map((row) => row.term));
       return rows.map((row) => rowToCard(row, levels.get(row.term) ?? null));
-    }),
+    }, { visibility: "public" }),
 
     listCards: defineRead(ListCardsInput, (ctx, input) => {
       const where: Record<string, WhereValue> = {};
@@ -261,7 +261,7 @@ export const vocabApp: AppModule = {
       });
       const levels = loadWordLevels(ctx.db, rows.map((row) => row.term));
       return rows.map((row) => rowToCard(row, levels.get(row.term) ?? null));
-    }),
+    }, { visibility: "public" }),
 
     getStats: defineRead(z.object({}), (ctx) => {
       const now = Date.now();
@@ -271,6 +271,6 @@ export const vocabApp: AppModule = {
         mastered: ctx.db.count("card", { status: "mastered" }),
         dueNow: ctx.db.count("card", { status: "learning", due: { lte: now } }),
       };
-    }),
+    }, { visibility: "public" }),
   },
 };

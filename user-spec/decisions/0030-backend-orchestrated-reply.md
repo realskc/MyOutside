@@ -1,15 +1,15 @@
-# D-0030 回复由对话应用的后台生成，整段返回，不做流式
+# D-0030 回复由对话应用的后端生成，整段返回，不做流式
 
-- 状态：有效
+- 状态：部分被取代（→ [D-0065](0065-streaming-output.md)）：「不做流式」被取代
 - 日期：2026-10-07
 - 决策者：讨论
 - 服务于：
-  - 用户预期：[apps/dialog.md「定位」](../apps/dialog.md)
+  - 作者预期：[apps/dialog.md「定位」](../apps/dialog.md)
   - 上游决策：[D-0008](0008-resolve-then-commit.md)
 
 ## 决策
 
-- `dialog.generateReply`（读函数）在后台计算当前路径、按预算截断、拼上系统提示词，调用平台 AI，返回结果但**不落库**；界面再调用 `dialog.appendMessage` 保存；界面不直接调用 AI；
+- `dialog.generateReply`（只读 API）在后端计算当前路径、按预算截断、拼上系统提示词，调用平台 AI，返回结果但**不落库**；前端再调用 `dialog.appendMessage` 保存；前端不直接调用 AI；
 - 生成失败不留半截状态，用户消息保留，可以重试；
 - 不做流式输出（需要改造内核与传输层）。
 

@@ -1,10 +1,10 @@
 # 学英语（vocab）技术文档
 
-> 应用 id：`vocab`；显示名「学英语」。用户的预期见 `user-spec/apps/vocab.md`。
+> 应用 id：`vocab`；显示名「学英语」。作者的预期见 `user-spec/apps/vocab.md`。
 
 ## 1. 结构
 
-- 后台：`apps/vocab/backend/src/`（`index.ts` = AppModule；`mapping.ts` = 行 ↔ 卡片 / FSRS 转换；`data/toefl-word-levels.json` = 参考词表）
+- 后端：`apps/vocab/backend/src/`（`index.ts` = AppModule；`mapping.ts` = 行 ↔ 卡片 / FSRS 转换；`data/toefl-word-levels.json` = 参考词表）
 - 界面：`apps/vocab/ui/`（静态 HTML / JS，五个标签页：复习 / 查词 / 词库 / 添加 / 统计）
 - 契约：`packages/contracts/src/vocab.ts`
 - 测试：`apps/vocab/test/vocab.test.ts`

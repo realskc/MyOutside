@@ -1,6 +1,6 @@
 # 临时函数（one-off functions）技术设计
 
-> 未实现。规则与理由见 D-0001；用户的预期见 `user-spec/principles.md`「需求观」、`user-spec/future/builder.md`。
+> 未实现。规则与理由见 D-0001；作者的预期见 `user-spec/principles.md`「需求观」、`user-spec/future/builder.md`。
 
 ## 1. 规则落到工程上
 

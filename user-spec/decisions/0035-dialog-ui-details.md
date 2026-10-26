@@ -1,10 +1,10 @@
 # D-0035 对话界面细节
 
-- 状态：有效
+- 状态：部分被取代（→ [D-0069](0069-markdown-and-latex.md)）：「Markdown 极简渲染、零依赖」被取代
 - 日期：2026-10-07
 - 决策者：讨论
 - 服务于：
-  - 用户预期：[apps/dialog.md「定位」](../apps/dialog.md)
+  - 作者预期：[apps/dialog.md「定位」](../apps/dialog.md)
 
 ## 决策
 

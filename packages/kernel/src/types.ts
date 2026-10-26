@@ -57,26 +57,50 @@ export interface Migration {
   up(ctx: MigrationCtx): void;
 }
 
+/** 一次调用的运行期附带信息：进度事件的出口与取消信号（沿嵌套调用向下传递） */
+export interface RunContext {
+  /** 直接调用方：子应用 id、"shell"，或 undefined（平台内部）。平台 API 用它按调用者计量 */
+  readonly caller: string | undefined;
+  /** 把事件推送给发起这次调用的一方；没有推送通道时为空操作 */
+  emit(event: unknown): void;
+  /** 发起方取消这次调用时触发 */
+  readonly signal: AbortSignal;
+}
+
 export interface TxContext {
   readonly appId: string;
   readonly db: AppDb;
-  /** 事务内调用其他应用的事务函数（同步、纯数据，与本次写入一起成败） */
+  /** 事务内调用其他应用的事务 API（同步、纯数据，与本次写入一起成败） */
   call(name: string, payload?: unknown): unknown;
 }
 
-export interface ReadContext {
+export interface ReadContext extends RunContext {
   readonly appId: string;
+  /** 只读句柄：写入方法会抛出 FORBIDDEN */
   readonly db: AppDb;
-  /** 异步调用其他应用的读函数 */
+  /** 异步调用只读 API */
+  call(name: string, payload?: unknown): Promise<unknown>;
+}
+
+export interface AsyncContext extends RunContext {
+  readonly appId: string;
+  /** 只读句柄：写数据只能通过调用本子应用的事务 API */
+  readonly db: AppDb;
+  /** 调用只读 API、本子应用的事务 API（各自是一个独立的短事务）或本子应用的异步函数 */
   call(name: string, payload?: unknown): Promise<unknown>;
 }
 
 export type TxHandler = (ctx: TxContext, input: any) => unknown;
 export type ReadHandler = (ctx: ReadContext, input: any) => unknown | Promise<unknown>;
+export type AsyncHandler = (ctx: AsyncContext, input: any) => Promise<unknown>;
+
+/** 可见性：公开 API 其他子应用可调用（还需在其清单 uses 里声明）；内部 API 只有本子应用能调用 */
+export type ApiVisibility = "public" | "internal";
 
 export type ApiDefinition =
-  | { kind: "read"; input: ZodType<any>; handler: ReadHandler }
-  | { kind: "tx"; input: ZodType<any>; handler: TxHandler };
+  | { kind: "read"; input: ZodType<any>; handler: ReadHandler; visibility: ApiVisibility }
+  | { kind: "tx"; input: ZodType<any>; handler: TxHandler; visibility: ApiVisibility }
+  | { kind: "async"; input: ZodType<any>; handler: AsyncHandler; visibility: "internal" };
 
 export interface AppModule {
   id: string;
@@ -88,9 +112,28 @@ export interface AppModule {
   api: Record<string, ApiDefinition>;
 }
 
+/** 子应用清单（D-0056）：描述子应用并声明其权限；与代码分开存放 */
+export interface AppManifest {
+  id: string;
+  name: string;
+  protocolVersion: number;
+  ui?: string;
+  backend?: string;
+  owns?: string[];
+  /** 会调用的其他子应用 / 平台的 API 全名 */
+  uses?: string[];
+}
+
 export interface KernelRequest {
   call: string;
   payload?: unknown;
+}
+
+/** 发起调用的一方：子应用 id、"shell"（外壳，平台自身）；不传 = 平台内部（受信任） */
+export interface HandleOptions {
+  caller?: string;
+  emit?: (event: unknown) => void;
+  signal?: AbortSignal;
 }
 
 export interface KernelErrorPayload {

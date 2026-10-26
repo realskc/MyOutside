@@ -178,9 +178,9 @@ function closeSettings() {
 async function renderSettings() {
   let hasKey = false;
   try {
+    // 凭据读不到值，只能知道是否已设置
     const res = await call("platform.settings.get", { key: "ai.deepseek.apiKey" });
-    const value = res.ok ? res.result.value : null;
-    hasKey = typeof value === "string" && value.length > 0;
+    hasKey = res.ok && res.result.isSet === true;
   } catch {
     /* ignore */
   }

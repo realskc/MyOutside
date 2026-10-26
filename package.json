@@ -13,7 +13,8 @@
     "build:toefl": "tsx scripts/build-toefl-levels.ts",
     "dev": "pnpm --filter @myoutside/host dev",
     "dev:lan": "pnpm --filter @myoutside/host dev:lan",
-    "smoke": "pnpm --filter @myoutside/host smoke"
+    "smoke": "pnpm --filter @myoutside/host smoke",
+    "ai:check": "tsx scripts/real-check.ts"
   },
   "devDependencies": {
     "@myoutside/kernel": "workspace:*",

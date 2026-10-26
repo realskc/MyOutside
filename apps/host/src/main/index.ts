@@ -1,11 +1,23 @@
-import { app, BrowserWindow, ipcMain, Menu, protocol, shell, type MenuItemConstructorOptions } from "electron";
+import {
+  app,
+  BrowserWindow,
+  ipcMain,
+  Menu,
+  protocol,
+  shell,
+  type MenuItemConstructorOptions,
+  type WebFrameMain,
+} from "electron";
 import { copyFileSync, existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { extname, join, normalize, resolve, sep } from "node:path";
-import { createKernel, type Kernel } from "@myoutside/kernel";
+import { createKernel, SHELL_CALLER, type Kernel } from "@myoutside/kernel";
 import { createNodeSqliteAdapter } from "@myoutside/kernel-node";
 import { vocabApp } from "@myoutside/vocab";
+import vocabManifest from "@myoutside/vocab/manifest.json";
 import { dialogApp } from "@myoutside/dialog";
+import dialogManifest from "@myoutside/dialog/manifest.json";
 import { goApp } from "@myoutside/go";
+import goManifest from "@myoutside/go/manifest.json";
 import { startLanServer } from "./lan-server";
 
 // 数据目录使用正式名称：%APPDATA%/MyOutside
@@ -249,6 +261,17 @@ async function runSmoke(win: BrowserWindow): Promise<void> {
         `({ title: document.title, ready: document.readyState, hasTopbar: !!document.querySelector(".topbar"), hasLookup: !!document.querySelector('[data-tab="lookup"]'), hasMastered: !!document.getElementById("btn-mastered"), goodInterval: (document.querySelector('[data-interval="good"]') || {}).textContent || "", text: (document.body && document.body.innerText || "").slice(0, 160) })`,
       );
       console.log("[smoke] vocab debug:", JSON.stringify(debug));
+
+      // 硬约束：子应用读不到凭据、不能修改平台设置、不能调用其他子应用的内部 API
+      const guard = await vocabFrame.executeJavaScript(
+        `(async () => {
+          const key = await window.outside.call("platform.settings.get", { key: "ai.deepseek.apiKey" });
+          const set = await window.outside.call("platform.settings.set", { key: "ui.language", value: "en" });
+          const other = await window.outside.call("dialog.listConversations", {});
+          return { keyValue: key.ok ? key.result.value : "ERR", setCode: set.ok ? "OK" : set.error.code, otherCode: other.ok ? "OK" : other.error.code };
+        })()`,
+      );
+      console.log("[smoke] vocab guard:", JSON.stringify(guard));
     } else {
       console.log("[smoke] vocab iframe 未找到");
     }
@@ -351,6 +374,7 @@ async function runSmoke(win: BrowserWindow): Promise<void> {
         const a = await window.outside.call("go.join", { token: "smoke-go-a" });
         const b = await window.outside.call("go.join", { token: "smoke-go-b" });
         const s = await window.outside.call("go.getState", { token: "smoke-go-a" });
+        const lang = await window.outside.call("platform.settings.get", { key: "ui.language" });
         return {
           hasBoard: typeof window.GoBoard === "function",
           joinA: a.ok ? a.result : null,
@@ -358,6 +382,8 @@ async function runSmoke(win: BrowserWindow): Promise<void> {
           stateOk: s.ok,
           board: s.ok ? s.result.board.length : null,
           status: s.ok ? s.result.status : null,
+          langOk: lang.ok,
+          lang: lang.ok ? lang.result.value : null,
         };
       })()`,
     );
@@ -398,15 +424,34 @@ app.whenReady().then(async () => {
   console.log("[host] data dir:", dataDir);
 
   const kernel = createKernel({ storage: createNodeSqliteAdapter({ path: dbPath }) });
-  kernel.registerApp(vocabApp);
-  kernel.registerApp(dialogApp);
-  kernel.registerApp(goApp);
+  kernel.registerApp(vocabApp, vocabManifest);
+  kernel.registerApp(dialogApp, dialogManifest);
+  kernel.registerApp(goApp, goManifest);
   kernel.start();
+  const appIds = new Set(kernel.listApps().map((item) => item.id));
+
+  /** 调用者 = 发起 IPC 的页面所属的子应用（app://<id>/）；外壳 = 平台自身 */
+  const callerOf = (frame: WebFrameMain | null): string | null => {
+    if (!frame) return null;
+    let host: string;
+    try {
+      const url = new URL(frame.url);
+      if (url.protocol !== "app:") return null;
+      host = url.hostname;
+    } catch {
+      return null;
+    }
+    if (host === SHELL_CALLER) return SHELL_CALLER;
+    return appIds.has(host) ? host : null;
+  };
+
+  /** 进行中的调用（按运行 ID）：用于推送事件与取消 */
+  const runs = new Map<string, { controller: AbortController; frame: WebFrameMain }>();
   console.log("[host] kernel ready. functions:", kernel.listFunctions().join(", "));
 
   const uiDirs = buildUiDirs(kernel);
 
-  // 开发用 LAN 预览（D-0058）：默认关闭，只有 dev:lan 才设置 MYOUTSIDE_LAN=1。
+  // 开发用 LAN 预览（D-0071）：默认关闭，只有 dev:lan 才设置 MYOUTSIDE_LAN=1。
   if (process.env.MYOUTSIDE_LAN === "1") {
     const port = Number(process.env.MYOUTSIDE_LAN_PORT ?? 3000);
     if (!Number.isInteger(port) || port <= 0 || port > 65535) {
@@ -421,8 +466,30 @@ app.whenReady().then(async () => {
   let currentLang = await getLanguage(kernel);
   buildMenu(currentLang);
 
-  ipcMain.handle("kernel:call", async (_event, request: { call: string; payload?: unknown }) => {
-    const result = await kernel.handle(request);
+  ipcMain.handle("kernel:call", async (event, request: { call: string; payload?: unknown; runId?: string }) => {
+    const frame = event.senderFrame;
+    const caller = callerOf(frame);
+    if (!caller || !frame) {
+      return { ok: false, error: { code: "FORBIDDEN", message: "无法识别调用者" }, dataVersion: kernel.dataVersion };
+    }
+    const controller = new AbortController();
+    const runId = typeof request.runId === "string" && request.runId ? request.runId : null;
+    if (runId) runs.set(runId, { controller, frame });
+    const emit = runId
+      ? (payload: unknown) => {
+          try {
+            frame.send("kernel:event", { runId, event: payload });
+          } catch {
+            /* 页面已关闭：推送只是附带的进度，丢失不影响结果 */
+          }
+        }
+      : undefined;
+    let result;
+    try {
+      result = await kernel.handle({ call: request.call, payload: request.payload }, { caller, emit, signal: controller.signal });
+    } finally {
+      if (runId) runs.delete(runId);
+    }
     if (request.call === "platform.settings.set" && result.ok) {
       const nextLang = await getLanguage(kernel);
       if (nextLang !== currentLang) {
@@ -434,6 +501,15 @@ app.whenReady().then(async () => {
       }
     }
     return result;
+  });
+
+  // 取消一次进行中的调用：只能取消同一页面发起的调用
+  ipcMain.handle("kernel:cancel", async (event, runId: unknown) => {
+    if (typeof runId !== "string") return false;
+    const run = runs.get(runId);
+    if (!run || run.frame !== event.senderFrame) return false;
+    run.controller.abort();
+    return true;
   });
 
   // 子应用 UI 的外链：交给系统浏览器（仅 http/https）

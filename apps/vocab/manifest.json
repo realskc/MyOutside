@@ -1,0 +1,9 @@
+{
+  "id": "vocab",
+  "name": "学英语",
+  "protocolVersion": 1,
+  "ui": "ui/index.html",
+  "backend": "backend/src/index.ts",
+  "owns": ["card", "word_level"],
+  "uses": ["platform.settings.get", "platform.ai.chat"]
+}

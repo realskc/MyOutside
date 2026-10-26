@@ -2,11 +2,11 @@
 
 - 状态：有效
 - 日期：2026-10-07
-- 决策者：用户（认真思考后敲定）
+- 决策者：作者（认真思考后敲定）
 - 服务于：
-  - 用户预期：[apps/zheye.md「愉悦」](../apps/zheye.md)（不投其所好、不做画像）
-  - 用户预期：[apps/zheye.md「读者」](../apps/zheye.md)（固定的读者形象）
-  - 用户预期：[apps/zheye.md「真实性」](../apps/zheye.md)
+  - 作者预期：[apps/zheye.md「愉悦」](../apps/zheye.md)（不投其所好、不做画像）
+  - 作者预期：[apps/zheye.md「读者」](../apps/zheye.md)（固定的读者形象）
+  - 作者预期：[apps/zheye.md「真实性」](../apps/zheye.md)
 
 ## 决策
 

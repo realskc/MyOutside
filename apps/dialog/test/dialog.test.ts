@@ -2,12 +2,13 @@ import { createKernel, type Kernel } from "@myoutside/kernel";
 import { createNodeSqliteAdapter } from "@myoutside/kernel-node";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { dialogApp } from "../backend/src/index.js";
+import dialogManifest from "../manifest.json";
 import { estimateTokens, trimHistory } from "../backend/src/history.js";
 
 function setup(): Kernel {
   const storage = createNodeSqliteAdapter({ path: ":memory:" });
   const kernel = createKernel({ storage });
-  kernel.registerApp(dialogApp);
+  kernel.registerApp(dialogApp, dialogManifest);
   kernel.start();
   return kernel;
 }

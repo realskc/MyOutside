@@ -7,13 +7,14 @@ import { join } from "node:path";
 import { createKernel } from "@myoutside/kernel";
 import { createNodeSqliteAdapter } from "@myoutside/kernel-node";
 import { vocabApp } from "@myoutside/vocab";
+import vocabManifest from "@myoutside/vocab/manifest.json";
 
 const appData = process.env.APPDATA ?? join(homedir(), ".config");
 const dbPath = join(appData, "MyOutside", "myoutside.db");
 console.log("[ai-ping] db:", dbPath);
 
 const kernel = createKernel({ storage: createNodeSqliteAdapter({ path: dbPath }) });
-kernel.registerApp(vocabApp);
+kernel.registerApp(vocabApp, vocabManifest);
 kernel.start();
 
 const res = await kernel.handle({

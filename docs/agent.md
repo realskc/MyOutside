@@ -1,7 +1,7 @@
 # agent 框架（共享库）设计
 
 > 技术文档：层次设计与接口形状。具体实现随产品功能逐步推进，本文随之修订。
-> 用户的预期：`user-spec/platform.md`「平台 AI」（agent 框架必须共享、硬约束在框架层面）、`user-spec/principles.md`「约束：软约束与硬约束都要」。
+> 作者的预期：`user-spec/platform.md`「平台 AI」（agent 框架必须共享、硬约束在框架层面）、`user-spec/principles.md`「约束：软约束与硬约束都要」。
 > 自研、不引入开源框架：D-0048。
 
 ## 1. 目标与使用者
@@ -49,7 +49,7 @@
 3. 循环调用 `platform.ai.chat`（**模型层**）→ 模型回答「我要搜索 DeepSeek V4」；
 4. 循环执行搜索工具（**工具层**）→ 工具内部 `ctx.call("platform.web.search")` → **内核**检查 dialog 是否声明过这个调用 → 执行 → 推送「正在搜索 DeepSeek V4」；
 5. 结果回到循环 → 再调用模型 → 模型给出最终回答 → 循环结束；
-6. `generateReply` 返回 → 界面调用 `dialog.appendMessage` 落库（写函数）。
+6. `generateReply` 返回 → 界面调用 `dialog.appendMessage` 落库（事务 API）。
 
 分层见 D-0049。
 
@@ -59,11 +59,11 @@
 
 每一次调用都要知道**是谁发起的**——这是权限检查与按子应用计量的前提。
 
-- 后台发起：`ctx.call` 的调用者就是 `ctx.appId`（已知）；
+- 后端发起：`ctx.call` 的调用者就是 `ctx.appId`（已知）；
 - 界面发起：IPC 事件的 `event.senderFrame.url`（如 `app://vocab/index.html`）→ 调用者 `vocab`；外壳页面（`app://shell/`）→ 调用者 `shell`（平台自身，拥有平台设置等特权）；
 - 内核 `handle(request, caller)` 把调用者传入上下文：`ctx.caller`（直接调用方）。嵌套调用时，调用者是发起这一层 `ctx.call` 的应用。
 
-顺带解决：子应用界面不再能读取 `ai.deepseek.apiKey`（D-0019「代价」）——平台设置只允许 `shell` 读写。
+顺带解决：子应用不再能读取 `ai.deepseek.apiKey`（D-0019「代价」）——平台设置子应用可读、不可改，只有 `shell` 可以修改；凭据类设置（如 API Key）任何调用者都读不到值，外壳只能知道「是否已设置」（D-0053）。
 
 ### 3.2 推送通道
 
@@ -73,11 +73,11 @@
 // 界面
 const { runId } = await outside.call("dialog.generateReply", { conversationId, stream: true });
 outside.subscribe(runId, (event) => { ... });   // 事件见 §5.3
-// 内核侧（读函数里）
+// 内核侧（只读 API 里）
 ctx.emit(event)   // 推送给本次调用的发起方
 ```
 
-- 本地：宿主经 `event.senderFrame.send("kernel:event", { runId, event })` 推回发起调用的 iframe；
+- 本地：Electron 主进程经 `event.senderFrame.send("kernel:event", { runId, event })` 推回发起调用的 iframe；
 - 多端：WebSocket 天然支持推送（`docs/future/multi-device.md`）；
 - 推送只是「附带的进度」，调用的最终结果仍按原来的请求-响应返回；推送丢失不影响正确性。
 
@@ -95,7 +95,11 @@ ctx.emit(event)   // 推送给本次调用的发起方
 4. **按调用者计量**：每次调用把 `{ caller, model, tokens, ts }` 写入平台用量表（`platform_ai_usage`），为将来按子应用的用量显示与管控打基础（`user-spec/platform.md`「用量管控」）。
 5. **（以后）流式**：SSE 接收；增量经推送通道发出，最终仍返回完整消息。流式下工具调用参数分片到达，由模型层拼装。
 
-待查：「关」档目前传 `reasoning_effort: "none"`；DeepSeek 文档中 Chat Completions 关闭思考的方式是 `thinking: { type: "disabled" }`，`none` 不在 effort 映射表里。需要真实调用确认「关」档是否生效。
+已确认：「关」档传 `reasoning_effort: "none"` 有效——接口文档中 `reasoning_effort` 的取值为 `none / low / high / max`，`none` 即关闭思考模式（另一种写法是 `thinking: { type: "disabled" }`）。
+
+`tool_choice`：DeepSeek 在思考模式下不支持 `required` 与指定工具（返回 400），因此**不使用 `tool_choice` 的强制调用**（D-0059）。需要模型按要求调用工具的地方（结构化输出、结束形式），用提示词 + 校验与重试实现。
+
+学英语判重目前未指定思考强度，默认以「高」强度思考——简单判断不需要，迁移到共享库时应按场景设置。
 
 ## 5. 平台工具：搜索与抓取
 
@@ -148,8 +152,8 @@ runAgent(ctx, {
 callStructured(ctx, { system?, messages, schema: ZodType<T>, name, description }) → T
 ```
 
-- `ctx` 只需要能 `call("platform.ai.chat", ...)` 与 `emit(event)`：读函数的上下文即可，循环库不依赖 Electron；
-- `callStructured`：强制模型调用一次名为 `name` 的工具，按 `schema` 校验参数；校验失败把错误告诉模型重试一次。学英语的去重判断与卡片草稿迁移到它。
+- `ctx` 只需要能 `call("platform.ai.chat", ...)` 与 `emit(event)`：只读 API 的上下文即可，循环库不依赖 Electron；
+- `callStructured`：提供一个名为 `name` 的工具，并在提示词里要求模型调用它（不用 `tool_choice` 强制，D-0059）；按 `schema` 校验参数；模型没有调用、或校验失败，就把问题告诉模型重试（有次数上限）。学英语的去重判断与卡片草稿迁移到它。
 
 ### 6.2 循环
 
@@ -168,6 +172,8 @@ return max_steps
 ```
 
 工具调用顺序执行（不并行），实现简单且结果可预期；需要时再加并行。
+
+结束条件：模型某一次回复不再调用工具即结束（暂时的决策，D-0060）；此外还有最大步数、预算、取消、出错等兜底的停止原因。
 
 ### 6.3 事件
 
@@ -232,7 +238,7 @@ type AgentEvent =
 
 ### 7.3 写操作
 
-- 调用内运行（§8.1）里，工具只能调用**读函数**（读上下文本来就不能调用写函数，D-0007）——对话搜索满足；
+- 调用内运行（§8.1）里，工具只能调用**只读 API**（读上下文本来就不能调用事务 API，D-0007）——对话搜索满足；
 - 需要中途写数据的 agent 走后台任务（§8.2），写操作经 `task.commit(txFn, payload)` 进入内核队列。
 
 ### 7.4 不可信内容
@@ -246,8 +252,8 @@ type AgentEvent =
 
 ### 8.1 模式一：调用内运行（v1）
 
-- 循环跑在某个读函数里（例如 `dialog.generateReply`），生命周期 = 这次调用；
-- 工具只读；结果返回给界面后，再由写函数落库（沿用 D-0008）；
+- 循环跑在某个只读 API 里（例如 `dialog.generateReply`），生命周期 = 这次调用；
+- 工具只读；结果返回给界面后，再由事务 API 落库（沿用 D-0008）；
 - 窗口关闭或进程退出 → 这次运行丢失（对话里用户消息仍在，可以重试）；
 - 足够支撑对话搜索。
 
@@ -260,21 +266,40 @@ platform.task.start({ kind, input }) → { taskId }      // 由某个应用发�
 platform.task.get({ taskId }) / list / cancel
 ```
 
-- 任务在后台异步运行，不依赖界面调用是否还在；
+- 任务由内核异步运行，不依赖前端的调用是否还在；
 - **日志**：每一步（模型调用结果、工具结果）写入任务日志；崩溃或重启后按日志重放，已完成的步骤不再执行；
 - **中途落库**：`task.commit(txFn, payload)` 把「这一步的数据写入」与「这一步的日志」放进**同一个事务**——数据写入恰好一次，重放时不会重复；
 - **撤销**：内核为任务记录每次写入前的数据（变更日志），`platform.task.revert(taskId)` 把这次任务改过的数据恢复原样。网络请求等外部副作用撤不回；builder 改的代码文件用 git 兜底；
 - **批准**：任务可以暂停等待用户批准（例如不可信内容之后的写操作），用户在界面上同意后继续；
-- 写函数仍然同步、纯数据（D-0007 不变）：后台任务是新增的异步编排者，它调用写函数，而不是让写函数变异步。
+- 事务 API 仍然同步、纯数据（D-0007 不变）：后台任务是新增的异步编排者，它调用事务 API，而不是让事务 API 变异步。
 
 运行模式的划分见 D-0052。
 
-## 9. agent 与工作流
+## 9. 工作流与通用 agent 结构
 
-- **agent**：模型决定下一步做什么（`runAgent`）；
-- **工作流**：固定的步骤序列，步骤里可以调用模型（`callStructured`、单次 `platform.ai.chat`）或局部用 `runAgent`；
-- 工作流就是普通的 TypeScript 异步函数，不做图编排语言；需要持久化时放进后台任务，每个步骤自然成为一条日志。
-- 哲野大部分是工作流：精读 → 提出前置 → 等用户回答 → 按依赖顺序生成。
+- **工作流**：包含 LLM 调用与工具的程序流程，用代码实现（不做图编排语言、不预设工作流）；agent 就是工作流。**工具循环**（`runAgent`）是工作流里的一种常见模式（概念见 `user-spec/concepts/agent.md`）。
+- 整个子应用不是一个工作流：例如对话应用里只有「生成回复」是工作流；消息树是子应用的数据，工作流把当前路径当作输入、把结果写回。
+
+### 9.1 通用 agent 结构：平台基类（规划，D-0061）
+
+平台以可继承的基类提供两种通用结构，存储逻辑写在基类里，数据存在子应用自己的表空间：
+
+| 基类 | 语义 | 主要操作 | 使用者 |
+|---|---|---|---|
+| 消息树 | 节点是消息（用户 / 助手 / 工具步骤）；子节点互相替代（分支），同一时刻选中一条 | 追加、分叉、切换分支、取当前路径、转成发给模型的消息（含思考过程回传等规则） | 对话；哲野的批注线程；builder 的对话 |
+| 任务图 | 节点是工作项；连线是依赖 / 子任务；子节点都要完成 | 找出可开始的工作、标记进度、等人回答 | 哲野的单元与前置；将来的智能任务列表 |
+
+```ts
+// 示意
+class AnnotationThread extends MessageTree {
+  static columns = { ...MessageTree.columns, quote: "TEXT" };   // 子应用追加字段
+  toModelMessages(path) { ... }                                  // 子应用覆盖行为
+}
+```
+
+- 表由类声明的字段生成；表已存在时追加字段需要迁移，基类提供生成迁移的辅助；
+- 其他子应用使用这些数据时，通过拥有者的公开 API；
+- 持久任务的暂停与恢复机制另行设计。
 
 ## 10. 用量与费用
 

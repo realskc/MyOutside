@@ -1,10 +1,10 @@
 # 对话（dialog）技术文档
 
-> 应用 id：`dialog`；显示名「对话」。用户的预期见 `user-spec/apps/dialog.md`。
+> 应用 id：`dialog`；显示名「对话」。作者的预期见 `user-spec/apps/dialog.md`。
 
 ## 1. 结构
 
-- 后台：`apps/dialog/backend/src/`（`index.ts` = AppModule；`history.ts` = 上下文预算截断；`mapping.ts` = 行 ↔ 对象转换）
+- 后端：`apps/dialog/backend/src/`（`index.ts` = AppModule；`history.ts` = 上下文预算截断；`mapping.ts` = 行 ↔ 对象转换）
 - 界面：`apps/dialog/ui/`（静态 HTML / JS；`markdown.js` = 极简 Markdown 渲染）
 - 契约：`packages/contracts/src/dialog.ts`
 - 测试：`apps/dialog/test/dialog.test.ts`
