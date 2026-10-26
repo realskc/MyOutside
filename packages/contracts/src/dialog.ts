@@ -11,11 +11,45 @@ export const ConversationSchema = z.object({
   title: z.string(),
   systemPrompt: z.string().nullable(),
   reasoningEffort: ReasoningEffort,
+  /** 联网搜索开关（D-0055）：打开时把搜索 / 抓取工具交给模型 */
+  webSearch: z.boolean(),
   activeFirstId: z.string().nullable(),
   createdAt: z.number().int(),
   updatedAt: z.number().int(),
 });
 export type Conversation = z.infer<typeof ConversationSchema>;
+
+/** 一次回复中的一次工具调用（搜索、抓取……） */
+export const ReplyToolCallSchema = z.object({
+  id: z.string(),
+  name: z.string(),
+  arguments: z.string(),
+  ok: z.boolean(),
+  /** 给界面看的一句话，例如「搜索：DeepSeek 发布」 */
+  summary: z.string(),
+  /** 交给模型的结果文字（已截断）；重建历史时原样回传 */
+  result: z.string(),
+});
+export type ReplyToolCall = z.infer<typeof ReplyToolCallSchema>;
+
+/** 一次回复中调用了工具的一轮（不含最后一轮回答） */
+export const ReplyStepSchema = z.object({
+  reasoning: z.string().nullable(),
+  content: z.string(),
+  toolCalls: z.array(ReplyToolCallSchema),
+});
+export type ReplyStep = z.infer<typeof ReplyStepSchema>;
+
+/** 回复引用的来源（正文用 [n] 标注，D-0064） */
+export const ReplySourceSchema = z.object({
+  index: z.number().int(),
+  url: z.string(),
+  title: z.string(),
+  siteName: z.string().nullable(),
+  snippet: z.string(),
+  date: z.string().nullable(),
+});
+export type ReplySource = z.infer<typeof ReplySourceSchema>;
 
 export const MessageSchema = z.object({
   id: z.string(),
@@ -26,6 +60,11 @@ export const MessageSchema = z.object({
   reasoning: z.string().nullable(),
   model: z.string().nullable(),
   usage: AiUsageSchema.nullable(),
+  /** 回复过程中调用了工具的各轮（搜索过程） */
+  steps: z.array(ReplyStepSchema).nullable(),
+  sources: z.array(ReplySourceSchema).nullable(),
+  /** 生成这条回复时，最后一次请求的上下文长度（输入 token 数） */
+  contextTokens: z.number().int().nullable(),
   activeChildId: z.string().nullable(),
   createdAt: z.number().int(),
 });
@@ -54,6 +93,10 @@ export type GetPathInput = z.infer<typeof GetPathInput>;
 export const GetPathOutput = z.object({
   messages: z.array(PathMessageSchema),
   hasMore: z.boolean(),
+  /** 这个会话是否正在生成回复 */
+  generating: z.boolean(),
+  /** 当前上下文长度（token）：最近一条回复的实际输入 token 数，加上其后消息的估算；无回复时整体估算（D-0068） */
+  contextTokens: z.number().int(),
 });
 export type GetPathOutput = z.infer<typeof GetPathOutput>;
 
@@ -70,21 +113,62 @@ export const UsageSummarySchema = z.object({
 });
 export type UsageSummary = z.infer<typeof UsageSummarySchema>;
 
-export const GenerateReplyInput = z.object({ conversationId: z.string() });
-export type GenerateReplyInput = z.infer<typeof GenerateReplyInput>;
+/** 发送一条用户消息并生成回复（内部 API，普通的异步函数） */
+export const SendMessageInput = z.object({
+  conversationId: z.string(),
+  content: z.string().min(1),
+});
+export type SendMessageInput = z.infer<typeof SendMessageInput>;
 
-export const GenerateReplyOutput = z.object({
+/** 为某条用户消息生成一条回复（内部 API）：重新生成、失败后重试都用它；新回复成为已有回复的兄弟（D-0066） */
+export const GenerateInput = z.object({
+  conversationId: z.string(),
+  /** 要回答的那条用户消息 */
+  parentId: z.string(),
+});
+export type GenerateInput = z.infer<typeof GenerateInput>;
+
+/** 编辑一条用户消息（产生新分叉）并生成回复（内部 API） */
+export const EditAndSendInput = z.object({
+  messageId: z.string(),
+  content: z.string().min(1),
+});
+export type EditAndSendInput = z.infer<typeof EditAndSendInput>;
+
+export const GenerateOutput = z.object({
+  /** 新回复的 id */
+  messageId: z.string(),
+  /** 回答的那条用户消息 */
+  parentId: z.string(),
+  stopReason: z.enum(["done", "max_rounds"]),
+});
+export type GenerateOutput = z.infer<typeof GenerateOutput>;
+
+/** 保存一条回复（内部事务 API）：挂在指定的用户消息下 */
+export const SaveReplyInput = z.object({
+  conversationId: z.string(),
+  parentId: z.string(),
   content: z.string(),
   reasoning: z.string().nullable(),
-  model: z.string(),
+  model: z.string().nullable(),
   usage: AiUsageSchema.nullable(),
+  steps: z.array(ReplyStepSchema).nullable(),
+  sources: z.array(ReplySourceSchema).nullable(),
+  contextTokens: z.number().int().nullable(),
 });
-export type GenerateReplyOutput = z.infer<typeof GenerateReplyOutput>;
+export type SaveReplyInput = z.infer<typeof SaveReplyInput>;
+
+export const SetWebSearchInput = z.object({
+  conversationId: z.string(),
+  enabled: z.boolean(),
+});
+export type SetWebSearchInput = z.infer<typeof SetWebSearchInput>;
 
 export const CreateConversationInput = z.object({
   title: z.string().optional(),
   systemPrompt: z.string().nullable().optional(),
   reasoningEffort: ReasoningEffort.optional(),
+  webSearch: z.boolean().optional(),
 });
 export type CreateConversationInput = z.infer<typeof CreateConversationInput>;
 
@@ -146,7 +230,11 @@ export interface DialogApi {
   "dialog.listConversations": { input: ListConversationsInput; output: Conversation[] };
   "dialog.getPath": { input: GetPathInput; output: GetPathOutput };
   "dialog.getUsage": { input: GetUsageInput; output: UsageSummary };
-  "dialog.generateReply": { input: GenerateReplyInput; output: GenerateReplyOutput };
+  "dialog.send": { input: SendMessageInput; output: GenerateOutput };
+  "dialog.generate": { input: GenerateInput; output: GenerateOutput };
+  "dialog.editAndSend": { input: EditAndSendInput; output: GenerateOutput };
+  "dialog.saveReply": { input: SaveReplyInput; output: { messageId: string } };
+  "dialog.setWebSearch": { input: SetWebSearchInput; output: OkOutput };
   "dialog.createConversation": { input: CreateConversationInput; output: CreateConversationOutput };
   "dialog.appendMessage": { input: AppendMessageInput; output: AppendMessageOutput };
   "dialog.editUserMessage": { input: EditUserMessageInput; output: EditUserMessageOutput };

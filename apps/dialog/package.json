@@ -13,6 +13,7 @@
     "typecheck": "tsc --noEmit -p tsconfig.json"
   },
   "dependencies": {
+    "@myoutside/agent": "workspace:*",
     "@myoutside/contracts": "workspace:*",
     "@myoutside/kernel": "workspace:*",
     "zod": "^3.24.0"

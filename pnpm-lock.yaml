@@ -196,6 +196,9 @@ importers:
 
   apps/dialog:
     dependencies:
+      '@myoutside/agent':
+        specifier: workspace:*
+        version: link:../../packages/agent
       '@myoutside/contracts':
         specifier: workspace:*
         version: link:../../packages/contracts

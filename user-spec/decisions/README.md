@@ -90,7 +90,7 @@
 | [D-0027](0027-ai-lookup.md) | 查词：AI 翻译解说并生成卡片草稿 | 有效 |
 | [D-0028](0028-review-screen.md) | 复习界面：三个评分按钮 +「完全学会」 | 有效 |
 | [D-0029](0029-message-tree.md) | 对话消息树：父指针 + 当前选中的分叉指针 | 有效 |
-| [D-0030](0030-backend-orchestrated-reply.md) | 回复由对话应用的后端生成，整段返回，不做流式 | 部分被取代（→ D-0065） |
+| [D-0030](0030-backend-orchestrated-reply.md) | 回复由对话应用的后端生成，整段返回，不做流式 | 部分被取代（→ D-0065、D-0071） |
 | [D-0031](0031-edit-user-messages-only.md) | 只能编辑用户消息；暂不支持重新生成助手回复 | 部分被取代（→ D-0066） |
 | [D-0032](0032-reasoning-display.md) | 思考强度按会话设置；思考过程折叠显示、不放进后续上下文 | 有效（加搜索时必须修改） |
 | [D-0033](0033-context-budget.md) | 发给 AI 的上下文按约 100 万 token 的预算截断 | 有效 |
@@ -131,3 +131,4 @@
 | [D-0068](0068-show-current-context-length.md) | 用量显示改为突出当前上下文长度 | 有效（未实现） |
 | [D-0069](0069-markdown-and-latex.md) | 对话回复渲染完整的 Markdown 与 LaTeX 公式 | 有效（未实现） |
 | [D-0070](0070-kernel-permissions-implementation.md) | 调用者识别、权限检查与清单的实现方式 | 有效 |
+| [D-0071](0071-dialog-generation-implementation.md) | 对话回复的生成与保存方式 | 有效 |

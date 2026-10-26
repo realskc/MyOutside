@@ -4,6 +4,14 @@
   "protocolVersion": 1,
   "ui": "ui/index.html",
   "backend": "backend/src/index.ts",
-  "owns": ["conversation", "message"],
-  "uses": ["platform.settings.get", "platform.ai.chat"]
+  "owns": [
+    "conversation",
+    "message"
+  ],
+  "uses": [
+    "platform.settings.get",
+    "platform.ai.chat",
+    "platform.web.search",
+    "platform.web.fetch"
+  ]
 }
