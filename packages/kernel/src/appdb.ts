@@ -1,3 +1,4 @@
+import { KernelError } from "./errors.js";
 import type { AppDb, DbAdapter, MigrationCtx, SqlValue, WhereValue } from "./types.js";
 
 const IDENT = /^[A-Za-z_][A-Za-z0-9_]*$/;
@@ -63,6 +64,17 @@ function buildWhere(where: Record<string, WhereValue>): { sql: string; params: S
   }
   if (clauses.length === 0) return { sql: "", params: [] };
   return { sql: " WHERE " + clauses.join(" AND "), params };
+}
+
+/** 只读句柄的写入方法：直接拒绝（写数据只能通过事务 API，D-0063） */
+function denyWrite(): never {
+  throw new KernelError("FORBIDDEN", "只读上下文不能写数据：写数据只能通过事务 API");
+}
+
+/** 创建以某个应用为作用域的只读数据访问助手（只读 API、普通的异步函数使用） */
+export function createReadonlyAppDb(adapter: DbAdapter, appId: string): AppDb {
+  const db = createAppDb(adapter, appId);
+  return { ...db, insert: denyWrite, update: denyWrite, delete: denyWrite };
 }
 
 /** 创建以某个应用为作用域的数据访问助手；表名不能越出该应用（所有权由构造保证） */

@@ -2,11 +2,12 @@ import { createKernel, type Kernel } from "@myoutside/kernel";
 import { createNodeSqliteAdapter } from "@myoutside/kernel-node";
 import { describe, expect, it } from "vitest";
 import { vocabApp } from "../backend/src/index.js";
+import vocabManifest from "../manifest.json";
 
 function setup(): Kernel {
   const storage = createNodeSqliteAdapter({ path: ":memory:" });
   const kernel = createKernel({ storage });
-  kernel.registerApp(vocabApp);
+  kernel.registerApp(vocabApp, vocabManifest);
   kernel.start();
   return kernel;
 }

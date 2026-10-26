@@ -89,6 +89,7 @@ function readStringSetting(storage: DbAdapter, key: string): string | null {
 export function createPlatformAiDefinition(storage: DbAdapter): ApiDefinition {
   return {
     kind: "read",
+    visibility: "public",
     input: AiChatInputSchema,
     handler: async (_ctx, input: AiChatInput) => {
       const apiKey = readStringSetting(storage, "ai.deepseek.apiKey");

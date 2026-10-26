@@ -90,12 +90,12 @@
 | [D-0027](0027-ai-lookup.md) | 查词：AI 翻译解说并生成卡片草稿 | 有效 |
 | [D-0028](0028-review-screen.md) | 复习界面：三个评分按钮 +「完全学会」 | 有效 |
 | [D-0029](0029-message-tree.md) | 对话消息树：父指针 + 当前选中的分叉指针 | 有效 |
-| [D-0030](0030-backend-orchestrated-reply.md) | 回复由对话应用的后端生成，整段返回，不做流式 | 有效 |
-| [D-0031](0031-edit-user-messages-only.md) | 只能编辑用户消息；暂不支持重新生成助手回复 | 有效 |
+| [D-0030](0030-backend-orchestrated-reply.md) | 回复由对话应用的后端生成，整段返回，不做流式 | 部分被取代（→ D-0065） |
+| [D-0031](0031-edit-user-messages-only.md) | 只能编辑用户消息；暂不支持重新生成助手回复 | 部分被取代（→ D-0066） |
 | [D-0032](0032-reasoning-display.md) | 思考强度按会话设置；思考过程折叠显示、不放进后续上下文 | 有效（加搜索时必须修改） |
 | [D-0033](0033-context-budget.md) | 发给 AI 的上下文按约 100 万 token 的预算截断 | 有效 |
-| [D-0034](0034-usage-display.md) | 用量显示：每条回复的明细 + 会话累计 | 有效 |
-| [D-0035](0035-dialog-ui-details.md) | 对话界面细节 | 有效 |
+| [D-0034](0034-usage-display.md) | 用量显示：每条回复的明细 + 会话累计 | 已取代（→ D-0068） |
+| [D-0035](0035-dialog-ui-details.md) | 对话界面细节 | 部分被取代（→ D-0069） |
 | [D-0036](0036-zheye-explanation-units.md) | 哲野的讲解单元：词 / 句 / 文三种，三种来源 | 有效（未实现） |
 | [D-0037](0037-zheye-prerequisites.md) | 哲野的前置检查：轻 / 重前置，只问重前置，全递归 | 有效（未实现） |
 | [D-0038](0038-zheye-generation.md) | 哲野的生成：自动开始，全局串行，按依赖顺序，生成后固定 | 有效（未实现） |
@@ -124,3 +124,10 @@
 | [D-0061](0061-agent-structures-as-platform-base-classes.md) | 通用 agent 结构以平台基类提供，数据存在子应用自己的表空间 | 有效（未实现） |
 | [D-0062](0062-workflow-persistence-is-app-responsibility.md) | 工作流的暂停与恢复由子应用自己解决，平台不提供通用的重放机制 | 有效 |
 | [D-0063](0063-internal-apis-may-be-async-functions.md) | 写数据只能通过事务 API；公开 API 只能是只读或事务，内部 API 还可以是普通的异步函数 | 有效（异步函数形式未实现） |
+| [D-0064](0064-search-results-presentation.md) | 搜索结果的呈现：正文标注引用、下方列出来源、搜索过程折叠 | 有效（未实现） |
+| [D-0065](0065-streaming-output.md) | 对话回复逐字流式输出 | 有效（未实现） |
+| [D-0066](0066-regenerate-reply.md) | 支持重新生成助手回复（在回复这一层分叉） | 有效（未实现） |
+| [D-0067](0067-flash-only.md) | 对话固定使用 deepseek-flash，不提供模型选择 | 有效 |
+| [D-0068](0068-show-current-context-length.md) | 用量显示改为突出当前上下文长度 | 有效（未实现） |
+| [D-0069](0069-markdown-and-latex.md) | 对话回复渲染完整的 Markdown 与 LaTeX 公式 | 有效（未实现） |
+| [D-0070](0070-kernel-permissions-implementation.md) | 调用者识别、权限检查与清单的实现方式 | 有效 |

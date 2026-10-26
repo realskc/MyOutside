@@ -82,7 +82,8 @@ export type AiChatOutput = z.infer<typeof AiChatOutput>;
 export interface PlatformApi {
   "platform.dataVersion": { input: Record<string, never>; output: number };
   "platform.listApps": { input: Record<string, never>; output: Array<{ id: string; name: string }> };
-  "platform.settings.get": { input: { key: string }; output: { value: unknown } };
+  /** 凭据类设置（如 API Key）的 value 恒为 null，只能通过 isSet 知道是否已设置 */
+  "platform.settings.get": { input: { key: string }; output: { value: unknown; isSet: boolean } };
   "platform.settings.set": { input: { key: string; value: unknown }; output: { ok: true } };
   "platform.ai.chat": { input: AiChatInput; output: AiChatOutput };
 }

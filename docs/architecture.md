@@ -48,9 +48,9 @@ interface AppModule {
 - 函数用 `defineTx(schema, handler)` / `defineRead(schema, handler)` 定义（`packages/kernel/src/api.ts`）。
 - Electron 主进程在启动时 `kernel.registerApp(...)` 注册全部子应用，再 `kernel.start()`；注册必须在 start 之前。
 - 子应用界面目录由 Electron 主进程硬编码登记（`apps/host/src/main/index.ts` 的 `uiDirs`）。
-- 尚未实现：独立的应用清单（D-0056），见 §11。
+- 每个子应用一份清单 `manifest.json`，以 `kernel.registerApp(app, manifest)` 注册（§2.1）。
 
-### 2.1 应用清单（规划，D-0056）
+### 2.1 应用清单（D-0056、D-0070）
 
 每个子应用一份 `apps/<id>/manifest.json`：
 
@@ -81,10 +81,11 @@ interface AppModule {
 |---|---|---|---|
 | 事务 API（`tx`） | 进入串行队列，在一个数据库事务内执行 | **同步、纯数据**：只读写自己的表，不做文件 / 网络副作用；返回 Promise 会被拒绝（`INTERNAL`） | 公开或内部 |
 | 只读 API（`read`） | 直接执行 | 可以异步（例如调用平台 AI）；不能写数据 | 公开或内部 |
-| 普通的异步函数（规划，D-0063） | 直接执行 | 可以异步；**写数据只能通过调用本子应用的事务 API**（每次一个独立的短事务）；整体不保证原子 | **只能是内部** |
+| 普通的异步函数（`async`，`defineAsync`，D-0063） | 直接执行 | 可以异步；**写数据只能通过调用本子应用的事务 API**（每次一个独立的短事务）；整体不保证原子 | **只能是内部** |
 
-- 已知差距：只读 API 拿到的 `ctx.db` 目前也有写入方法，内核没有拦截——需要改为只读句柄；
-- 普通的异步函数需要内核新增一种函数类别：它的 `ctx.call` 可以调用只读 API 与本子应用的事务 API；只有本子应用（前端、后端）能调用它；
+- 只读 API 与普通的异步函数拿到的 `ctx.db` 是**只读句柄**，写入方法抛出 `FORBIDDEN`；
+- 普通的异步函数的 `ctx.call` 可以调用只读 API、本子应用的事务 API（各自进写队列、独立成事务）与本子应用的异步函数；只有本子应用（前端、后端）能调用它；
+- 定义时默认是内部 API，公开需显式声明：`defineTx(schema, handler, { visibility: "public" })`；
 - 步骤之间的一致性由子应用在事务 API 里做提交时校验（例如「当前末端仍是我开始时的那个节点」），冲突时拒绝写入（§7.1）。
 
 ### 3.2 调用
@@ -104,9 +105,18 @@ interface AppModule {
 
 错误码（`packages/kernel/src/errors.ts`）：`UNKNOWN_FUNCTION`、`VALIDATION`、`TX_CALL_INVALID`、`CALL_DEPTH_EXCEEDED`、`NOT_FOUND`、`PRECONDITION`、`UPSTREAM`、`INTERNAL`。事务 API 抛错 → 整个事务回滚。
 
-### 3.4 已知差距
+### 3.4 权限（D-0053、D-0070）
 
-- 内核不区分调用者：任何界面都能调用任何函数（包括 `platform.settings.get` 读取密钥）。见 D-0006、D-0019「代价」。
+调用者：前端发起时由 Electron 主进程按 `senderFrame.url`（`app://<id>/`）确定；后端发起时是正在执行的函数所属的子应用；`app://shell/` 为外壳；直接调用内核视为平台内部（受信任）。
+
+| 被调用的函数 | 规则 |
+|---|---|
+| 自己的函数 | 不受限 |
+| 平台 API | 子应用需在清单 `uses` 里声明；`platform.settings.set` 只给外壳 |
+| 其他子应用的 API | 必须是公开 API，且在清单 `uses` 里声明 |
+| （外壳调用子应用的 API） | 拒绝 |
+
+拒绝时错误码 `FORBIDDEN`。平台设置中的凭据（`ai.deepseek.apiKey`）任何调用者读到的都是 `{ value: null, isSet }`。
 
 ## 4. 事务与数据版本（D-0004）
 
@@ -195,9 +205,9 @@ get(table, where) / all(table, where?, { orderBy?, limit?, offset? }) / count(ta
 
 ## 10. Electron 程序（apps/host）
 
-- 主进程（`src/main/index.ts`）：创建内核与存储、注册子应用、IPC（`kernel:call`、`host:openExternal`）、`app://` 协议、菜单、冒烟模式；
+- 主进程（`src/main/index.ts`）：创建内核与存储、按清单注册子应用、识别调用者、IPC（`kernel:call`、`kernel:cancel`、`host:openExternal`）、推送事件（`kernel:event`）、`app://` 协议、菜单、冒烟模式；
 - 界面（D-0018）：外壳页面 `app://shell/index.html`，一个 iframe 作为面板，切换时改 `src`；`app://<id>/` 映射到各应用 `ui/` 目录，带路径穿越检查；
-- preload（`src/preload/index.ts`）：`window.outside = { call, openExternal }`；
+- preload（`src/preload/index.ts`）：`window.outside = { call(name, payload, { runId }), newRunId, onEvent(runId, listener), cancel(runId), openExternal }`；
 - 外链：`host.openExternal` 只接受 http/https，用系统浏览器打开；
 - 菜单：文件 / 编辑 / 视图；「编辑」菜单让 macOS 上的剪贴板快捷键生效；中英文跟随 `ui.language`；
 - 单实例锁（D-0016）；数据目录：`app.getPath("userData")`（应用名 MyOutside）；
@@ -206,12 +216,12 @@ get(table, where) / all(table, where?, { orderBy?, limit?, offset? }) / count(ta
 
 ## 11. 未实现 / 待定
 
-1. 应用清单（§2.1，D-0056）：自动装载、协议版本、`owns` 登记。
-2. 调用者身份与 `uses` 权限检查（§3.4，D-0053）；被调用方是否需要声明「哪些函数允许别人调用」，暂不做。
+1. 自动发现与装载子应用（目前在主进程代码里逐个注册清单与模块）；`owns` 的使用。
+2. builder 修改清单的批准流程。
 3. 按子应用热重载 `reloadApp`（D-0017）：每个子应用独立产出后端模块，运行时只重载一个应用。
 4. API 函数的版本策略。
 5. 事务 API 的副作用：如需要，走提交后钩子（post-commit）或补偿，不得混入事务。
-6. 普通的异步函数形式的内部 API（D-0063）：内核新增函数类别、只读 API 改为只读句柄。
+6. （已实现）普通的异步函数、只读句柄、权限检查。
 7. 事件 / 消息总线（暂缓）。
 8. 子应用形态允许混合（Web 内容 / 将来进程化 / WASM），呈现层统一为 Web。
 9. 文件仓库（§9）。
