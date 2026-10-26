@@ -4,6 +4,7 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>对话</title>
+    <link rel="stylesheet" href="vendor/katex.min.css" />
     <link rel="stylesheet" href="ui.css" />
   </head>
   <body>
@@ -31,6 +32,10 @@
                 <option value="max" data-i18n="effortMax">最高</option>
               </select>
             </label>
+            <label class="toggle-wrap">
+              <input id="web-search-toggle" type="checkbox" checked />
+              <span data-i18n="webSearch">联网搜索</span>
+            </label>
             <div class="tools-right">
               <span id="usage-total" class="usage-total"></span>
               <button id="btn-conv-settings" class="link-btn" data-i18n="convSettings">会话设置</button>
@@ -48,6 +53,9 @@
     <div id="settings-panel" class="settings-panel hidden"></div>
     <div id="toast" class="toast hidden"></div>
 
+    <script src="vendor/marked.umd.js"></script>
+    <script src="vendor/purify.min.js"></script>
+    <script src="vendor/katex.min.js"></script>
     <script src="markdown.js"></script>
     <script src="ui.js"></script>
   </body>

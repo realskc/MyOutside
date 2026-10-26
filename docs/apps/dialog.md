@@ -94,18 +94,19 @@ dialog.renameConversation / setSystemPrompt / setReasoningEffort / setWebSearch 
 
 `DEFAULT_SYSTEM_PROMPT`：「你是一个乐于助人的 AI 助手。回答简洁、准确；除非用户要求，使用与用户相同的语言回答。」
 
-## 5. 界面（D-0035、D-0034）
+## 5. 界面（D-0035、D-0064～D-0069）
 
 - 左栏会话列表（新建 / 重命名 / 删除 / 会话设置），右栏消息流 + 输入区；窄屏（< 720px）列表收为抽屉；
 - 消息流只显示当前路径；兄弟数 > 1 时显示 `‹ i/k ›` 分叉切换器；
-- 用户消息悬停出现「编辑」→ 行内编辑 → 保存 = 新分叉 + 自动重新生成；
-- 输入区工具条：思考强度（关 / 低 / 高 / 最高），改动即存；
-- 助手消息有 reasoning 时，上方显示可折叠的「思考过程」；
-- 用量：每条助手消息的操作栏显示本条明细（悬停可见）；输入区右侧显示会话累计（悬停查看输入 / 输出 / 思考 / 合计）；
-- 发送编排：`appendMessage(user)` → `generateReply` → `appendMessage(assistant)`；失败显示错误气泡 +「重试」，用户消息保留；
-- 生成中：该会话的发送 / 编辑 / 切换分叉禁用；可以切到其他会话，回来时重新拉取；
+- 用户消息「编辑」→ 行内编辑 → 保存 = `dialog.editAndSend`；助手消息「重新生成」= `dialog.generate`（新回复成为兄弟，D-0066）；
+- 输入区工具条：思考强度（关 / 低 / 高 / 最高）、「联网搜索」开关，改动即存；右侧显示**当前上下文长度**，悬停看会话累计用量（D-0068）；
+- **生成**：前端以运行 ID 调用 `dialog.send` / `generate` / `editAndSend`，订阅推送事件（`outside.onEvent`），实时显示思考过程、搜索过程（每次搜索 / 阅读的状态）与流式正文（按动画帧节流重绘）；生成中发送按钮变为「停止」（`outside.cancel`）；结束后重新读取路径；
+- 生成中可以切到其他会话；离开后重新打开页面，`getPath` 的 `generating` 为真时显示「生成中…」并定时刷新；
+- 失败显示错误 +「重试」；停止、或最后一条是没有回复的用户消息时，显示提示 +「生成回复」；
+- 助手消息：可折叠的「思考过程」与「搜索过程」（默认折叠），正文里的 `[n]` 渲染为指向来源的链接，下方列出来源（D-0064）；
 - 输入：Enter 发送、Shift+Enter 换行，处理中文输入法组字；
-- Markdown 极简渲染（零依赖、转义优先），代码块带复制按钮；链接（仅 http/https）经 `outside.openExternal` 用系统浏览器打开；
+- **Markdown + LaTeX**（D-0069，`ui/markdown.js`）：marked 解析，KaTeX 渲染公式（`$…$`、`\(…\)`、`$$…$$`、`\[…\]`；代码里的 `$` 不处理；`$5 和 $10` 这类金额不当公式），DOMPurify 清洗，原始 HTML 一律转义；代码块带复制按钮；链接仅 http/https，经 `outside.openExternal` 用系统浏览器打开；
+- 第三方库放在 `ui/vendor/`，由 `node scripts/vendor-dialog-ui.mjs` 从 devDependencies 复制（版本见 `vendor/VERSIONS.txt`），前端不经构建；
 - 会话设置：编辑系统提示词（保存 / 恢复默认）；
 - 文案中英双语。
 

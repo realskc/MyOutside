@@ -1,4 +1,5 @@
-/* 对话 v0：多会话 + 树形历史分叉 + 思考强度 + Markdown（中英文） */
+/* 对话：多会话 + 树形历史分叉 + 联网搜索 + 流式输出 + Markdown / LaTeX（中英文）
+   生成在后端（dialog.send / generate / editAndSend），前端只负责发起、显示进度与结果（D-0071）。 */
 (() => {
   const bridge = window.outside;
   if (!bridge) {
@@ -14,12 +15,14 @@
       startHint: "输入消息开始对话。",
       inputPlaceholder: "输入消息…（Enter 发送，Shift+Enter 换行）",
       send: "发送",
+      stop: "停止",
       generating: "生成中…",
       thinkingLabel: "思考",
       effortNone: "关",
       effortLow: "低",
       effortHigh: "高",
       effortMax: "最高",
+      webSearch: "联网搜索",
       untitled: "新对话",
       noConversations: "还没有对话",
       convSettings: "会话设置",
@@ -27,6 +30,7 @@
       systemPromptLabel: "系统提示词（留空 = 默认）",
       settingsHint: "系统提示词只影响之后生成的回复。",
       save: "保存",
+      saved: "已保存",
       cancel: "取消",
       close: "关闭",
       delete: "删除",
@@ -34,19 +38,26 @@
       copy: "复制",
       copied: "已复制",
       copyCode: "复制",
+      regenerate: "重新生成",
       loadEarlier: "加载更早的消息",
       reasoning: "思考过程",
+      thinking: "思考中…",
+      searchProcess: (n) => `搜索过程（${n} 步）`,
+      sources: "来源",
       retry: "重试",
+      generateNow: "生成回复",
+      noReply: "这条消息还没有回复（上次生成被中断）。",
+      stopped: "已停止生成。",
       errorPrefix: "生成失败：",
       needKey: "请先在「设置」里配置 DeepSeek API Key。",
       confirmDelete: (title) => `删除会话「${title}」？此操作不可恢复。`,
-      usageTotal: (n) => `累计 ${n} tokens`,
+      contextLength: (n) => `上下文 约 ${n} tokens`,
       usageMsg: (prompt, completion, reasoning) =>
         reasoning == null
           ? `输入 ${prompt} · 输出 ${completion}`
           : `输入 ${prompt} · 输出 ${completion} · 思考 ${reasoning}`,
-      usageTitle: (prompt, completion, reasoning, total) =>
-        `输入 ${prompt} · 输出 ${completion} · 思考 ${reasoning} · 合计 ${total}`,
+      usageTitle: (replies, prompt, completion, reasoning, total) =>
+        `本会话累计（${replies} 条回复）：输入 ${prompt} · 输出 ${completion} · 思考 ${reasoning} · 合计 ${total}`,
       you: "你",
       assistant: "助手",
     },
@@ -57,12 +68,14 @@
       startHint: "Type a message to start.",
       inputPlaceholder: "Type a message… (Enter to send, Shift+Enter for newline)",
       send: "Send",
+      stop: "Stop",
       generating: "Generating…",
       thinkingLabel: "Thinking",
       effortNone: "Off",
       effortLow: "Low",
       effortHigh: "High",
       effortMax: "Max",
+      webSearch: "Web search",
       untitled: "New chat",
       noConversations: "No conversations",
       convSettings: "Conversation settings",
@@ -70,6 +83,7 @@
       systemPromptLabel: "System prompt (empty = default)",
       settingsHint: "The system prompt affects future replies only.",
       save: "Save",
+      saved: "Saved",
       cancel: "Cancel",
       close: "Close",
       delete: "Delete",
@@ -77,17 +91,24 @@
       copy: "Copy",
       copied: "Copied",
       copyCode: "Copy",
+      regenerate: "Regenerate",
       loadEarlier: "Load earlier messages",
       reasoning: "Reasoning",
+      thinking: "Thinking…",
+      searchProcess: (n) => `Search process (${n} steps)`,
+      sources: "Sources",
       retry: "Retry",
+      generateNow: "Generate reply",
+      noReply: "This message has no reply yet (the last generation was interrupted).",
+      stopped: "Generation stopped.",
       errorPrefix: "Generation failed: ",
       needKey: "Configure the DeepSeek API key in Settings first.",
       confirmDelete: (title) => `Delete conversation “${title}”? This cannot be undone.`,
-      usageTotal: (n) => `${n} tokens total`,
+      contextLength: (n) => `Context ~${n} tokens`,
       usageMsg: (prompt, completion, reasoning) =>
         reasoning == null ? `in ${prompt} · out ${completion}` : `in ${prompt} · out ${completion} · think ${reasoning}`,
-      usageTitle: (prompt, completion, reasoning, total) =>
-        `in ${prompt} · out ${completion} · think ${reasoning} · total ${total}`,
+      usageTitle: (replies, prompt, completion, reasoning, total) =>
+        `This conversation (${replies} replies): in ${prompt} · out ${completion} · think ${reasoning} · total ${total}`,
       you: "You",
       assistant: "Assistant",
     },
@@ -99,8 +120,8 @@
     return typeof value === "function" ? value(...args) : value;
   };
 
-  async function call(name, payload) {
-    return bridge.call(name, payload);
+  async function call(name, payload, options) {
+    return bridge.call(name, payload, options);
   }
 
   async function callOrThrow(name, payload) {
@@ -121,6 +142,7 @@
   const newBtn = document.getElementById("btn-new");
   const menuBtn = document.getElementById("btn-menu");
   const effortSelect = document.getElementById("effort-select");
+  const webSearchToggle = document.getElementById("web-search-toggle");
   const settingsBtn = document.getElementById("btn-conv-settings");
   const settingsPanel = document.getElementById("settings-panel");
   const toastEl = document.getElementById("toast");
@@ -133,13 +155,18 @@
   let pathMessages = [];
   let pathHasMore = false;
   let pathLimit = 100;
+  let pathGenerating = false; // 后端报告的「正在生成」（可能是别的页面 / 重新打开前发起的）
+  let contextTokens = 0;
   let composing = false;
   let usageSummary = null;
-  const generating = new Set();
-  const errors = new Map();
+  /** 本页面发起、正在进行的生成：会话 id → { runId, pendingUser, rounds: [{ reasoning, content, tools: [] }] } */
+  const live = new Map();
+  /** 生成结束后的提示：会话 id → { kind: "error" | "stopped", text } */
+  const notices = new Map();
+  let remotePoll = null;
 
   const currentConversation = () => conversations.find((item) => item.id === currentId) || null;
-  const isGenerating = (id) => generating.has(id);
+  const isBusy = (id) => live.has(id) || (id === currentId && pathGenerating);
 
   function toast(text) {
     toastEl.textContent = text;
@@ -159,26 +186,32 @@
     return lang === "zh" ? `${Math.floor(diff / day)} 天前` : `${Math.floor(diff / day)}d ago`;
   }
 
-  // ---- 语言 ----
-
   const formatNumber = (value) => value.toLocaleString(lang === "zh" ? "zh-CN" : "en-US");
+
+  // ---- 上下文长度与用量（D-0068） ----
 
   function renderUsage() {
     const conversation = currentConversation();
-    if (!conversation || !usageSummary || usageSummary.totalTokens <= 0) {
+    if (!conversation || pathMessages.length === 0) {
       usageTotalEl.textContent = "";
       usageTotalEl.title = "";
       return;
     }
-    usageTotalEl.textContent = t("usageTotal", formatNumber(usageSummary.totalTokens));
-    usageTotalEl.title = t(
-      "usageTitle",
-      formatNumber(usageSummary.promptTokens),
-      formatNumber(usageSummary.completionTokens),
-      formatNumber(usageSummary.reasoningTokens),
-      formatNumber(usageSummary.totalTokens),
-    );
+    usageTotalEl.textContent = t("contextLength", formatNumber(contextTokens));
+    usageTotalEl.title =
+      usageSummary && usageSummary.totalTokens > 0
+        ? t(
+            "usageTitle",
+            usageSummary.replies,
+            formatNumber(usageSummary.promptTokens),
+            formatNumber(usageSummary.completionTokens),
+            formatNumber(usageSummary.reasoningTokens),
+            formatNumber(usageSummary.totalTokens),
+          )
+        : "";
   }
+
+  // ---- 语言 ----
 
   async function initLanguage() {
     let value = null;
@@ -242,7 +275,7 @@
       title.textContent = conversation.title || t("untitled");
       const meta = document.createElement("div");
       meta.className = "conv-meta";
-      meta.textContent = timeAgo(conversation.updatedAt);
+      meta.textContent = live.has(conversation.id) ? t("generating") : timeAgo(conversation.updatedAt);
       main.appendChild(title);
       main.appendChild(meta);
 
@@ -288,13 +321,15 @@
     const conversation = conversations.find((item) => item.id === id);
     const title = (conversation && conversation.title) || t("untitled");
     if (!window.confirm(t("confirmDelete", title))) return;
+    const run = live.get(id);
+    if (run) void bridge.cancel(run.runId);
     try {
       await callOrThrow("dialog.deleteConversation", { conversationId: id });
     } catch (error) {
       toast(error.message);
       return;
     }
-    errors.delete(id);
+    notices.delete(id);
     if (currentId === id) {
       currentId = null;
       pathMessages = [];
@@ -305,6 +340,7 @@
       renderMessages();
       renderComposerState();
       syncComposer();
+      renderUsage();
     }
   }
 
@@ -328,6 +364,7 @@
     if (!currentId) {
       pathMessages = [];
       pathHasMore = false;
+      pathGenerating = false;
       usageSummary = null;
       renderMessages();
       renderComposerState();
@@ -335,24 +372,39 @@
       renderUsage();
       return;
     }
+    const id = currentId;
     const [result, usage] = await Promise.all([
-      callOrThrow("dialog.getPath", { conversationId: currentId, limit: pathLimit }),
-      callOrThrow("dialog.getUsage", { conversationId: currentId }),
+      callOrThrow("dialog.getPath", { conversationId: id, limit: pathLimit }),
+      callOrThrow("dialog.getUsage", { conversationId: id }),
     ]);
+    if (id !== currentId) return;
     pathMessages = result.messages;
     pathHasMore = result.hasMore;
+    pathGenerating = result.generating;
+    contextTokens = result.contextTokens;
     usageSummary = usage;
     renderMessages({ scroll });
     renderComposerState();
     syncComposer();
     renderUsage();
+    watchRemoteGeneration();
+  }
+
+  /** 后端正在生成、但不是本页面发起的（例如重新打开了页面）：定时刷新，直到生成结束 */
+  function watchRemoteGeneration() {
+    clearTimeout(remotePoll);
+    if (currentId && pathGenerating && !live.has(currentId)) {
+      remotePoll = setTimeout(() => void loadPath({ scroll: false }).catch(() => {}), 1500);
+    }
   }
 
   function renderMessages(options = {}) {
     const scroll = options.scroll !== false;
+    const nearBottom = messagesEl.scrollHeight - messagesEl.scrollTop - messagesEl.clientHeight < 80;
     messagesEl.innerHTML = "";
 
-    if (!currentId || pathMessages.length === 0) {
+    const run = currentId ? live.get(currentId) : null;
+    if (!currentId || (pathMessages.length === 0 && !run)) {
       const hint = document.createElement("div");
       hint.className = "empty-state";
       hint.textContent = currentId ? t("startHint") : t("emptyHint");
@@ -379,39 +431,56 @@
       messagesEl.appendChild(renderMessage(message));
     }
 
-    const error = errors.get(currentId);
-    if (error) messagesEl.appendChild(renderErrorBubble(error));
+    if (run) {
+      if (run.pendingUser) messagesEl.appendChild(renderPendingUser(run.pendingUser));
+      messagesEl.appendChild(renderLive(run));
+    } else if (currentId === (currentConversation() || {}).id && pathGenerating) {
+      messagesEl.appendChild(renderRemoteGenerating());
+    } else {
+      const notice = notices.get(currentId);
+      const last = pathMessages.at(-1);
+      if (notice) messagesEl.appendChild(renderNotice(notice, last));
+      else if (last && last.role === "user") messagesEl.appendChild(renderNotice({ kind: "missing", text: t("noReply") }, last));
+    }
 
-    if (scroll) messagesEl.scrollTop = messagesEl.scrollHeight;
+    if (scroll || (run && nearBottom)) messagesEl.scrollTop = messagesEl.scrollHeight;
+  }
+
+  function messageHead(roleKey, message) {
+    const head = document.createElement("div");
+    head.className = "msg-head";
+    const role = document.createElement("span");
+    role.className = "msg-role";
+    role.textContent = t(roleKey);
+    head.appendChild(role);
+    if (message && message.siblingCount > 1) head.appendChild(buildBranchSwitcher(message));
+    return head;
   }
 
   function renderMessage(message) {
     const wrap = document.createElement("div");
     wrap.className = `msg ${message.role}`;
-
-    const head = document.createElement("div");
-    head.className = "msg-head";
-    const role = document.createElement("span");
-    role.className = "msg-role";
-    role.textContent = message.role === "user" ? t("you") : t("assistant");
-    head.appendChild(role);
-    if (message.siblingCount > 1) {
-      head.appendChild(buildBranchSwitcher(message));
-    }
-    wrap.appendChild(head);
+    wrap.appendChild(messageHead(message.role === "user" ? "you" : "assistant", message));
 
     if (message.role === "assistant" && message.reasoning) {
-      wrap.appendChild(buildReasoning(message.reasoning));
+      wrap.appendChild(buildCollapsible(t("reasoning"), buildReasoningBody(message.reasoning)));
+    }
+    if (message.role === "assistant" && message.steps && message.steps.length > 0) {
+      wrap.appendChild(buildCollapsible(t("searchProcess", countTools(message.steps)), buildStepsBody(message.steps)));
     }
 
     const bubble = document.createElement("div");
     bubble.className = "bubble";
     if (message.role === "assistant") {
-      bubble.innerHTML = window.renderMarkdown(message.content, { copyLabel: t("copyCode") });
+      bubble.innerHTML = window.renderMarkdown(message.content, { copyLabel: t("copyCode"), sources: message.sources || [] });
     } else {
       bubble.textContent = message.content;
     }
     wrap.appendChild(bubble);
+
+    if (message.role === "assistant" && message.sources && message.sources.length > 0) {
+      wrap.appendChild(buildSources(message.sources));
+    }
 
     const actions = document.createElement("div");
     actions.className = "msg-actions";
@@ -427,78 +496,199 @@
       );
       actions.appendChild(usageNote);
     }
-    const copyBtn = document.createElement("button");
-    copyBtn.type = "button";
-    copyBtn.className = "link-btn";
-    copyBtn.textContent = t("copy");
-    copyBtn.addEventListener("click", () => {
+    actions.appendChild(linkButton(t("copy"), () => {
       void navigator.clipboard.writeText(message.content).then(() => toast(t("copied")));
-    });
-    actions.appendChild(copyBtn);
+    }));
     if (message.role === "user") {
-      const editBtn = document.createElement("button");
-      editBtn.type = "button";
-      editBtn.className = "link-btn";
-      editBtn.textContent = t("edit");
-      editBtn.addEventListener("click", () => startEdit(message, bubble));
-      actions.appendChild(editBtn);
+      actions.appendChild(linkButton(t("edit"), () => startEdit(message, bubble)));
+    } else {
+      actions.appendChild(linkButton(t("regenerate"), () => void regenerate(message)));
     }
     wrap.appendChild(actions);
     return wrap;
   }
 
-  function buildReasoning(reasoning) {
+  function linkButton(text, onClick) {
+    const button = document.createElement("button");
+    button.type = "button";
+    button.className = "link-btn";
+    button.textContent = text;
+    button.addEventListener("click", onClick);
+    return button;
+  }
+
+  function countTools(steps) {
+    return steps.reduce((sum, step) => sum + (step.toolCalls || step.tools || []).length, 0);
+  }
+
+  function buildCollapsible(label, body, open = false) {
     const box = document.createElement("div");
-    box.className = "reasoning";
+    box.className = "collapsible";
     const toggle = document.createElement("button");
     toggle.type = "button";
-    toggle.className = "reasoning-toggle";
-    toggle.textContent = `▸ ${t("reasoning")}`;
-    const body = document.createElement("div");
-    body.className = "reasoning-body hidden";
-    body.textContent = reasoning;
+    toggle.className = "collapsible-toggle reasoning-toggle";
+    toggle.textContent = `${open ? "▾" : "▸"} ${label}`;
+    if (!open) body.classList.add("hidden");
     toggle.addEventListener("click", () => {
       const hidden = body.classList.toggle("hidden");
-      toggle.textContent = `${hidden ? "▸" : "▾"} ${t("reasoning")}`;
+      toggle.textContent = `${hidden ? "▸" : "▾"} ${label}`;
     });
     box.appendChild(toggle);
     box.appendChild(body);
     return box;
   }
 
+  function buildReasoningBody(reasoning) {
+    const body = document.createElement("div");
+    body.className = "reasoning-body";
+    body.textContent = reasoning;
+    return body;
+  }
+
+  /** 搜索过程：每一轮说的话（如有）与工具调用 */
+  function buildStepsBody(steps) {
+    const body = document.createElement("div");
+    body.className = "steps-body";
+    for (const step of steps) {
+      if (step.content) {
+        const said = document.createElement("div");
+        said.className = "step-said";
+        said.textContent = step.content;
+        body.appendChild(said);
+      }
+      for (const tool of step.toolCalls || step.tools || []) {
+        const row = document.createElement("div");
+        const status = tool.status || (tool.ok ? "ok" : "fail");
+        row.className = `step-tool ${status}`;
+        row.textContent = `${status === "running" ? "…" : status === "ok" ? "✓" : "✕"} ${tool.summary}`;
+        body.appendChild(row);
+      }
+    }
+    return body;
+  }
+
+  function buildSources(sources) {
+    const box = document.createElement("div");
+    box.className = "sources";
+    const label = document.createElement("div");
+    label.className = "sources-label";
+    label.textContent = t("sources");
+    box.appendChild(label);
+    const list = document.createElement("ol");
+    for (const source of sources) {
+      const item = document.createElement("li");
+      item.value = source.index;
+      const link = document.createElement("a");
+      link.href = source.url;
+      link.dataset.external = "1";
+      link.rel = "noreferrer";
+      link.textContent = source.title || source.url;
+      item.appendChild(link);
+      const meta = [source.siteName, source.date ? source.date.slice(0, 10) : null].filter(Boolean).join(" · ");
+      if (meta) {
+        const span = document.createElement("span");
+        span.className = "source-meta";
+        span.textContent = ` — ${meta}`;
+        item.appendChild(span);
+      }
+      list.appendChild(item);
+    }
+    box.appendChild(list);
+    return box;
+  }
+
+  function renderPendingUser(text) {
+    const wrap = document.createElement("div");
+    wrap.className = "msg user pending";
+    wrap.appendChild(messageHead("you"));
+    const bubble = document.createElement("div");
+    bubble.className = "bubble";
+    bubble.textContent = text;
+    wrap.appendChild(bubble);
+    return wrap;
+  }
+
+  /** 正在生成的回复：思考过程、搜索过程（实时状态）、流式正文 */
+  function renderLive(run) {
+    const wrap = document.createElement("div");
+    wrap.className = "msg assistant live";
+    wrap.appendChild(messageHead("assistant"));
+
+    const current = run.rounds.at(-1) || { reasoning: "", content: "", tools: [] };
+    const toolRounds = run.rounds.filter((round) => round.tools.length > 0);
+    const reasoning = run.rounds.map((round) => round.reasoning).filter(Boolean).join("\n\n");
+    if (reasoning) {
+      const open = !current.content && current.tools.length === 0;
+      wrap.appendChild(buildCollapsible(open ? t("thinking") : t("reasoning"), buildReasoningBody(reasoning), open));
+    }
+    if (toolRounds.length > 0) {
+      wrap.appendChild(buildCollapsible(t("searchProcess", countTools(toolRounds)), buildStepsBody(toolRounds), true));
+    }
+
+    const bubble = document.createElement("div");
+    bubble.className = "bubble";
+    const text = current.tools.length === 0 ? current.content : "";
+    if (text) bubble.innerHTML = window.renderMarkdown(text, { copyLabel: t("copyCode") });
+    else bubble.innerHTML = `<span class="typing">${t(reasoning ? "thinking" : "generating")}</span>`;
+    wrap.appendChild(bubble);
+    return wrap;
+  }
+
+  function renderRemoteGenerating() {
+    const wrap = document.createElement("div");
+    wrap.className = "msg assistant live";
+    wrap.appendChild(messageHead("assistant"));
+    const bubble = document.createElement("div");
+    bubble.className = "bubble";
+    bubble.innerHTML = `<span class="typing">${t("generating")}</span>`;
+    wrap.appendChild(bubble);
+    return wrap;
+  }
+
+  /** 生成失败 / 已停止 / 没有回复：提示 + 重试（为最后那条用户消息生成） */
+  function renderNotice(notice, lastMessage) {
+    const box = document.createElement("div");
+    box.className = notice.kind === "error" ? "error-bubble" : "notice-bubble";
+    const span = document.createElement("span");
+    span.textContent = notice.text;
+    box.appendChild(span);
+    if (lastMessage && lastMessage.role === "user") {
+      box.appendChild(
+        linkButton(notice.kind === "error" ? t("retry") : t("generateNow"), () => {
+          void startRun(lastMessage.conversationId, "dialog.generate", {
+            conversationId: lastMessage.conversationId,
+            parentId: lastMessage.id,
+          });
+        }),
+      );
+    }
+    return box;
+  }
+
   function buildBranchSwitcher(message) {
     const box = document.createElement("span");
     box.className = "branch-switcher";
-    const prev = document.createElement("button");
-    prev.type = "button";
-    prev.className = "link-btn";
-    prev.textContent = "‹";
+    const prev = linkButton("‹", () => void switchTo(-1));
     const label = document.createElement("span");
     label.textContent = `${message.siblingIndex}/${message.siblingCount}`;
-    const next = document.createElement("button");
-    next.type = "button";
-    next.className = "link-btn";
-    next.textContent = "›";
+    const next = linkButton("›", () => void switchTo(1));
 
-    const switchTo = async (offset) => {
-      if (isGenerating(message.conversationId)) return;
+    async function switchTo(offset) {
       const index = message.siblingIds.indexOf(message.id);
       if (index < 0) return;
-      const target =
-        message.siblingIds[(index + offset + message.siblingIds.length) % message.siblingIds.length];
+      const target = message.siblingIds[(index + offset + message.siblingIds.length) % message.siblingIds.length];
       try {
         await callOrThrow("dialog.switchBranch", {
           conversationId: message.conversationId,
           parentId: message.parentId,
           childId: target,
         });
+        notices.delete(message.conversationId);
         await loadPath();
       } catch (error) {
         toast(error.message);
       }
-    };
-    prev.addEventListener("click", () => void switchTo(-1));
-    next.addEventListener("click", () => void switchTo(1));
+    }
     box.appendChild(prev);
     box.appendChild(label);
     box.appendChild(next);
@@ -506,7 +696,7 @@
   }
 
   function startEdit(message, bubble) {
-    if (isGenerating(message.conversationId)) return;
+    if (isBusy(message.conversationId)) return;
     const editor = document.createElement("div");
     editor.className = "edit-box";
     const textarea = document.createElement("textarea");
@@ -533,99 +723,115 @@
     save.addEventListener("click", () => {
       const text = textarea.value.trim();
       if (!text) return;
-      void saveEdit(message, text);
+      void startRun(message.conversationId, "dialog.editAndSend", { messageId: message.id, content: text });
     });
   }
 
-  async function saveEdit(message, text) {
-    try {
-      await callOrThrow("dialog.editUserMessage", { messageId: message.id, content: text });
-    } catch (error) {
-      toast(error.message);
-      return;
-    }
-    await loadConversations();
-    if (currentId === message.conversationId) await loadPath();
-    await generateReplyFor(message.conversationId);
+  async function regenerate(message) {
+    if (isBusy(message.conversationId) || !message.parentId) return;
+    await startRun(message.conversationId, "dialog.generate", {
+      conversationId: message.conversationId,
+      parentId: message.parentId,
+    });
   }
 
-  // ---- 生成 ----
+  // ---- 生成：发起、接收推送事件、结束后刷新 ----
 
-  async function generateReplyFor(conversationId) {
-    generating.add(conversationId);
-    errors.delete(conversationId);
+  let renderScheduled = false;
+  function scheduleRender(conversationId) {
+    if (conversationId !== currentId || renderScheduled) return;
+    renderScheduled = true;
+    requestAnimationFrame(() => {
+      renderScheduled = false;
+      renderMessages({ scroll: false });
+    });
+  }
+
+  function handleEvent(conversationId, run, event) {
+    if (!event || typeof event !== "object") return;
+    const current = () => {
+      if (run.rounds.length === 0) run.rounds.push({ reasoning: "", content: "", tools: [] });
+      return run.rounds.at(-1);
+    };
+    switch (event.type) {
+      case "round_start":
+        if (run.rounds.length === 0 || run.rounds.at(-1).reasoning || run.rounds.at(-1).content || run.rounds.at(-1).tools.length) {
+          run.rounds.push({ reasoning: "", content: "", tools: [] });
+        }
+        break;
+      case "ai_delta":
+        if (event.reasoning) current().reasoning += event.reasoning;
+        if (event.content) current().content += event.content;
+        break;
+      case "tool_start":
+        current().tools.push({ callId: event.callId, summary: event.summary, status: "running" });
+        break;
+      case "tool_result": {
+        const tool = current().tools.find((item) => item.callId === event.callId);
+        if (tool) tool.status = event.ok ? "ok" : "fail";
+        break;
+      }
+      default:
+        return;
+    }
+    scheduleRender(conversationId);
+  }
+
+  /**
+   * 发起一次生成（dialog.send / generate / editAndSend）。
+   * 生成与保存都在后端；本页面通过推送事件显示进度，结束后重新读取路径。
+   */
+  async function startRun(conversationId, api, payload, options = {}) {
+    if (isBusy(conversationId)) return;
+    const runId = bridge.newRunId();
+    const run = { runId, pendingUser: options.pendingUser || null, rounds: [] };
+    live.set(conversationId, run);
+    notices.delete(conversationId);
+    const unsubscribe = bridge.onEvent(runId, (event) => handleEvent(conversationId, run, event));
+    renderConversations();
     if (currentId === conversationId) {
       renderMessages();
       renderComposerState();
-      syncComposer();
     }
-    try {
-      const reply = await callOrThrow("dialog.generateReply", { conversationId });
-      await callOrThrow("dialog.appendMessage", {
-        conversationId,
-        role: "assistant",
-        content: reply.content,
-        ...(reply.reasoning ? { reasoning: reply.reasoning } : {}),
-        ...(reply.model ? { model: reply.model } : {}),
-        ...(reply.usage ? { usage: reply.usage } : {}),
-      });
-      await loadConversations();
-      if (currentId === conversationId) await loadPath();
-    } catch (error) {
-      const text = String(error.message || error);
-      errors.set(
-        conversationId,
-        text.includes("API Key") ? t("needKey") : `${t("errorPrefix")}${text}`,
-      );
-      if (currentId === conversationId) renderMessages();
-    } finally {
-      generating.delete(conversationId);
-      if (currentId === conversationId) {
-        renderMessages();
-        renderComposerState();
-        syncComposer();
-      }
-      renderConversations();
+    // 编辑：后端很快会建好新分叉，刷新一次以显示改过的消息
+    if (api === "dialog.editAndSend" && currentId === conversationId) {
+      setTimeout(() => {
+        if (live.get(conversationId) === run && currentId === conversationId) void loadPath({ scroll: true }).catch(() => {});
+      }, 150);
     }
-  }
 
-  function renderErrorBubble(text) {
-    const box = document.createElement("div");
-    box.className = "error-bubble";
-    const span = document.createElement("span");
-    span.textContent = text;
-    const retry = document.createElement("button");
-    retry.type = "button";
-    retry.className = "link-btn";
-    retry.textContent = t("retry");
-    retry.addEventListener("click", () => {
-      const id = currentId;
-      if (id) void generateReplyFor(id);
-    });
-    box.appendChild(span);
-    box.appendChild(retry);
-    return box;
+    let result;
+    try {
+      result = await call(api, payload, { runId });
+    } finally {
+      unsubscribe();
+      live.delete(conversationId);
+    }
+    if (!result || !result.ok) {
+      const code = result && result.error ? result.error.code : "INTERNAL";
+      const text = result && result.error ? String(result.error.message) : "unknown error";
+      if (code === "ABORTED") notices.set(conversationId, { kind: "stopped", text: t("stopped") });
+      else if (code === "PRECONDITION" && text.includes("API Key")) notices.set(conversationId, { kind: "error", text: t("needKey") });
+      else notices.set(conversationId, { kind: "error", text: `${t("errorPrefix")}${text}` });
+    }
+    await loadConversations().catch(() => {});
+    if (currentId === conversationId) await loadPath().catch(() => {});
+    else renderConversations();
   }
 
   async function send() {
     const conversation = currentConversation();
-    if (!conversation || isGenerating(conversation.id)) return;
+    if (!conversation || isBusy(conversation.id)) return;
     const text = inputEl.value.trim();
     if (!text) return;
-    const conversationId = conversation.id;
     inputEl.value = "";
     autosize();
-    try {
-      await callOrThrow("dialog.appendMessage", { conversationId, role: "user", content: text });
-    } catch (error) {
-      inputEl.value = text;
-      autosize();
-      toast(error.message);
-      return;
-    }
-    await loadConversations();
-    if (currentId === conversationId) await loadPath();
-    await generateReplyFor(conversationId);
+    await startRun(conversation.id, "dialog.send", { conversationId: conversation.id, content: text }, { pendingUser: text });
+  }
+
+  function stop() {
+    const run = currentId ? live.get(currentId) : null;
+    if (run) void bridge.cancel(run.runId);
   }
 
   // ---- 输入区 ----
@@ -637,16 +843,22 @@
 
   function syncComposer() {
     const conversation = currentConversation();
-    if (conversation) effortSelect.value = conversation.reasoningEffort;
+    if (conversation) {
+      effortSelect.value = conversation.reasoningEffort;
+      webSearchToggle.checked = conversation.webSearch !== false;
+    }
   }
 
   function renderComposerState() {
     const conversation = currentConversation();
-    const busy = conversation ? isGenerating(conversation.id) : false;
-    sendBtn.disabled = !conversation || busy;
-    sendBtn.textContent = busy ? t("generating") : t("send");
+    const mine = conversation ? live.has(conversation.id) : false;
+    const busy = conversation ? isBusy(conversation.id) : false;
+    sendBtn.disabled = !conversation || (busy && !mine);
+    sendBtn.textContent = mine ? t("stop") : busy ? t("generating") : t("send");
+    sendBtn.classList.toggle("stop", mine);
     settingsBtn.disabled = !conversation;
-    effortSelect.disabled = !conversation || busy;
+    effortSelect.disabled = !conversation;
+    webSearchToggle.disabled = !conversation;
   }
 
   inputEl.addEventListener("compositionstart", () => {
@@ -662,7 +874,10 @@
       void send();
     }
   });
-  sendBtn.addEventListener("click", () => void send());
+  sendBtn.addEventListener("click", () => {
+    if (currentId && live.has(currentId)) stop();
+    else void send();
+  });
   newBtn.addEventListener("click", () => void createConversation());
 
   effortSelect.addEventListener("change", async () => {
@@ -672,6 +887,19 @@
     try {
       await callOrThrow("dialog.setReasoningEffort", { conversationId: conversation.id, effort });
       conversation.reasoningEffort = effort;
+    } catch (error) {
+      toast(error.message);
+      syncComposer();
+    }
+  });
+
+  webSearchToggle.addEventListener("change", async () => {
+    const conversation = currentConversation();
+    if (!conversation) return;
+    const enabled = webSearchToggle.checked;
+    try {
+      await callOrThrow("dialog.setWebSearch", { conversationId: conversation.id, enabled });
+      conversation.webSearch = enabled;
     } catch (error) {
       toast(error.message);
       syncComposer();
@@ -739,10 +967,7 @@
       const systemPrompt = promptInput.value.trim();
       try {
         if (title && title !== conversation.title) {
-          await callOrThrow("dialog.renameConversation", {
-            conversationId: conversation.id,
-            title,
-          });
+          await callOrThrow("dialog.renameConversation", { conversationId: conversation.id, title });
         }
         if (systemPrompt !== (conversation.systemPrompt ?? "")) {
           await callOrThrow("dialog.setSystemPrompt", {
