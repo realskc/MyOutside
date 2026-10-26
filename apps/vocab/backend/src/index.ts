@@ -2,12 +2,14 @@ import { randomUUID } from "node:crypto";
 import {
   AddCardInput,
   GetDueInput,
+  GetWordLevelInput,
   ListCardsInput,
   PreviewReviewInput,
   ResolveCardInput,
   SetMasteredInput,
   SubmitReviewInput,
   UpdateCardInput,
+  type WordLevel,
 } from "@myoutside/contracts";
 import {
   defineRead,
@@ -261,6 +263,13 @@ export const vocabApp: AppModule = {
       });
       const levels = loadWordLevels(ctx.db, rows.map((row) => row.term));
       return rows.map((row) => rowToCard(row, levels.get(row.term) ?? null));
+    }, { visibility: "public" }),
+
+    /** 查参考词表分级：不需要已经有卡片（查词草稿用） */
+    getWordLevel: defineRead(GetWordLevelInput, (ctx, input) => {
+      const term = normalizeTerm(input.term);
+      const row = ctx.db.get<{ level: WordLevel }>("word_level", { term });
+      return { level: row?.level ?? null };
     }, { visibility: "public" }),
 
     getStats: defineRead(z.object({}), (ctx) => {

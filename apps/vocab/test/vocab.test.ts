@@ -90,6 +90,12 @@ describe("vocab backend", () => {
 
     const empty = await call<Array<{ level: string | null }>>(kernel, "vocab.listCards", { term: "zzzznotaword" });
     expect(empty[0]?.level).toBeNull();
+
+    // 查词草稿用：不要求已经有卡片
+    const direct = await call<{ level: string | null }>(kernel, "vocab.getWordLevel", { term: " Abandon " });
+    expect(direct.level).toBe("A");
+    const directMiss = await call<{ level: string | null }>(kernel, "vocab.getWordLevel", { term: "zzzznotaword" });
+    expect(directMiss.level).toBeNull();
   });
 
   it("resolveCard：新拼写直接返回 new（不触发 AI）", async () => {

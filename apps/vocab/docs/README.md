@@ -51,6 +51,8 @@ level  TEXT       -- 'A' | 'B' | 'C' | 'D'
 vocab.getDue({ before?, limit? }) → Card[]            // status=learning 且 due <= before（默认现在），按 due 升序，默认 50
 vocab.listCards({ term?, query?, status?, limit?, offset? }) → Card[]
   // term：按归一化拼写精确匹配；query：按 display 模糊匹配；按 created_at 倒序，默认 200
+vocab.getWordLevel({ term }) → { level: "A" | "B" | "C" | "D" | null }
+  // 按归一化拼写查参考词表；不要求已经有卡片（查词草稿用）
 vocab.getStats({}) → { cards, learning, mastered, dueNow }
 vocab.previewReview({ cardId }) → { again, hard, good, easy: { due, scheduledDays } }
 vocab.resolveCard({ term, sense, meaning?, context? }) → { action: "new" } | { action: "match", cardId }
@@ -77,11 +79,13 @@ vocab.setMastered({ cardId, mastered }) → { ok }
 ## 5. 查词（VOCAB-0007、VOCAB-0004）
 
 - 界面直接调用 `platform.ai.chat`，带 `make_card` 工具；AI 返回卡片草稿（单词 / 意项 / 音标 / 释义 / 例句），内容一律中文、例句英文；
+- 草稿卡用 `draft.term` 调用 `vocab.getWordLevel` 查参考词表，命中时在音标旁显示「托福 A/B/C/D」徽章；
 - 用户确认「加入词库」后走添加流程；结果不缓存。
 
 ## 6. 界面
 
 - **复习**（VOCAB-0008）：剩余张数 → 单词 → 显示答案（音标 / 释义 / 语境 / 分级徽章）→ 评分（重来 / 不错 / 简单，按钮下显示 `previewReview` 的间隔）或「完全学会」（`setMastered`）；
+- **查词**：AI 翻译解说 + 卡片草稿；草稿命中参考词表时显示「托福 A/B/C/D」徽章，确认后走添加流程；
 - **词库**：卡片列表 + 拼写搜索 + 展开编辑 + 标记 / 取消掌握；命中参考词表显示「托福 A/B/C/D」徽章；
 - **添加**：手动填写单词 / 意项 / 释义 / 音标 / 语境，走添加流程；
 - **统计**：卡片总数 / 学习中 / 已掌握 / 待复习；

@@ -548,7 +548,14 @@
           draft = null;
         }
         if (draft && draft.term && draft.sense) {
-          renderDraft(draftEl, draft);
+          let level = null;
+          try {
+            const levelResult = await call("vocab.getWordLevel", { term: String(draft.term) });
+            level = levelResult.level;
+          } catch {
+            /* 分级只是附加信息，查不到不影响查词 */
+          }
+          renderDraft(draftEl, draft, level);
         }
       }
     } catch (error) {
@@ -558,7 +565,7 @@
     }
   }
 
-  function renderDraft(container, draft) {
+  function renderDraft(container, draft, level = null) {
     container.classList.remove("hidden");
     container.innerHTML = "";
 
@@ -566,7 +573,7 @@
     card.className = "draft-card";
     card.innerHTML =
       `<div class="draft-term">${escapeHtml(draft.term)}` +
-      `<span class="phonetic">${escapeHtml(draft.phonetic ?? "")}</span></div>` +
+      `<span class="phonetic">${escapeHtml(draft.phonetic ?? "")}${levelBadgeHtml({ level })}</span></div>` +
       `<div class="draft-sense">${escapeHtml(draft.sense)}</div>` +
       `<div class="draft-meaning">${escapeHtml(draft.meaning)}</div>` +
       (draft.example ? `<div class="context">${escapeHtml(draft.example)}</div>` : "");

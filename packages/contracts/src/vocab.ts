@@ -98,6 +98,13 @@ export const ListCardsInput = z.object({
 });
 export type ListCardsInput = z.infer<typeof ListCardsInput>;
 
+/** 按拼写查参考词表的分级；不要求已经有卡片 */
+export const GetWordLevelInput = z.object({ term: z.string().min(1) });
+export type GetWordLevelInput = z.infer<typeof GetWordLevelInput>;
+
+export const GetWordLevelOutput = z.object({ level: WordLevel.nullable() });
+export type GetWordLevelOutput = z.infer<typeof GetWordLevelOutput>;
+
 export const SubmitReviewInput = z.object({
   cardId: z.string(),
   rating: Rating,
@@ -167,6 +174,7 @@ export interface VocabApi {
   "vocab.updateCard": { input: UpdateCardInput; output: OkOutput };
   "vocab.getDue": { input: GetDueInput; output: Card[] };
   "vocab.listCards": { input: ListCardsInput; output: Card[] };
+  "vocab.getWordLevel": { input: GetWordLevelInput; output: GetWordLevelOutput };
   "vocab.submitReview": { input: SubmitReviewInput; output: SubmitReviewOutput };
   "vocab.previewReview": { input: PreviewReviewInput; output: PreviewReviewOutput };
   "vocab.setMastered": { input: SetMasteredInput; output: OkOutput };
