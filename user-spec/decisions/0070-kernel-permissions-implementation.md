@@ -28,7 +28,7 @@
 
 **清单**：每个子应用一份 `manifest.json`，由 Electron 主进程以静态 `import` 读入后传给 `kernel.registerApp(app, manifest)`；内核校验 id 与协议版本（当前为 1）。**自动发现与装载子应用暂不实现**——仍在 Electron 主进程代码里逐个注册。
 
-**运行 ID、推送与取消**：前端调用时可以带运行 ID；执行中的事件经 `frame.send("kernel:event")` 推回发起调用的页面；`kernel:cancel` 只能取消同一页面发起的调用，内核把取消信号沿嵌套调用向下传递，以 `ABORTED` 结束。
+**运行 ID、推送与取消**：前端调用时可以带运行 ID；执行中的事件经 `frame.send("kernel:event")` 推回发起调用的页面；`kernel:cancel` 只能取消同一页面发起的调用，内核把取消信号沿嵌套调用向下传递；取消只是通知函数「该停了」，函数可以就此以 `ABORTED` 结束，也可以先经本应用的事务 API 保存已有的进度（内核不因取消而拒绝写入，见 [DIALOG-0017](../../apps/dialog/user-spec/decisions/DIALOG-0017-keep-partial-reply-on-stop.md)）。
 
 ## 理由
 

@@ -48,6 +48,8 @@
       generateNow: "生成回复",
       noReply: "这条消息还没有回复（上次生成被中断）。",
       stopped: "已停止生成。",
+      stoppedTag: "已停止",
+      stoppedTitle: "生成被停止，这是停止前已生成的部分",
       errorPrefix: "生成失败：",
       needKey: "请先在「设置」里配置 DeepSeek API Key。",
       confirmDelete: (title) => `删除会话「${title}」？此操作不可恢复。`,
@@ -101,6 +103,8 @@
       generateNow: "Generate reply",
       noReply: "This message has no reply yet (the last generation was interrupted).",
       stopped: "Generation stopped.",
+      stoppedTag: "Stopped",
+      stoppedTitle: "Generation was stopped; this is what had been generated",
       errorPrefix: "Generation failed: ",
       needKey: "Configure the DeepSeek API key in Settings first.",
       confirmDelete: (title) => `Delete conversation “${title}”? This cannot be undone.`,
@@ -453,6 +457,13 @@
     role.className = "msg-role";
     role.textContent = t(roleKey);
     head.appendChild(role);
+    if (message && message.stopped) {
+      const tag = document.createElement("span");
+      tag.className = "stopped-tag";
+      tag.textContent = t("stoppedTag");
+      tag.title = t("stoppedTitle");
+      head.appendChild(tag);
+    }
     if (message && message.siblingCount > 1) head.appendChild(buildBranchSwitcher(message));
     return head;
   }

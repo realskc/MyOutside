@@ -100,6 +100,12 @@ const notesApp: AppModule = {
       await ctx.call("notes.fail", {});
       return "unreachable";
     }),
+    /** 普通的异步函数：被取消后保存已有的进度（取消不拒绝写入，由函数自己决定） */
+    saveOnAbort: defineAsync(z.object({}), async (ctx) => {
+      await new Promise<void>((resolve) => ctx.signal.addEventListener("abort", () => resolve()));
+      await ctx.call("notes.createNote", { title: "partial" });
+      return "saved";
+    }),
     /** 普通的异步函数：等待取消 */
     waitForever: defineAsync(z.object({}), async (ctx) => {
       await new Promise((_resolve, reject) => {
@@ -545,5 +551,14 @@ describe("kernel", () => {
     expect(own.ok).toBe(true);
     const other = await kernel.handle({ call: "notes.secret", payload: {} }, { caller: "seed", remote: true });
     expect(other.ok).toBe(false);
+  });
+  it("取消后：函数仍可经本应用的事务 API 保存已有的进度", async () => {
+    const { storage, kernel } = setup();
+    const controller = new AbortController();
+    const pending = kernel.handle({ call: "notes.saveOnAbort", payload: {} }, { signal: controller.signal });
+    controller.abort();
+    const r = await pending;
+    expect(r.ok).toBe(true);
+    expect(storage.select<{ title: string }>("SELECT title FROM notes__note").map((row) => row.title)).toEqual(["partial"]);
   });
 });

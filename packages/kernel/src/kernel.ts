@@ -329,10 +329,13 @@ export function createKernel({ storage }: KernelOptions) {
     return run;
   }
 
-  /** 事务 API：进写队列，单事务执行，成功后 DataVersion + 1 */
+  /**
+   * 事务 API：进写队列，单事务执行，成功后 DataVersion + 1。
+   * 取消只是通知正在执行的函数「该停了」；它停下来之后要不要再保存一次（例如保存已生成的部分），由它自己决定，
+   * 所以这里不因取消而拒绝写入。
+   */
   function executeTx(fn: RegisteredFunction, input: unknown, frame: CallFrame): Promise<unknown> {
     return enqueue(() => {
-      if (frame.signal.aborted) throw new KernelError("ABORTED", "调用已取消");
       const result = storage.transaction(() => runTx(fn, input, frame.depth));
       dataVersion += 1;
       return result;

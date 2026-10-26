@@ -251,4 +251,34 @@ describe("platform AI / web", () => {
     expect(missing.error.code).toBe("UPSTREAM");
     expect((missing.error.details as { retryable: boolean }).retryable).toBe(false);
   });
+  it("流式中途取消：返回已经收到的部分，finishReason = aborted；未拼完的工具调用丢弃", async () => {
+    const { kernel } = await setup();
+    const controller = new AbortController();
+    vi.stubGlobal("fetch", async (_url: string, init: { signal: AbortSignal }) => {
+      const encoder = new TextEncoder();
+      const body = new ReadableStream<Uint8Array>({
+        start(stream) {
+          const send = (chunk: unknown) => stream.enqueue(encoder.encode(`data: ${JSON.stringify(chunk)}\n\n`));
+          send({ model: "deepseek-flash", choices: [{ delta: { reasoning_content: "想一想" } }] });
+          send({ choices: [{ delta: { content: "第一段，" } }] });
+          send({ choices: [{ delta: { tool_calls: [{ index: 0, id: "c1", function: { name: "web_search", arguments: '{"q' } }] } }] });
+          init.signal.addEventListener("abort", () => stream.error(new DOMException("aborted", "AbortError")));
+          setTimeout(() => controller.abort(), 10);
+        },
+      });
+      return new Response(body, { status: 200, headers: { "content-type": "text/event-stream" } });
+    });
+    const r = await kernel.handle(
+      { call: "platform.ai.chat", payload: { messages: [{ role: "user", content: "hi" }], stream: true } },
+      { signal: controller.signal },
+    );
+    expect(r.ok).toBe(true);
+    if (!r.ok) return;
+    const out = r.result as { content: string; reasoning: string; toolCalls: unknown[]; finishReason: string; usage: unknown };
+    expect(out.finishReason).toBe("aborted");
+    expect(out.content).toBe("第一段，");
+    expect(out.reasoning).toBe("想一想");
+    expect(out.toolCalls).toEqual([]);
+    expect(out.usage).toBeNull();
+  });
 });

@@ -139,6 +139,12 @@ export const dialogApp: AppModule = {
         ctx.addColumn("message", "context_tokens INTEGER"); // 生成时最后一次请求的输入 token 数
       },
     },
+    {
+      id: "0003_stopped",
+      up: (ctx) => {
+        ctx.addColumn("message", "stopped INTEGER NOT NULL DEFAULT 0"); // 生成被停止，内容是已生成的部分
+      },
+    },
   ],
 
   api: {
@@ -347,6 +353,7 @@ export const dialogApp: AppModule = {
         steps: input.steps ? JSON.stringify(input.steps) : null,
         sources: input.sources ? JSON.stringify(input.sources) : null,
         context_tokens: input.contextTokens,
+        stopped: input.stopped ? 1 : 0,
         active_child_id: null,
         created_at: now,
       });

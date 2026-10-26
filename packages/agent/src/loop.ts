@@ -67,7 +67,8 @@ function toolSpec(tool: AgentTool): Record<string, unknown> {
  * - 可重试的上游错误（429 / 5xx / 网络）按指数退避重试；
  * - 工具不存在、参数不是合法 JSON、执行失败、重复调用：都作为工具结果告诉模型，让它自己修正；
  * - 达到最大轮数时，最后一轮不再提供工具，让模型根据已有信息直接回答；
- * - 取消时：未执行的工具调用补上「已取消」的结果，保证新增的消息仍然合法，以 aborted 结束。
+ * - 取消时：未执行的工具调用补上「已取消」的结果，保证新增的消息仍然合法，以 aborted 结束；
+ *   模型输出到一半被取消时，已输出的部分作为最后一轮保留在 rounds 里。
  */
 export async function runToolLoop(ctx: AgentContext, options: ToolLoopOptions): Promise<ToolLoopResult> {
   const maxRounds = Math.max(1, options.maxRounds ?? DEFAULT_MAX_ROUNDS);
@@ -138,6 +139,12 @@ export async function runToolLoop(ctx: AgentContext, options: ToolLoopOptions): 
     };
     rounds.push(round);
     push(response.message);
+
+    // 流式中途被取消：平台 AI 返回已经收到的部分，作为最后一轮保留
+    if (response.finishReason === "aborted") {
+      emit({ type: "round_end", round: index });
+      return result("aborted");
+    }
 
     if (response.toolCalls.length === 0) {
       emit({ type: "round_end", round: index });

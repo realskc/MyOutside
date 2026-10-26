@@ -65,6 +65,8 @@ export const MessageSchema = z.object({
   sources: z.array(ReplySourceSchema).nullable(),
   /** 生成这条回复时，最后一次请求的上下文长度（输入 token 数） */
   contextTokens: z.number().int().nullable(),
+  /** 生成被停止（按停止或正常关闭 MyOutside），内容是停止前已生成的部分 */
+  stopped: z.boolean(),
   activeChildId: z.string().nullable(),
   createdAt: z.number().int(),
 });
@@ -140,7 +142,8 @@ export const GenerateOutput = z.object({
   messageId: z.string(),
   /** 回答的那条用户消息 */
   parentId: z.string(),
-  stopReason: z.enum(["done", "max_rounds"]),
+  /** stopped：被停止，已生成的部分已保存 */
+  stopReason: z.enum(["done", "max_rounds", "stopped"]),
 });
 export type GenerateOutput = z.infer<typeof GenerateOutput>;
 
@@ -155,6 +158,7 @@ export const SaveReplyInput = z.object({
   steps: z.array(ReplyStepSchema).nullable(),
   sources: z.array(ReplySourceSchema).nullable(),
   contextTokens: z.number().int().nullable(),
+  stopped: z.boolean().optional(),
 });
 export type SaveReplyInput = z.infer<typeof SaveReplyInput>;
 

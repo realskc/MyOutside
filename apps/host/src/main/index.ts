@@ -385,6 +385,12 @@ async function runSmoke(win: BrowserWindow): Promise<void> {
         const state = (await win.webContents.executeJavaScript(
           `({ live: !!document.querySelector(".msg.live"), steps: document.querySelectorAll(".msg.live .step-tool").length, text: ((document.querySelector(".msg.live .bubble") || {}).innerText || "").length, stop: document.getElementById("btn-send").classList.contains("stop") })`,
         )) as { live: boolean; steps: number; text: number; stop: boolean };
+        // 可选：生成到一半时正常退出（MYOUTSIDE_SMOKE_QUIT_MID=1），验证退出前会保存已生成的部分
+        if (process.env.MYOUTSIDE_SMOKE_QUIT_MID === "1" && state.live && state.text > 80) {
+          console.log("[smoke] quitting mid-generation:", JSON.stringify(state));
+          app.quit();
+          return;
+        }
         if (!midShot && state.live && state.text > 80) {
           const mid = await captureWindow(win, 4, 100);
           writeFileSync(join(app.getPath("temp"), "myoutside-dialog-live.png"), mid);
@@ -526,10 +532,17 @@ app.whenReady().then(async () => {
           }
         }
       : undefined;
+    if (quitting) {
+      return { ok: false, error: { code: "ABORTED", message: "MyOutside 正在退出" }, dataVersion: kernel.dataVersion };
+    }
+    const done = kernel.handle({ call: request.call, payload: request.payload }, { caller, emit, signal: controller.signal });
+    const entry = { controller, done };
+    inflight.add(entry);
     let result;
     try {
-      result = await kernel.handle({ call: request.call, payload: request.payload }, { caller, emit, signal: controller.signal });
+      result = await done;
     } finally {
+      inflight.delete(entry);
       if (runId) runs.delete(runId);
     }
     if (request.call === "platform.settings.set" && result.ok) {
@@ -568,6 +581,21 @@ app.whenReady().then(async () => {
   if (process.env.MYOUTSIDE_SMOKE === "1") {
     await runSmoke(win);
   }
+});
+
+/** 进行中的调用：正常退出时先取消它们，等它们收尾（例如保存已生成的部分）再退出（DIALOG-0017） */
+const inflight = new Set<{ controller: AbortController; done: Promise<unknown> }>();
+const QUIT_GRACE_MS = 3000;
+let quitting = false;
+
+app.on("before-quit", (event) => {
+  if (quitting || inflight.size === 0) return;
+  event.preventDefault();
+  quitting = true;
+  const pending = [...inflight];
+  for (const call of pending) call.controller.abort();
+  const timeout = new Promise((resolve) => setTimeout(resolve, QUIT_GRACE_MS));
+  void Promise.race([Promise.allSettled(pending.map((call) => call.done)), timeout]).then(() => app.quit());
 });
 
 app.on("window-all-closed", () => {

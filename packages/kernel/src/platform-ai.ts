@@ -106,6 +106,7 @@ export type RecordUsage = (record: UsageRecord) => void;
  * - 请求透传 messages（含 reasoning_content 回传）/ tools / 思考强度；
  * - 响应返回内容、思考过程、工具调用、可直接追加进历史的 assistant 消息、结束原因与 usage；
  * - stream = true 时，增量经 ctx.emit 推送：{ type: "ai_delta", content?, reasoning? }；
+ *   中途被取消时不报错，返回已经收到的部分，finishReason = "aborted"（未拼完的工具调用丢弃；拿不到 usage）；
  * - 每次成功调用按调用者记一条用量。
  */
 export function createPlatformAiDefinition(storage: DbAdapter, recordUsage: RecordUsage = () => {}): ApiDefinition {
@@ -139,44 +140,57 @@ export function createPlatformAiDefinition(storage: DbAdapter, recordUsage: Reco
 
       if (input.stream) {
         const partial: Array<{ id: string; name: string; arguments: string }> = [];
-        for await (const raw of readSse(response, ctx.signal)) {
-          const chunk = raw as {
-            model?: string;
-            choices?: Array<{
-              delta?: {
-                content?: string | null;
-                reasoning_content?: string | null;
-                tool_calls?: Array<{ index: number; id?: string; function?: { name?: string; arguments?: string } }>;
-              };
-              finish_reason?: string | null;
-            }>;
-            usage?: DeepSeekUsage;
-          };
-          if (chunk.model) responseModel = chunk.model;
-          if (chunk.usage) usage = mapUsage(chunk.usage);
-          const choice = chunk.choices?.[0];
-          if (!choice) continue;
-          const delta = choice.delta ?? {};
-          if (delta.reasoning_content) {
-            reasoning += delta.reasoning_content;
-            ctx.emit({ type: "ai_delta", reasoning: delta.reasoning_content });
+        try {
+          for await (const raw of readSse(response, ctx.signal)) {
+            const chunk = raw as {
+              model?: string;
+              choices?: Array<{
+                delta?: {
+                  content?: string | null;
+                  reasoning_content?: string | null;
+                  tool_calls?: Array<{ index: number; id?: string; function?: { name?: string; arguments?: string } }>;
+                };
+                finish_reason?: string | null;
+              }>;
+              usage?: DeepSeekUsage;
+            };
+            if (chunk.model) responseModel = chunk.model;
+            if (chunk.usage) usage = mapUsage(chunk.usage);
+            const choice = chunk.choices?.[0];
+            if (!choice) continue;
+            const delta = choice.delta ?? {};
+            if (delta.reasoning_content) {
+              reasoning += delta.reasoning_content;
+              ctx.emit({ type: "ai_delta", reasoning: delta.reasoning_content });
+            }
+            if (delta.content) {
+              content += delta.content;
+              ctx.emit({ type: "ai_delta", content: delta.content });
+            }
+            // 流式下工具调用的参数分片到达：按 index 拼装
+            for (const piece of delta.tool_calls ?? []) {
+              const slot = (partial[piece.index] ??= { id: "", name: "", arguments: "" });
+              if (piece.id) slot.id = piece.id;
+              if (piece.function?.name) slot.name += piece.function.name;
+              if (piece.function?.arguments) slot.arguments += piece.function.arguments;
+            }
+            if (choice.finish_reason) finishReason = choice.finish_reason;
           }
-          if (delta.content) {
-            content += delta.content;
-            ctx.emit({ type: "ai_delta", content: delta.content });
-          }
-          // 流式下工具调用的参数分片到达：按 index 拼装
-          for (const piece of delta.tool_calls ?? []) {
-            const slot = (partial[piece.index] ??= { id: "", name: "", arguments: "" });
-            if (piece.id) slot.id = piece.id;
-            if (piece.function?.name) slot.name += piece.function.name;
-            if (piece.function?.arguments) slot.arguments += piece.function.arguments;
-          }
-          if (choice.finish_reason) finishReason = choice.finish_reason;
+        } catch (cause) {
+          // 流式中途被取消：返回已经收到的部分（finishReason = "aborted"），由调用方决定要不要保留
+          if (!(cause instanceof KernelError && cause.code === "ABORTED")) throw cause;
+          finishReason = "aborted";
         }
-        toolCalls = partial
-          .filter((slot) => slot && slot.name)
-          .map((slot) => ({ id: slot.id, type: "function" as const, function: { name: slot.name, arguments: slot.arguments } }));
+        toolCalls =
+          finishReason === "aborted"
+            ? []
+            : partial
+                .filter((slot) => slot && slot.name)
+                .map((slot) => ({
+                  id: slot.id,
+                  type: "function" as const,
+                  function: { name: slot.name, arguments: slot.arguments },
+                }));
       } else {
         const data = (await response.json()) as {
           model?: string;
@@ -203,7 +217,7 @@ export function createPlatformAiDefinition(storage: DbAdapter, recordUsage: Reco
         responseModel = data.model ?? model;
       }
 
-      if (ctx.signal.aborted) throw new KernelError("ABORTED", "调用已取消");
+      if (ctx.signal.aborted && finishReason !== "aborted") throw new KernelError("ABORTED", "调用已取消");
       recordUsage({ caller: ctx.caller, kind: "ai.chat", model: responseModel, usage });
 
       return {

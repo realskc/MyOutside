@@ -5,6 +5,8 @@ interface FakeReply {
   content?: string;
   reasoning?: string;
   toolCalls?: Array<{ id: string; name: string; arguments: string }>;
+  /** 模拟流式中途被取消：平台 AI 返回已收到的部分 */
+  aborted?: boolean;
 }
 
 /** 按脚本回复的假模型 + 可配置的其他 API；记录每次请求 */
@@ -36,7 +38,7 @@ function fakeContext(
           toolCalls,
           model: "deepseek-flash",
           usage: { promptTokens: 10, completionTokens: 5, totalTokens: 15 },
-          finishReason: toolCalls.length ? "tool_calls" : "stop",
+          finishReason: reply.aborted ? "aborted" : toolCalls.length ? "tool_calls" : "stop",
           message: {
             role: "assistant",
             content: toolCalls.length && !reply.content ? null : reply.content ?? "",
@@ -209,5 +211,16 @@ describe("runToolLoop", () => {
       [2, "https://b.com"],
       [3, "https://c.com"],
     ]);
+  });
+  it("模型输出到一半被取消：已输出的部分作为最后一轮保留，以 aborted 结束", async () => {
+    const { ctx } = fakeContext([
+      { content: "我先查一下。", toolCalls: [{ id: "1", name: "echo", arguments: '{"text":"a"}' }] },
+      { content: "查到的结果是", reasoning: "整理", aborted: true },
+    ]);
+    const r = await runToolLoop(ctx, { messages: base, tools: [echoTool] });
+    expect(r.stopReason).toBe("aborted");
+    expect(r.rounds).toHaveLength(2);
+    expect(r.content).toBe("查到的结果是");
+    expect(r.reasoning).toBe("整理");
   });
 });
