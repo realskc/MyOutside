@@ -10,7 +10,7 @@ const MAX_BODY_BYTES = 2 * 1024 * 1024;
 
 /**
  * 浏览器版 window.outside。
- * 只做 request / response；没有推送。见 D-0058。
+ * 只做 request / response；没有推送。见 D-0072。
  */
 const BRIDGE_JS = `(() => {
   const call = async (name, payload) => {

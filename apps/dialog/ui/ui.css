@@ -384,8 +384,9 @@ textarea {
   color: var(--accent);
 }
 
-/* 思考过程 */
+/* 思考过程 / 搜索过程（可折叠） */
 
+.collapsible,
 .reasoning {
   border: 1px dashed var(--border);
   border-radius: 10px;
@@ -410,6 +411,132 @@ textarea {
   color: var(--fg);
   opacity: 0.85;
   overflow-wrap: anywhere;
+}
+
+.steps-body {
+  margin-top: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 13px;
+}
+
+.step-said {
+  color: var(--fg);
+  opacity: 0.85;
+}
+
+.step-tool {
+  color: var(--muted);
+  overflow-wrap: anywhere;
+}
+
+.step-tool.ok {
+  color: var(--ok);
+}
+
+.step-tool.fail {
+  color: var(--danger);
+}
+
+.step-tool.running {
+  color: var(--accent);
+}
+
+/* 来源与引用（D-0064） */
+
+.sources {
+  margin-top: 8px;
+  font-size: 13px;
+  color: var(--muted);
+}
+
+.sources-label {
+  font-weight: 600;
+  margin-bottom: 2px;
+}
+
+.sources ol {
+  margin: 0;
+  padding-left: 22px;
+}
+
+.sources li {
+  margin: 2px 0;
+  overflow-wrap: anywhere;
+}
+
+.sources a,
+a.cite {
+  color: var(--accent);
+  text-decoration: none;
+}
+
+a.cite {
+  font-size: 0.8em;
+  vertical-align: super;
+  margin: 0 1px;
+}
+
+.sources a:hover,
+a.cite:hover {
+  text-decoration: underline;
+}
+
+/* 公式（KaTeX） */
+
+.math-display {
+  overflow-x: auto;
+  overflow-y: hidden;
+  margin: 8px 0;
+}
+
+.bubble table {
+  border-collapse: collapse;
+  margin: 8px 0;
+  display: block;
+  overflow-x: auto;
+}
+
+.bubble th,
+.bubble td {
+  border: 1px solid var(--border);
+  padding: 4px 8px;
+}
+
+/* 生成中 */
+
+.typing {
+  color: var(--muted);
+  animation: typing-pulse 1.2s ease-in-out infinite;
+}
+
+@keyframes typing-pulse {
+  0%,
+  100% {
+    opacity: 0.4;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+
+.msg.pending .bubble {
+  opacity: 0.75;
+}
+
+.notice-bubble {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  border: 1px solid var(--border);
+  background: #f8fafc;
+  color: var(--muted);
+  border-radius: 10px;
+  padding: 10px 12px;
+  font-size: 13px;
+  margin-bottom: 18px;
 }
 
 /* 分叉切换器 */
@@ -473,7 +600,7 @@ textarea {
 .composer-tools {
   display: flex;
   align-items: center;
-  justify-content: space-between;
+  justify-content: flex-start;
   font-size: 13px;
   color: var(--muted);
 }
@@ -484,12 +611,21 @@ textarea {
   gap: 6px;
 }
 
+.toggle-wrap {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  margin-left: 14px;
+  cursor: pointer;
+}
+
 .effort-wrap select {
   padding: 3px 6px;
   font-size: 13px;
 }
 
 .tools-right {
+  margin-left: auto;
   display: flex;
   align-items: center;
   gap: 14px;
@@ -605,4 +741,9 @@ textarea {
     background: rgba(15, 23, 42, 0.25);
     z-index: 9;
   }
+}
+
+#btn-send.stop {
+  background: var(--danger);
+  border-color: var(--danger);
 }

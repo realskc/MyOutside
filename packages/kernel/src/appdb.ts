@@ -146,6 +146,12 @@ export function createMigrationCtx(adapter: DbAdapter, appId: string): Migration
         `CREATE INDEX IF NOT EXISTS ${appId}__${indexName} ON ${physicalTableName(appId, tableName)} (${columnsSql})`,
       );
     },
+    addColumn(tableName, columnSql) {
+      if (!/^[A-Za-z_][A-Za-z0-9_]*\s+[^;]+$/.test(columnSql.trim())) {
+        throw new Error(`非法的列定义：${JSON.stringify(columnSql)}`);
+      }
+      adapter.execute(`ALTER TABLE ${physicalTableName(appId, tableName)} ADD COLUMN ${columnSql.trim()}`);
+    },
     insert(name, row) {
       db.insert(name, row);
     },

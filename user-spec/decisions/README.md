@@ -91,7 +91,7 @@
 | [D-0027](0027-ai-lookup.md) | 查词：AI 翻译解说并生成卡片草稿 | 有效 |
 | [D-0028](0028-review-screen.md) | 复习界面：三个评分按钮 +「完全学会」 | 有效 |
 | [D-0029](0029-message-tree.md) | 对话消息树：父指针 + 当前选中的分叉指针 | 有效 |
-| [D-0030](0030-backend-orchestrated-reply.md) | 回复由对话应用的后端生成，整段返回，不做流式 | 部分被取代（→ D-0065） |
+| [D-0030](0030-backend-orchestrated-reply.md) | 回复由对话应用的后端生成，整段返回，不做流式 | 部分被取代（→ D-0065、D-0071） |
 | [D-0031](0031-edit-user-messages-only.md) | 只能编辑用户消息；暂不支持重新生成助手回复 | 部分被取代（→ D-0066） |
 | [D-0032](0032-reasoning-display.md) | 思考强度按会话设置；思考过程折叠显示、不放进后续上下文 | 有效（加搜索时必须修改） |
 | [D-0033](0033-context-budget.md) | 发给 AI 的上下文按约 100 万 token 的预算截断 | 有效 |
@@ -111,27 +111,28 @@
 | [D-0047](0047-current-stage-non-goals.md) | 现阶段不做的事 | 有效 |
 | [D-0048](0048-self-built-agent-library.md) | agent 框架自研，不引入开源 agent 框架 | 有效 |
 | [D-0049](0049-agent-layering.md) | agent 能力分四部分：执行层承载循环，循环调用模型层与工具层 | 有效 |
-| [D-0050](0050-web-tools-as-platform-api.md) | 搜索与抓取做成平台 API | 有效（未实现） |
-| [D-0051](0051-event-centric-agent-runs.md) | agent 运行以事件为中心；流式输出与进度显示共用推送通道 | 有效（未实现） |
+| [D-0050](0050-web-tools-as-platform-api.md) | 搜索与抓取做成平台 API | 有效 |
+| [D-0051](0051-event-centric-agent-runs.md) | agent 运行以事件为中心；流式输出与进度显示共用推送通道 | 有效 |
 | [D-0052](0052-agent-execution-modes.md) | agent 的两种运行模式：调用内运行先行，后台任务后置 | 已取代（→ D-0061、D-0062、D-0063） |
-| [D-0053](0053-kernel-enforced-call-permissions.md) | 调用权限：应用声明自己会调用哪些函数，内核强制检查 | 有效（未实现） |
-| [D-0054](0054-dialog-search-v1-with-progress.md) | 对话搜索第一版就做进度推送 | 有效（未实现） |
-| [D-0055](0055-web-search-toggle.md) | 对话的「联网搜索」开关：默认打开，打开时由模型决定搜不搜 | 有效（未实现） |
-| [D-0056](0056-app-manifest.md) | 应用清单（manifest）的内容与形式：每个子应用一份 JSON 文件 | 有效（未实现） |
+| [D-0053](0053-kernel-enforced-call-permissions.md) | 调用权限：应用声明自己会调用哪些函数，内核强制检查 | 有效 |
+| [D-0054](0054-dialog-search-v1-with-progress.md) | 对话搜索第一版就做进度推送 | 有效 |
+| [D-0055](0055-web-search-toggle.md) | 对话的「联网搜索」开关：默认打开，打开时由模型决定搜不搜 | 有效 |
+| [D-0056](0056-app-manifest.md) | 应用清单（manifest）的内容与形式：每个子应用一份 JSON 文件 | 有效 |
 | [D-0057](0057-track-word-levels-data.md) | 参考词表数据随仓库提交；`.gitignore` 只忽略根目录 `data/` | 有效 |
-| [D-0058](0058-public-and-internal-functions.md) | 前端调用后端也经过内核；函数分公开与内部 | 有效（「公开 / 内部」未实现） |
+| [D-0058](0058-public-and-internal-functions.md) | 前端调用后端也经过内核；函数分公开与内部 | 有效 |
 | [D-0059](0059-no-tool-choice.md) | 不使用 `tool_choice` 的强制调用 | 有效 |
 | [D-0060](0060-tool-loop-ends-without-tool-calls.md) | 工具循环在模型不调用工具时结束 | 有效（暂时） |
 | [D-0061](0061-agent-structures-as-platform-base-classes.md) | 通用 agent 结构以平台基类提供，数据存在子应用自己的表空间 | 有效（未实现） |
 | [D-0062](0062-workflow-persistence-is-app-responsibility.md) | 工作流的暂停与恢复由子应用自己解决，平台不提供通用的重放机制 | 有效 |
-| [D-0063](0063-internal-apis-may-be-async-functions.md) | 写数据只能通过事务 API；公开 API 只能是只读或事务，内部 API 还可以是普通的异步函数 | 有效（异步函数形式未实现） |
-| [D-0064](0064-search-results-presentation.md) | 搜索结果的呈现：正文标注引用、下方列出来源、搜索过程折叠 | 有效（未实现） |
-| [D-0065](0065-streaming-output.md) | 对话回复逐字流式输出 | 有效（未实现） |
-| [D-0066](0066-regenerate-reply.md) | 支持重新生成助手回复（在回复这一层分叉） | 有效（未实现） |
+| [D-0063](0063-internal-apis-may-be-async-functions.md) | 写数据只能通过事务 API；公开 API 只能是只读或事务，内部 API 还可以是普通的异步函数 | 有效 |
+| [D-0064](0064-search-results-presentation.md) | 搜索结果的呈现：正文标注引用、下方列出来源、搜索过程折叠 | 有效 |
+| [D-0065](0065-streaming-output.md) | 对话回复逐字流式输出 | 有效 |
+| [D-0066](0066-regenerate-reply.md) | 支持重新生成助手回复（在回复这一层分叉） | 有效 |
 | [D-0067](0067-flash-only.md) | 对话固定使用 deepseek-flash，不提供模型选择 | 有效 |
-| [D-0068](0068-show-current-context-length.md) | 用量显示改为突出当前上下文长度 | 有效（未实现） |
-| [D-0069](0069-markdown-and-latex.md) | 对话回复渲染完整的 Markdown 与 LaTeX 公式 | 有效（未实现） |
+| [D-0068](0068-show-current-context-length.md) | 用量显示改为突出当前上下文长度 | 有效 |
+| [D-0069](0069-markdown-and-latex.md) | 对话回复渲染完整的 Markdown 与 LaTeX 公式 | 有效 |
 | [D-0070](0070-kernel-permissions-implementation.md) | 调用者识别、权限检查与清单的实现方式 | 有效 |
+| [D-0071](0071-dialog-generation-implementation.md) | 对话回复的生成与保存方式 | 有效 |
 | [D-0072](0072-dev-lan-preview.md) | 开发用 LAN 预览：Electron 主进程内加可选 HTTP 宿主 | 有效 |
 | [D-0073](0073-app-local-decisions.md) | 应用自包含：spec/docs/decisions 在 apps/<app>/ 内按层组织 | 有效 |
 

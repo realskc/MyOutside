@@ -13,6 +13,54 @@ function setup(): Kernel {
   return kernel;
 }
 
+async function setupWithKey(): Promise<Kernel> {
+  const kernel = setup();
+  await call(kernel, "platform.settings.set", { key: "ai.deepseek.apiKey", value: "test-key" });
+  return kernel;
+}
+
+interface FakeReply {
+  content?: string;
+  reasoning?: string;
+  toolCalls?: Array<{ id: string; name: string; arguments: string }>;
+  promptTokens?: number;
+}
+
+/** 按脚本回复的假 DeepSeek：对话接口用 SSE 流式返回；其他接口由 apis 提供；gate 可以让对话请求等待 */
+function fakeDeepSeek(replies: FakeReply[], apis: Record<string, (body: any) => unknown> = {}, gate?: Promise<void>) {
+  const requests: any[] = [];
+  const searches: any[] = [];
+  let index = 0;
+  const fetch = async (url: string, init: { body: string }) => {
+    const body = JSON.parse(init.body);
+    const path = new URL(url).pathname;
+    if (path === "/chat/completions") {
+      requests.push(body);
+      if (gate) await gate;
+      const reply = replies[index++];
+      if (!reply) throw new Error("脚本里没有更多回复");
+      const chunks: unknown[] = [];
+      if (reply.reasoning) chunks.push({ model: "deepseek-flash", choices: [{ delta: { reasoning_content: reply.reasoning } }] });
+      if (reply.content) chunks.push({ model: "deepseek-flash", choices: [{ delta: { content: reply.content } }] });
+      (reply.toolCalls ?? []).forEach((call, i) =>
+        chunks.push({ choices: [{ delta: { tool_calls: [{ index: i, id: call.id, function: { name: call.name, arguments: call.arguments } }] } }] }),
+      );
+      const prompt = reply.promptTokens ?? 100;
+      chunks.push({
+        choices: [{ delta: {}, finish_reason: reply.toolCalls?.length ? "tool_calls" : "stop" }],
+        usage: { prompt_tokens: prompt, completion_tokens: 10, total_tokens: prompt + 10 },
+      });
+      const text = chunks.map((chunk) => `data: ${JSON.stringify(chunk)}\n\n`).join("") + "data: [DONE]\n\n";
+      return new Response(text, { status: 200, headers: { "content-type": "text/event-stream" } });
+    }
+    if (path === "/v1/tools/search") searches.push(body);
+    const api = apis[path];
+    if (!api) return new Response("not found", { status: 404 });
+    return new Response(JSON.stringify(api(body)), { status: 200, headers: { "content-type": "application/json" } });
+  };
+  return { fetch, requests, searches };
+}
+
 async function call<T>(kernel: Kernel, name: string, payload?: unknown): Promise<T> {
   const res = await kernel.handle({ call: name, payload });
   if (!res.ok) throw new Error(`${res.error.code}: ${res.error.message}`);
@@ -238,84 +286,212 @@ describe("dialog backend", () => {
     });
   });
 
-  it("generateReply：无 key → PRECONDITION；无回复时不允许生成", async () => {
+  it("send：无 key → PRECONDITION；用户消息保留；之后可以用 generate 重试", async () => {
     const kernel = setup();
     const conversationId = await createConversation(kernel);
-    const assistant = await raw(kernel, "dialog.generateReply", { conversationId });
-    expect(assistant.ok).toBe(false);
-    if (!assistant.ok) expect(assistant.error.code).toBe("PRECONDITION");
+    const res = await raw(kernel, "dialog.send", { conversationId, content: "hi" });
+    expect(res.ok).toBe(false);
+    if (!res.ok) expect(res.error.code).toBe("PRECONDITION");
+    const path = await call<PathResult & { generating: boolean }>(kernel, "dialog.getPath", { conversationId });
+    expect(path.messages.map((m) => m.role)).toEqual(["user"]);
+    expect(path.generating).toBe(false);
 
-    await append(kernel, conversationId, "user", "hi");
-    const noKey = await raw(kernel, "dialog.generateReply", { conversationId });
-    expect(noKey.ok).toBe(false);
-    if (!noKey.ok) expect(noKey.error.code).toBe("PRECONDITION");
+    await call(kernel, "platform.settings.set", { key: "ai.deepseek.apiKey", value: "test-key" });
+    const model = fakeDeepSeek([{ content: "你好！" }]);
+    vi.stubGlobal("fetch", model.fetch);
+    const reply = await call<{ messageId: string; parentId: string }>(kernel, "dialog.generate", {
+      conversationId,
+      parentId: path.messages[0]!.id,
+    });
+    expect(reply.parentId).toBe(path.messages[0]!.id);
+    const after = await call<PathResult>(kernel, "dialog.getPath", { conversationId });
+    expect(after.messages.map((m) => m.content)).toEqual(["hi", "你好！"]);
   });
 
-  it("generateReply：透传思考强度与模型；返回并落库 reasoning / usage", async () => {
-    const kernel = setup();
-    await call(kernel, "platform.settings.set", { key: "ai.deepseek.apiKey", value: "test-key" });
-    const conversationId = await createConversation(kernel, { reasoningEffort: "low" });
-    await append(kernel, conversationId, "user", "hi");
+  it("send：流式生成、后端保存回复（思考过程 / 用量 / 上下文长度）；系统提示带日期；思考强度透传", async () => {
+    const kernel = await setupWithKey();
+    const conversationId = await createConversation(kernel, { reasoningEffort: "low", webSearch: false });
+    const model = fakeDeepSeek([{ content: "你好！", reasoning: "打个招呼", promptTokens: 120 }]);
+    vi.stubGlobal("fetch", model.fetch);
 
-    const fetchMock = vi.fn(async (_url: string, _init?: RequestInit) =>
-      new Response(
-        JSON.stringify({
-          model: "deepseek-flash",
-          choices: [
-            {
-              message: { content: "你好！", reasoning_content: "思考中…", tool_calls: [] },
-            },
-          ],
-          usage: {
-            prompt_tokens: 12,
-            completion_tokens: 8,
-            total_tokens: 20,
-            completion_tokens_details: { reasoning_tokens: 5 },
-          },
-        }),
-        { status: 200, headers: { "content-type": "application/json" } },
-      ),
+    const events: unknown[] = [];
+    const res = await kernel.handle(
+      { call: "dialog.send", payload: { conversationId, content: "hi" } },
+      { emit: (event) => events.push(event) },
     );
-    vi.stubGlobal("fetch", fetchMock);
+    expect(res.ok).toBe(true);
+    const body = model.requests[0]!;
+    expect(body.stream).toBe(true);
+    expect(body.reasoning_effort).toBe("low");
+    expect(body.tools).toBeUndefined();
+    expect(body.messages[0].role).toBe("system");
+    expect(body.messages[0].content).toMatch(/当前日期：\d{4}-\d{2}-\d{2}/);
+    expect(events).toContainEqual({ type: "ai_delta", content: "你好！" });
 
-    const reply = await call<{
-      content: string;
-      reasoning: string | null;
-      model: string;
-      usage: { totalTokens: number; reasoningTokens?: number } | null;
-    }>(kernel, "dialog.generateReply", { conversationId });
-    expect(reply.content).toBe("你好！");
-    expect(reply.reasoning).toBe("思考中…");
-    expect(reply.model).toBe("deepseek-flash");
-    expect(reply.usage?.reasoningTokens).toBe(5);
+    const path = await call<PathResult & { contextTokens: number; generating: boolean }>(kernel, "dialog.getPath", { conversationId });
+    const last = path.messages.at(-1)! as PathResult["messages"][number] & { contextTokens: number | null };
+    expect(last.content).toBe("你好！");
+    expect(last.reasoning).toBe("打个招呼");
+    expect(last.usage?.totalTokens).toBe(130);
+    expect(last.contextTokens).toBe(120);
+    expect(path.contextTokens).toBe(120 + estimateTokens("你好！"));
+    expect(path.generating).toBe(false);
+  });
 
-    const requestBody = JSON.parse(String(fetchMock.mock.calls[0]![1]?.body)) as Record<string, unknown>;
-    expect(requestBody.model).toBe("deepseek-flash");
-    expect(requestBody.reasoning_effort).toBe("low");
-    expect(Array.isArray(requestBody.messages)).toBe(true);
-    const sentMessages = requestBody.messages as Array<{ role: string; content: string }>;
-    expect(sentMessages[0]).toMatchObject({ role: "system" });
-    expect(sentMessages.at(-1)).toMatchObject({ role: "user", content: "hi" });
+  it("联网搜索：模型调用搜索 → 执行 → 回答带引用；保存搜索过程与来源；下一轮历史回传思考过程与工具消息", async () => {
+    const kernel = await setupWithKey();
+    const conversationId = await createConversation(kernel); // 默认打开联网搜索
+    const model = fakeDeepSeek(
+      [
+        {
+          content: "我先搜索一下。",
+          reasoning: "需要最新信息",
+          toolCalls: [{ id: "c1", name: "web_search", arguments: '{"query":"DeepSeek 发布"}' }],
+        },
+        { content: "DeepSeek 开放了搜索 API [1]。", reasoning: "整理结果" },
+        { content: "不客气。", reasoning: "礼貌回应" },
+      ],
+      {
+        "/v1/tools/search": () => ({
+          results: [
+            { title: "DeepSeek 开放搜索 API", url: "https://example.com/a", snippet: "短", summary: "长摘要", site_name: "Example", date: "2026-10-17T00:00:00Z" },
+          ],
+        }),
+      },
+    );
+    vi.stubGlobal("fetch", model.fetch);
 
-    await append(kernel, conversationId, "assistant", reply.content, {
-      reasoning: reply.reasoning ?? undefined,
-      model: reply.model,
-      usage: reply.usage ?? undefined,
-    });
+    await call(kernel, "dialog.send", { conversationId, content: "DeepSeek 最近发布了什么？" });
+    expect(model.requests[0]!.tools.map((t: any) => t.function.name)).toEqual(["web_search", "web_fetch"]);
+    expect(model.requests[0]!.messages[0].content).toContain("[1]");
+    expect(model.searches[0]).toMatchObject({ query: "DeepSeek 发布", ori_question: "DeepSeek 最近发布了什么？" });
+
+    let path = await call<any>(kernel, "dialog.getPath", { conversationId });
+    const reply = path.messages.at(-1);
+    expect(reply.content).toBe("DeepSeek 开放了搜索 API [1]。");
+    expect(reply.steps).toHaveLength(1);
+    expect(reply.steps[0].toolCalls[0]).toMatchObject({ name: "web_search", ok: true, summary: "搜索：DeepSeek 发布" });
+    expect(reply.sources).toEqual([
+      { index: 1, url: "https://example.com/a", title: "DeepSeek 开放搜索 API", siteName: "Example", snippet: "短", date: "2026-10-17T00:00:00Z" },
+    ]);
+
+    await call(kernel, "dialog.send", { conversationId, content: "谢谢" });
+    const history = model.requests[2]!.messages.slice(1).map((m: any) => ({
+      role: m.role,
+      reasoning: m.reasoning_content ?? null,
+      tools: m.tool_calls?.length ?? 0,
+    }));
+    expect(history).toEqual([
+      { role: "user", reasoning: null, tools: 0 },
+      { role: "assistant", reasoning: "需要最新信息", tools: 1 },
+      { role: "tool", reasoning: null, tools: 0 },
+      { role: "assistant", reasoning: "整理结果", tools: 0 },
+      { role: "user", reasoning: null, tools: 0 },
+    ]);
+    path = await call<any>(kernel, "dialog.getPath", { conversationId });
+    expect(path.messages.map((m: any) => m.role)).toEqual(["user", "assistant", "user", "assistant"]);
+  });
+
+  it("关闭联网搜索：不提供工具；历史里只保留之前回复的最终回答（不放工具调用）", async () => {
+    const kernel = await setupWithKey();
+    const conversationId = await createConversation(kernel);
+    const model = fakeDeepSeek(
+      [
+        { content: "", toolCalls: [{ id: "c1", name: "web_search", arguments: '{"query":"x"}' }] },
+        { content: "结果 [1]" },
+        { content: "好的" },
+      ],
+      { "/v1/tools/search": () => ({ results: [{ title: "t", url: "https://e.com", summary: "s" }] }) },
+    );
+    vi.stubGlobal("fetch", model.fetch);
+    await call(kernel, "dialog.send", { conversationId, content: "查一下" });
+    await call(kernel, "dialog.setWebSearch", { conversationId, enabled: false });
+    await call(kernel, "dialog.send", { conversationId, content: "继续" });
+    const last = model.requests[2]!;
+    expect(last.tools).toBeUndefined();
+    expect(last.messages.map((m: any) => m.role)).toEqual(["system", "user", "assistant", "user"]);
+    const list = await call<Array<{ webSearch: boolean }>>(kernel, "dialog.listConversations", {});
+    expect(list[0]!.webSearch).toBe(false);
+  });
+
+  it("重新生成：为同一条用户消息生成新回复，成为原回复的兄弟并被选中（D-0066）", async () => {
+    const kernel = await setupWithKey();
+    const conversationId = await createConversation(kernel, { webSearch: false });
+    vi.stubGlobal("fetch", fakeDeepSeek([{ content: "第一版" }, { content: "第二版" }]).fetch);
+    const first = await call<{ messageId: string; parentId: string }>(kernel, "dialog.send", { conversationId, content: "讲个笑话" });
+    const second = await call<{ messageId: string }>(kernel, "dialog.generate", { conversationId, parentId: first.parentId });
     const path = await call<PathResult>(kernel, "dialog.getPath", { conversationId });
-    const last = path.messages.at(-1)!;
-    expect(last.reasoning).toBe("思考中…");
-    expect(last.usage?.totalTokens).toBe(20);
+    const reply = path.messages.at(-1)!;
+    expect(reply.id).toBe(second.messageId);
+    expect(reply.content).toBe("第二版");
+    expect(reply.siblingIds).toEqual([first.messageId, second.messageId]);
+    expect(path.messages.filter((m) => m.role === "user")).toHaveLength(1);
+  });
 
-    // 历史请求不包含 reasoning；第二次生成会带上上下文
-    fetchMock.mockClear();
-    await append(kernel, conversationId, "user", "再说一次");
-    await call(kernel, "dialog.generateReply", { conversationId });
-    const secondBody = JSON.parse(String(fetchMock.mock.calls[0]![1]?.body)) as {
-      messages: Array<{ role: string; content: string; reasoning?: unknown }>;
-    };
-    expect(secondBody.messages.some((m) => "reasoning" in m)).toBe(false);
-    expect(secondBody.messages.map((m) => m.role)).toEqual(["system", "user", "assistant", "user"]);
+  it("editAndSend：编辑用户消息产生新分叉，并为新分叉生成回复", async () => {
+    const kernel = await setupWithKey();
+    const conversationId = await createConversation(kernel, { webSearch: false });
+    vi.stubGlobal("fetch", fakeDeepSeek([{ content: "回复一" }, { content: "回复二" }]).fetch);
+    const first = await call<{ parentId: string }>(kernel, "dialog.send", { conversationId, content: "原问题" });
+    await call(kernel, "dialog.editAndSend", { messageId: first.parentId, content: "改过的问题" });
+    const path = await call<PathResult>(kernel, "dialog.getPath", { conversationId });
+    expect(path.messages.map((m) => m.content)).toEqual(["改过的问题", "回复二"]);
+    expect(path.messages[0]!.siblingCount).toBe(2);
+  });
+
+  it("回复挂在明确的父节点上：生成期间切换了分支也不会挂错地方", async () => {
+    const kernel = await setupWithKey();
+    const conversationId = await createConversation(kernel, { webSearch: false });
+    let release!: () => void;
+    const gate = new Promise<void>((resolve) => (release = resolve));
+    const model = fakeDeepSeek([{ content: "旧分支的回答" }], {}, gate);
+    vi.stubGlobal("fetch", model.fetch);
+
+    const u1 = await append(kernel, conversationId, "user", "旧问题");
+    const pending = call<{ messageId: string }>(kernel, "dialog.generate", { conversationId, parentId: u1 });
+    await new Promise((resolve) => setTimeout(resolve, 5));
+    const busy = await raw(kernel, "dialog.generate", { conversationId, parentId: u1 });
+    expect(busy.ok).toBe(false); // 同一会话同一时刻只生成一条
+    const generating = await call<{ generating: boolean }>(kernel, "dialog.getPath", { conversationId });
+    expect(generating.generating).toBe(true);
+
+    const u1b = await call<{ messageId: string }>(kernel, "dialog.editUserMessage", { messageId: u1, content: "新问题" });
+    release();
+    const reply = await pending;
+
+    let path = await call<PathResult>(kernel, "dialog.getPath", { conversationId });
+    expect(path.messages.map((m) => m.id)).toEqual([u1b.messageId]); // 当前仍在新分支
+    await call(kernel, "dialog.switchBranch", { conversationId, parentId: null, childId: u1 });
+    path = await call<PathResult>(kernel, "dialog.getPath", { conversationId });
+    expect(path.messages.map((m) => m.id)).toEqual([u1, reply.messageId]);
+  });
+
+  it("取消：以 ABORTED 结束，不保存回复，不再显示生成中", async () => {
+    const kernel = await setupWithKey();
+    const conversationId = await createConversation(kernel, { webSearch: false });
+    vi.stubGlobal("fetch", (_url: string, init: { signal: AbortSignal }) => {
+      return new Promise((_resolve, reject) => {
+        init.signal.addEventListener("abort", () => reject(new DOMException("aborted", "AbortError")));
+      });
+    });
+    const controller = new AbortController();
+    const pending = kernel.handle({ call: "dialog.send", payload: { conversationId, content: "写一篇长文" } }, { signal: controller.signal });
+    await new Promise((resolve) => setTimeout(resolve, 5));
+    controller.abort();
+    const res = await pending;
+    expect(res.ok).toBe(false);
+    if (!res.ok) expect(res.error.code).toBe("ABORTED");
+    const path = await call<PathResult & { generating: boolean }>(kernel, "dialog.getPath", { conversationId });
+    expect(path.messages.map((m) => m.role)).toEqual(["user"]);
+    expect(path.generating).toBe(false);
+  });
+
+  it("内部 API：其他子应用不能调用 dialog.send", async () => {
+    const kernel = await setupWithKey();
+    const conversationId = await createConversation(kernel);
+    const res = await kernel.handle({ call: "dialog.send", payload: { conversationId, content: "x" } }, { caller: "vocab" });
+    expect(res.ok).toBe(false);
+    if (!res.ok) expect(res.error.code).toBe("FORBIDDEN");
   });
 
   it("上下文截断：估算与从最近保留（从 user 开始）", () => {

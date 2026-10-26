@@ -13,6 +13,7 @@
     "typecheck": "tsc --noEmit -p tsconfig.json"
   },
   "dependencies": {
+    "@myoutside/agent": "workspace:*",
     "@myoutside/contracts": "workspace:*",
     "@myoutside/kernel": "workspace:*",
     "zod": "^3.24.0"
@@ -20,6 +21,9 @@
   "devDependencies": {
     "@myoutside/kernel-node": "workspace:*",
     "@types/node": "^24.0.0",
+    "dompurify": "^3.4.17",
+    "katex": "^0.19.1",
+    "marked": "^18.1.1",
     "typescript": "^5.6.0",
     "vitest": "^3.0.0"
   }

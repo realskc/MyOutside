@@ -46,6 +46,8 @@ function mimeFor(file: string): string {
       return "image/svg+xml";
     case ".png":
       return "image/png";
+    case ".woff2":
+      return "font/woff2";
     default:
       return "application/octet-stream";
   }
@@ -240,7 +242,7 @@ async function runSmoke(win: BrowserWindow): Promise<void> {
   const guard = setTimeout(() => {
     console.error("[smoke] 超时，强制退出");
     app.quit();
-  }, 30000);
+  }, process.env.MYOUTSIDE_SMOKE_LIVE === "1" ? 120000 : 30000);
   try {
     await new Promise((resolve) => setTimeout(resolve, 1200)); // 等 iframe 加载
     const shell = await win.webContents.executeJavaScript(
@@ -333,7 +335,8 @@ async function runSmoke(win: BrowserWindow): Promise<void> {
 
     // 在临时副本上做一次演示写入：会话 → 两条消息 → 编辑生成分叉（用于查看切换器与思考过程）
     const demoAssistant =
-      "我是 **MyOutside** 里的对话助手：\n\n- 记住历史（树形保存，永不丢）\n- 修改用户消息会生成新**分叉**\n- 思考强度可调（输入框上方）";
+      "我是 **MyOutside** 里的对话助手：\n\n- 记住历史（树形保存，永不丢）\n- 修改用户消息会生成新**分叉**\n- 思考强度可调（输入框上方）\n\n" +
+      "欧拉恒等式 $e^{i\\pi}+1=0$，以及\n\n$$\\int_0^1 x^2\\,dx = \\frac{1}{3}$$\n\n| 能力 | 状态 |\n|---|---|\n| 联网搜索 | ✓ |\n| 公式渲染 | ✓ |";
     const demoReasoning = "用户要求一句话自我介绍。保持简短，顺便提示本应用的分叉与思考强度能力。";
     const demoConversation = await win.webContents.executeJavaScript(
       `(async () => {
@@ -355,11 +358,44 @@ async function runSmoke(win: BrowserWindow): Promise<void> {
       `(async () => { const toggle = document.querySelector(".reasoning-toggle"); if (toggle) toggle.click(); await new Promise((r) => setTimeout(r, 250)); return !!toggle; })()`,
     );
     console.log("[smoke] dialog reasoning toggle:", reasoningOpen);
+    const rendering = await win.webContents.executeJavaScript(
+      `({ katex: document.querySelectorAll(".katex").length, display: document.querySelectorAll(".math-display").length, table: !!document.querySelector(".bubble table"), webSearchToggle: !!document.getElementById("web-search-toggle"), context: (document.getElementById("usage-total") || {}).textContent || "" })`,
+    );
+    console.log("[smoke] dialog rendering:", JSON.stringify(rendering));
     const dialogShotPath = join(app.getPath("temp"), "myoutside-dialog.png");
     const dialogPng = await captureWindow(win, 12, 500);
     writeFileSync(dialogShotPath, dialogPng);
     console.log("[smoke] dialog screenshot:", dialogShotPath, `(${dialogPng.length} bytes)`);
 
+    // 可选：真实生成（MYOUTSIDE_SMOKE_LIVE=1）——经界面发一个需要联网搜索的问题，生成中与生成后各截一张
+    if (process.env.MYOUTSIDE_SMOKE_LIVE === "1") {
+      await win.webContents.executeJavaScript(
+        `(async () => { document.getElementById("btn-new").click(); await new Promise((r) => setTimeout(r, 500));
+          const input = document.getElementById("input"); input.value = ${JSON.stringify(process.env.MYOUTSIDE_SMOKE_QUESTION ?? "DeepSeek 最近发布了哪些 API 更新？")};
+          document.getElementById("btn-send").click(); return true; })()`,
+      );
+      let midShot = false;
+      for (let i = 0; i < 120; i += 1) {
+        await new Promise((resolve) => setTimeout(resolve, 500));
+        const state = (await win.webContents.executeJavaScript(
+          `({ live: !!document.querySelector(".msg.live"), steps: document.querySelectorAll(".msg.live .step-tool").length, text: ((document.querySelector(".msg.live .bubble") || {}).innerText || "").length, stop: document.getElementById("btn-send").classList.contains("stop") })`,
+        )) as { live: boolean; steps: number; text: number; stop: boolean };
+        if (!midShot && state.live && state.text > 80) {
+          const mid = await captureWindow(win, 4, 100);
+          writeFileSync(join(app.getPath("temp"), "myoutside-dialog-live.png"), mid);
+          console.log("[smoke] live mid-generation:", JSON.stringify(state));
+          midShot = true;
+        }
+        if (!state.live && i > 2) break;
+      }
+      await new Promise((resolve) => setTimeout(resolve, 800));
+      const final = await win.webContents.executeJavaScript(
+        `({ sources: document.querySelectorAll(".sources li").length, cites: document.querySelectorAll("a.cite").length, steps: !!document.querySelector(".steps-body"), notice: (document.querySelector(".error-bubble, .notice-bubble") || {}).innerText || null, context: document.getElementById("usage-total").textContent })`,
+      );
+      console.log("[smoke] live final:", JSON.stringify(final));
+      const finalShot = await captureWindow(win, 6, 300);
+      writeFileSync(join(app.getPath("temp"), "myoutside-dialog-final.png"), finalShot);
+    }
     // 围棋：验证 app://go 能加载、bridge 可用、9 路状态能返回
     await win.loadURL("app://go/index.html");
     for (let i = 0; i < 24; i += 1) {
@@ -392,6 +428,7 @@ async function runSmoke(win: BrowserWindow): Promise<void> {
     const goPng = await captureWindow(win, 10, 400);
     writeFileSync(goShotPath, goPng);
     console.log("[smoke] go screenshot:", goShotPath, `(${goPng.length} bytes)`);
+
   } catch (error) {
     console.error("[smoke] 失败：", error);
   } finally {
@@ -451,7 +488,7 @@ app.whenReady().then(async () => {
 
   const uiDirs = buildUiDirs(kernel);
 
-  // 开发用 LAN 预览（D-0071）：默认关闭，只有 dev:lan 才设置 MYOUTSIDE_LAN=1。
+  // 开发用 LAN 预览（D-0072）：默认关闭，只有 dev:lan 才设置 MYOUTSIDE_LAN=1。
   if (process.env.MYOUTSIDE_LAN === "1") {
     const port = Number(process.env.MYOUTSIDE_LAN_PORT ?? 3000);
     if (!Number.isInteger(port) || port <= 0 || port > 65535) {

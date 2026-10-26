@@ -1,5 +1,7 @@
-/* 极简 Markdown 渲染（零依赖、转义优先）
-   支持：标题 / 无序·有序列表 / 引用 / 围栏代码块 / 行内代码 / 粗体 / 斜体 / 链接 / 分隔线 */
+/* Markdown + LaTeX 渲染（D-0069）：marked 解析 Markdown，KaTeX 渲染公式，DOMPurify 清洗。
+   - 公式：$…$、\(…\) 行内；$$…$$、\[…\] 独立成行；代码里的 $ 不处理；
+   - 引用：正文里的 [n]（n 是本条回复的来源编号）渲染为指向来源的链接（D-0064）；
+   - 安全：原始 HTML 一律转义；只保留 http/https 链接，交给系统浏览器打开。 */
 (() => {
   "use strict";
 
@@ -12,121 +14,120 @@
       .replace(/'/g, "&#39;");
   }
 
-  function safeUrl(raw) {
-    const url = String(raw || "").trim();
-    return /^https?:\/\/[^\s]+$/i.test(url) ? url : null;
+  const isSafeUrl = (url) => /^https?:\/\/[^\s]+$/i.test(String(url || "").trim());
+
+  /** 占位符：只含字母数字，经过 Markdown 解析与清洗都不会被改动 */
+  const MATH = (index) => `MYOMATH${index}END`;
+  const CITE = (index) => `MYOCITE${index}END`;
+
+  /**
+   * 在非代码片段里把公式与引用换成占位符。
+   * 先按围栏代码块与行内代码切开，代码片段原样保留。
+   */
+  function protect(text, maths, cites, sourceIndexes) {
+    const parts = String(text).split(/(```[\s\S]*?(?:```|$)|`[^`\n]*`)/g);
+    return parts
+      .map((part, i) => {
+        if (i % 2 === 1) return part; // 代码
+        let out = part;
+        const putMath = (tex, display) => {
+          maths.push({ tex, display });
+          const token = MATH(maths.length - 1);
+          return display ? `\n\n${token}\n\n` : token;
+        };
+        out = out.replace(/\$\$([\s\S]+?)\$\$/g, (_m, tex) => putMath(tex, true));
+        out = out.replace(/\\\[([\s\S]+?)\\\]/g, (_m, tex) => putMath(tex, true));
+        out = out.replace(/\\\(([\s\S]+?)\\\)/g, (_m, tex) => putMath(tex, false));
+        // 行内 $…$：开头后、结尾前不能是空白，结尾后不能紧跟数字（避免把「$5 和 $10」当成公式）
+        out = out.replace(/\$(?!\s)([^$\n]+?)(?<!\s)\$(?!\d)/g, (_m, tex) => putMath(tex, false));
+        if (sourceIndexes.size > 0) {
+          out = out.replace(/\[(\d{1,3})\](?!\()/g, (match, n) => {
+            if (!sourceIndexes.has(Number(n))) return match;
+            cites.push(Number(n));
+            return CITE(cites.length - 1);
+          });
+        }
+        return out;
+      })
+      .join("");
   }
 
-  /** 行内元素（输入先整体转义，随后仅做受控替换） */
-  function inline(text) {
-    let out = escapeHtml(text);
-    const codes = [];
-    out = out.replace(/`([^`]+)`/g, (_match, code) => {
-      codes.push(code);
-      return `\u0000${codes.length - 1}\u0000`;
+  let parser = null;
+  function getParser(copyLabel) {
+    if (!window.marked || !window.marked.Marked) return null;
+    if (parser && parser.copyLabel === copyLabel) return parser.instance;
+    const instance = new window.marked.Marked({ gfm: true, breaks: true });
+    instance.use({
+      renderer: {
+        code(token) {
+          return (
+            `<div class="codeblock"><button type="button" class="code-copy">${escapeHtml(copyLabel)}</button>` +
+            `<pre><code>${escapeHtml(token.text)}</code></pre></div>`
+          );
+        },
+        html(token) {
+          return escapeHtml(token.text);
+        },
+      },
     });
-    out = out.replace(/\[([^\]]+)\]\(([^)\s]+)\)/g, (_match, label, url) => {
-      const safe = safeUrl(url);
-      return safe ? `<a href="${safe}" data-external="1" rel="noreferrer">${label}</a>` : label;
-    });
-    out = out.replace(/\*\*([^*]+)\*\*/g, "<strong>$1</strong>");
-    out = out.replace(/(^|[^*])\*([^*\n]+)\*/g, "$1<em>$2</em>");
-    out = out.replace(/(^|[^_])_([^_\n]+)_/g, "$1<em>$2</em>");
-    out = out.replace(/\u0000(\d+)\u0000/g, (_match, index) => `<code>${codes[Number(index)]}</code>`);
-    return out;
+    parser = { copyLabel, instance };
+    return instance;
   }
 
-  function render(text, options) {
-    const copyLabel = escapeHtml((options && options.copyLabel) || "Copy");
-    const lines = String(text || "").replace(/\r\n?/g, "\n").split("\n");
-    const out = [];
-    let para = [];
-    let list = null;
-
-    const flushPara = () => {
-      if (para.length > 0) {
-        out.push(`<p>${para.map((line) => inline(line)).join("<br />")}</p>`);
-        para = [];
-      }
-    };
-    const flushList = () => {
-      if (list) {
-        out.push(
-          `<${list.type}>${list.items.map((item) => `<li>${inline(item)}</li>`).join("")}</${list.type}>`,
-        );
-        list = null;
-      }
-    };
-
-    for (let i = 0; i < lines.length; i += 1) {
-      const line = lines[i];
-      const fence = /^```([\w-]*)\s*$/.exec(line);
-      if (fence) {
-        flushPara();
-        flushList();
-        const buffer = [];
-        i += 1;
-        while (i < lines.length && !/^```\s*$/.test(lines[i])) {
-          buffer.push(lines[i]);
-          i += 1;
-        }
-        out.push(
-          `<div class="codeblock"><button type="button" class="code-copy">${copyLabel}</button>` +
-            `<pre><code>${escapeHtml(buffer.join("\n"))}</code></pre></div>`,
-        );
-        continue;
-      }
-      if (/^\s*$/.test(line)) {
-        flushPara();
-        flushList();
-        continue;
-      }
-      const heading = /^(#{1,6})\s+(.*)$/.exec(line);
-      if (heading) {
-        flushPara();
-        flushList();
-        const level = heading[1].length;
-        out.push(`<h${level}>${inline(heading[2])}</h${level}>`);
-        continue;
-      }
-      if (/^\s*(-{3,}|\*{3,})\s*$/.test(line)) {
-        flushPara();
-        flushList();
-        out.push("<hr />");
-        continue;
-      }
-      const ul = /^\s*[-*+]\s+(.*)$/.exec(line);
-      if (ul) {
-        flushPara();
-        if (!list || list.type !== "ul") {
-          flushList();
-          list = { type: "ul", items: [] };
-        }
-        list.items.push(ul[1]);
-        continue;
-      }
-      const ol = /^\s*\d+[.)]\s+(.*)$/.exec(line);
-      if (ol) {
-        flushPara();
-        if (!list || list.type !== "ol") {
-          flushList();
-          list = { type: "ol", items: [] };
-        }
-        list.items.push(ol[1]);
-        continue;
-      }
-      const quote = /^>\s?(.*)$/.exec(line);
-      if (quote) {
-        flushPara();
-        flushList();
-        out.push(`<blockquote>${inline(quote[1])}</blockquote>`);
-        continue;
-      }
-      para.push(line);
+  function renderMath(tex, display) {
+    if (!window.katex) return escapeHtml(display ? `$$${tex}$$` : `$${tex}$`);
+    try {
+      return window.katex.renderToString(tex, { displayMode: display, throwOnError: false, output: "htmlAndMathml" });
+    } catch {
+      return escapeHtml(tex);
     }
-    flushPara();
-    flushList();
-    return out.join("\n");
+  }
+
+  /**
+   * @param {string} text
+   * @param {{ copyLabel?: string, sources?: Array<{ index: number, url: string, title: string }> }} options
+   */
+  function render(text, options = {}) {
+    const copyLabel = options.copyLabel || "Copy";
+    const sources = new Map((options.sources || []).map((source) => [source.index, source]));
+    const maths = [];
+    const cites = [];
+    const protectedText = protect(text || "", maths, cites, new Set(sources.keys()));
+
+    const instance = getParser(copyLabel);
+    let html = instance ? instance.parse(protectedText) : `<p>${escapeHtml(protectedText).replace(/\n/g, "<br />")}</p>`;
+    if (window.DOMPurify) html = window.DOMPurify.sanitize(html, { ADD_ATTR: ["data-external"] });
+
+    // 链接：只保留 http/https，交给系统浏览器打开
+    const template = document.createElement("template");
+    template.innerHTML = html;
+    for (const link of template.content.querySelectorAll("a")) {
+      const href = link.getAttribute("href") || "";
+      if (isSafeUrl(href)) {
+        link.setAttribute("data-external", "1");
+        link.setAttribute("rel", "noreferrer");
+      } else {
+        link.replaceWith(document.createTextNode(link.textContent || ""));
+      }
+    }
+    html = template.innerHTML;
+
+    // 占位符换成公式与引用（二者都由受信任的代码生成）
+    html = html.replace(/<p>\s*MYOMATH(\d+)END\s*<\/p>/g, (_m, index) => {
+      const math = maths[Number(index)];
+      return math ? `<div class="math-display">${renderMath(math.tex, true)}</div>` : "";
+    });
+    html = html.replace(/MYOMATH(\d+)END/g, (_m, index) => {
+      const math = maths[Number(index)];
+      return math ? renderMath(math.tex, math.display) : "";
+    });
+    html = html.replace(/MYOCITE(\d+)END/g, (_m, index) => {
+      const n = cites[Number(index)];
+      const source = sources.get(n);
+      if (!source || !isSafeUrl(source.url)) return `[${n}]`;
+      return `<a class="cite" href="${escapeHtml(source.url)}" data-external="1" rel="noreferrer" title="${escapeHtml(source.title)}">[${n}]</a>`;
+    });
+    return html;
   }
 
   window.renderMarkdown = render;
