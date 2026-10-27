@@ -4,13 +4,14 @@ import {
   ipcMain,
   Menu,
   protocol,
+  safeStorage,
   shell,
   type MenuItemConstructorOptions,
   type WebFrameMain,
 } from "electron";
 import { copyFileSync, existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { extname, join, normalize, resolve, sep } from "node:path";
-import { createKernel, SHELL_CALLER, type Kernel } from "@myoutside/kernel";
+import { createKernel, SHELL_CALLER, type Kernel, type SecretCodec } from "@myoutside/kernel";
 import { createNodeSqliteAdapter } from "@myoutside/kernel-node";
 import { vocabApp } from "@myoutside/vocab";
 import vocabManifest from "@myoutside/vocab/manifest.json";
@@ -30,7 +31,27 @@ if (process.env.MYOUTSIDE_SMOKE === "1") {
   // 关闭站点隔离：capturePage 对跨源 iframe（OOPIF）拍不到内容，仅测试用
   app.commandLine.appendSwitch("disable-site-isolation-trials");
   // 独立的浏览器配置目录：不和正在运行的 MyOutside 抢单实例锁、不共用配置
-  app.setPath("userData", join(app.getPath("temp"), "myoutside-smoke-profile"));
+  const smokeProfile = join(app.getPath("temp"), "myoutside-smoke-profile");
+  mkdirSync(smokeProfile, { recursive: true });
+  // Windows 上 safeStorage 的密钥记在配置目录的 Local State 里：带过去，才能解密数据库副本里的凭据（macOS 用钥匙串，不受影响）
+  const localState = join(REAL_USER_DATA, "Local State");
+  if (existsSync(localState)) copyFileSync(localState, join(smokeProfile, "Local State"));
+  app.setPath("userData", smokeProfile);
+}
+
+/**
+ * 凭据加解密（D-0075）：Electron safeStorage——macOS 上加密密钥由系统钥匙串保管（Windows 上是 DPAPI）。
+ * 系统不支持时返回 undefined，凭据退回明文保存。
+ */
+function createSecretCodec(): SecretCodec | undefined {
+  if (!safeStorage.isEncryptionAvailable()) {
+    console.warn("[host] 系统不支持 safeStorage，凭据将以明文保存");
+    return undefined;
+  }
+  return {
+    encrypt: (plain) => safeStorage.encryptString(plain).toString("base64"),
+    decrypt: (cipher) => safeStorage.decryptString(Buffer.from(cipher, "base64")),
+  };
 }
 
 /** 冒烟测试默认在后台运行：不显示窗口、不抢焦点、不在 Dock 出现；MYOUTSIDE_SMOKE_SHOW=1 时显示（调试用） */
@@ -487,7 +508,7 @@ app.whenReady().then(async () => {
   const dbPath = join(dataDir, "myoutside.db");
   console.log("[host] data dir:", dataDir);
 
-  const kernel = createKernel({ storage: createNodeSqliteAdapter({ path: dbPath }) });
+  const kernel = createKernel({ storage: createNodeSqliteAdapter({ path: dbPath }), secrets: createSecretCodec() });
   kernel.registerApp(vocabApp, vocabManifest);
   kernel.registerApp(dialogApp, dialogManifest);
   kernel.registerApp(goApp, goManifest);

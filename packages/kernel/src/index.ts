@@ -24,6 +24,7 @@ export type {
   ReadContext,
   ReadHandler,
   RunContext,
+  SecretCodec,
   SqlValue,
   TxContext,
   TxHandler,

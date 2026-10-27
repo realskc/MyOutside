@@ -1,21 +1,16 @@
 /**
- * 用应用数据目录里的配置做一次真实 AI 调用（验证 key、模型与思考强度参数）。
- * 运行：pnpm.cmd ai:ping
+ * 做一次真实 AI 调用（验证 key、模型与思考强度参数）。在内存数据库上运行，不碰真实数据。
+ * 运行：DEEPSEEK_API_KEY=sk-... pnpm ai:ping
+ * （MyOutside 里的密钥用系统钥匙串加密保存，脚本解不开，所以由环境变量提供，D-0075）
  */
-import { homedir } from "node:os";
-import { join } from "node:path";
 import { createKernel } from "@myoutside/kernel";
 import { createNodeSqliteAdapter } from "@myoutside/kernel-node";
-import { vocabApp } from "@myoutside/vocab";
-import vocabManifest from "@myoutside/vocab/manifest.json";
 
-const appData = process.env.APPDATA ?? join(homedir(), ".config");
-const dbPath = join(appData, "MyOutside", "myoutside.db");
-console.log("[ai-ping] db:", dbPath);
-
-const kernel = createKernel({ storage: createNodeSqliteAdapter({ path: dbPath }) });
-kernel.registerApp(vocabApp, vocabManifest);
+const apiKey = process.env.DEEPSEEK_API_KEY;
+if (!apiKey) throw new Error("需要环境变量 DEEPSEEK_API_KEY");
+const kernel = createKernel({ storage: createNodeSqliteAdapter({ path: ":memory:" }) });
 kernel.start();
+await kernel.handle({ call: "platform.settings.set", payload: { key: "ai.deepseek.apiKey", value: apiKey } });
 
 const res = await kernel.handle({
   call: "platform.ai.chat",

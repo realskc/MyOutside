@@ -1,7 +1,7 @@
 import { z } from "zod";
 import { deepseekPost, readSse, readStringSetting } from "./deepseek.js";
 import { KernelError } from "./errors.js";
-import type { ApiDefinition, DbAdapter, ReadContext } from "./types.js";
+import type { ApiDefinition, DbAdapter, ReadContext, SecretCodec } from "./types.js";
 
 const DEFAULT_MODEL = "deepseek-flash";
 
@@ -110,7 +110,11 @@ export type RecordUsage = (record: UsageRecord) => void;
  *   中途出错（例如断网）时照常报错，已经收到的部分放在错误的 details.partial = { content, reasoning } 里；
  * - 每次成功调用按调用者记一条用量。
  */
-export function createPlatformAiDefinition(storage: DbAdapter, recordUsage: RecordUsage = () => {}): ApiDefinition {
+export function createPlatformAiDefinition(
+  storage: DbAdapter,
+  recordUsage: RecordUsage = () => {},
+  secrets?: SecretCodec,
+): ApiDefinition {
   return {
     kind: "read",
     visibility: "public",
@@ -130,7 +134,7 @@ export function createPlatformAiDefinition(storage: DbAdapter, recordUsage: Reco
         ...(input.reasoningEffort ? { reasoning_effort: input.reasoningEffort } : {}),
         ...(input.stream ? { stream: true, stream_options: { include_usage: true } } : {}),
       };
-      const response = await deepseekPost(storage, "/chat/completions", body, ctx.signal, "AI 请求");
+      const response = await deepseekPost(storage, secrets, "/chat/completions", body, ctx.signal, "AI 请求");
 
       let content = "";
       let reasoning = "";

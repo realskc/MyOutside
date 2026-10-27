@@ -117,7 +117,7 @@ interface AppModule {
 | 其他子应用的 API | 必须是公开 API，且在清单 `uses` 里声明 |
 | （外壳调用子应用的 API） | 拒绝 |
 
-拒绝时错误码 `FORBIDDEN`。平台设置中的凭据（`ai.deepseek.apiKey`）任何调用者读到的都是 `{ value: null, isSet }`。
+拒绝时错误码 `FORBIDDEN`。平台设置中的凭据（`ai.deepseek.apiKey`）任何调用者读到的都是 `{ value: null, isSet }`；在数据库里只存密文 `{"$encrypted": ...}`，由 Electron 传入的 `SecretCodec`（`safeStorage`，macOS 钥匙串 / Windows DPAPI）加解密，启动时把明文改为密文（`packages/kernel/src/credentials.ts`，D-0075）。
 
 **远程调用**（`handle(request, { caller, remote: true })`，目前只有局域网预览，D-0072）：必须带调用者；不能调用只给外壳的平台 API（身份是对方报上来的，可以伪造）。局域网预览按 Referer 确定调用者（`/shell/` → 外壳，`/apps/<id>/` → 子应用）。
 

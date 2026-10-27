@@ -1,6 +1,6 @@
 import { DatabaseSync } from "node:sqlite";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { createKernel, estimateCost, isPeak, type DbAdapter, type SqlValue } from "../src/index.js";
+import { createKernel, estimateCost, isPeak, type DbAdapter, type SecretCodec, type SqlValue } from "../src/index.js";
 
 function createMemoryAdapter(): DbAdapter {
   const db = new DatabaseSync(":memory:");
@@ -369,5 +369,61 @@ describe("platform AI / web", () => {
     createKernel({ storage }).start();
     const [row] = storage.select<{ cost_yuan: number }>("SELECT cost_yuan FROM platform_usage");
     expect(row!.cost_yuan).toBeCloseTo(1, 6); // 100 万未命中输入 × 2 元 × 空闲半价
+  });
+  it("凭据加密保存：数据库里只有密文；平台内部解密后使用；已有的明文在启动时改为密文（D-0075）", async () => {
+    const codec: SecretCodec = {
+      encrypt: (plain) => Buffer.from(`sealed:${plain}`).toString("base64"),
+      decrypt: (cipher) => {
+        const text = Buffer.from(cipher, "base64").toString();
+        if (!text.startsWith("sealed:")) throw new Error("bad cipher");
+        return text.slice("sealed:".length);
+      },
+    };
+    const storage = createMemoryAdapter();
+    // 早期明文保存的密钥
+    createKernel({ storage }).start();
+    storage.execute("INSERT INTO platform_setting (key, value, updated_at) VALUES (?, ?, ?)", ["ai.deepseek.apiKey", JSON.stringify("sk-old"), 0]);
+
+    const kernel = createKernel({ storage, secrets: codec });
+    kernel.start();
+    const raw = () => storage.select<{ value: string }>("SELECT value FROM platform_setting WHERE key = 'ai.deepseek.apiKey'")[0]!.value;
+    expect(raw()).not.toContain("sk-old");
+    expect(JSON.parse(raw())).toHaveProperty("$encrypted");
+
+    let auth = "";
+    vi.stubGlobal("fetch", async (_url: string, init: { headers: Record<string, string> }) => {
+      auth = init.headers.authorization!;
+      return jsonResponse({ choices: [{ message: { content: "ok" }, finish_reason: "stop" }] });
+    });
+    await kernel.handle({ call: "platform.ai.chat", payload: { messages: [{ role: "user", content: "hi" }] } });
+    expect(auth).toBe("Bearer sk-old");
+
+    await kernel.handle({ call: "platform.settings.set", payload: { key: "ai.deepseek.apiKey", value: "sk-new" } }, { caller: "shell" });
+    expect(raw()).not.toContain("sk-new");
+    const got = await kernel.handle({ call: "platform.settings.get", payload: { key: "ai.deepseek.apiKey" } }, { caller: "shell" });
+    expect(got.ok && got.result).toEqual({ value: null, isSet: true });
+    await kernel.handle({ call: "platform.ai.chat", payload: { messages: [{ role: "user", content: "hi" }] } });
+    expect(auth).toBe("Bearer sk-new");
+  });
+
+  it("凭据无法解密（没有加解密能力 / 钥匙串拒绝）：PRECONDITION，提示重新填写", async () => {
+    const storage = createMemoryAdapter();
+    createKernel({ storage }).start();
+    storage.execute("INSERT INTO platform_setting (key, value, updated_at) VALUES (?, ?, ?)", [
+      "ai.deepseek.apiKey",
+      JSON.stringify({ $encrypted: "xxxx" }),
+      0,
+    ]);
+    const payload = { messages: [{ role: "user", content: "hi" }] };
+    const noCodec = createKernel({ storage });
+    noCodec.start();
+    const a = await noCodec.handle({ call: "platform.ai.chat", payload });
+    expect(!a.ok && a.error.code).toBe("PRECONDITION");
+
+    const broken = createKernel({ storage, secrets: { encrypt: (p) => p, decrypt: () => { throw new Error("denied"); } } });
+    broken.start();
+    const b = await broken.handle({ call: "platform.ai.chat", payload });
+    expect(!b.ok && b.error.code).toBe("PRECONDITION");
+    if (!b.ok) expect(b.error.message).toContain("重新填写");
   });
 });

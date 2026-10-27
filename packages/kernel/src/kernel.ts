@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { createAppDb, createMigrationCtx, createReadonlyAppDb } from "./appdb.js";
+import { CREDENTIAL_SETTINGS, encodeSetting, encryptPlaintextCredentials } from "./credentials.js";
 import { KernelError } from "./errors.js";
 import { createPlatformAiDefinition, type UsageRecord } from "./platform-ai.js";
 import { createWebFetchDefinition, createWebSearchDefinition } from "./platform-web.js";
@@ -14,6 +15,7 @@ import type {
   KernelResponse,
   Migration,
   ReadContext,
+  SecretCodec,
   TxContext,
 } from "./types.js";
 
@@ -25,8 +27,6 @@ export const SHELL_CALLER = "shell";
 /** 平台 API 的拥有者 */
 const PLATFORM = "platform";
 
-/** 凭据类平台设置：任何调用者都读不到值（外壳也只能知道是否已设置） */
-const CREDENTIAL_SETTINGS = new Set(["ai.deepseek.apiKey"]);
 
 const ManifestSchema = z.object({
   id: z.string().min(1),
@@ -40,6 +40,8 @@ const ManifestSchema = z.object({
 
 export interface KernelOptions {
   storage: DbAdapter;
+  /** 凭据加解密（D-0075）；不提供时凭据以明文保存（测试、脚本） */
+  secrets?: SecretCodec;
 }
 
 /** 平台 API 的访问规则：apps = 子应用可调用（需在清单 uses 里声明）；shell = 只有外壳与平台内部 */
@@ -64,7 +66,7 @@ const NOOP = () => {};
  * - 只读 API 直接执行；事务 API 经串行队列、单事务执行；普通的异步函数直接执行，写入经本应用的事务 API；
  * - 每次调用都按调用者检查权限（D-0053、D-0058、D-0063）。
  */
-export function createKernel({ storage }: KernelOptions) {
+export function createKernel({ storage, secrets }: KernelOptions) {
   const apps = new Map<string, AppModule>();
   const manifests = new Map<string, AppManifest>();
   const functions = new Map<string, RegisteredFunction>();
@@ -107,7 +109,7 @@ export function createKernel({ storage }: KernelOptions) {
     visibility: "public",
     input: z.object({ key: z.string().min(1), value: z.unknown() }),
     handler: (_ctx, input: { key: string; value: unknown }) => {
-      const serialized = JSON.stringify(input.value ?? null);
+      const serialized = JSON.stringify(encodeSetting(input.key, input.value ?? null, secrets));
       const existing = storage.select<{ key: string }>("SELECT key FROM platform_setting WHERE key = ?", [input.key])[0];
       if (existing) {
         storage.execute("UPDATE platform_setting SET value = ?, updated_at = ? WHERE key = ?", [
@@ -159,9 +161,9 @@ export function createKernel({ storage }: KernelOptions) {
     });
   }
 
-  definePlatform("platform.ai.chat", "apps", createPlatformAiDefinition(storage, recordUsage));
-  definePlatform("platform.web.search", "apps", createWebSearchDefinition(storage, recordUsage));
-  definePlatform("platform.web.fetch", "apps", createWebFetchDefinition(storage, recordUsage));
+  definePlatform("platform.ai.chat", "apps", createPlatformAiDefinition(storage, recordUsage, secrets));
+  definePlatform("platform.web.search", "apps", createWebSearchDefinition(storage, recordUsage, secrets));
+  definePlatform("platform.web.fetch", "apps", createWebFetchDefinition(storage, recordUsage, secrets));
   /** 用量与估算花费，按调用者（子应用）汇总（D-0074）；只给外壳 */
   definePlatform("platform.usage.summary", "shell", {
     kind: "read",
@@ -288,6 +290,7 @@ export function createKernel({ storage }: KernelOptions) {
         }
       });
     }
+    encryptPlaintextCredentials(storage, secrets);
     storage.transaction(() => {
       for (const { appId, migration } of migrationList) {
         const row = storage.select<{ c: number }>(

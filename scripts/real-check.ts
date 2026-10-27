@@ -1,14 +1,18 @@
 /**
  * 用真实的 DeepSeek 接口验证平台 AI / 搜索 / 抓取（在数据库副本上运行）。
- * 运行：pnpm ai:check <数据库副本路径>（务必用副本：会写入用量记录）
+ * 运行：DEEPSEEK_API_KEY=sk-... pnpm ai:check <数据库副本路径>（务必用副本：会写入用量记录与密钥）
+ * （MyOutside 里的密钥用系统钥匙串加密保存，脚本解不开，所以由环境变量提供，D-0075）
  */
 import { createKernel } from "@myoutside/kernel";
 import { createNodeSqliteAdapter } from "@myoutside/kernel-node";
 
 const dbPath = process.argv[2];
 if (!dbPath) throw new Error("需要数据库副本路径");
+const apiKey = process.env.DEEPSEEK_API_KEY;
+if (!apiKey) throw new Error("需要环境变量 DEEPSEEK_API_KEY");
 const kernel = createKernel({ storage: createNodeSqliteAdapter({ path: dbPath }) });
 kernel.start();
+await kernel.handle({ call: "platform.settings.set", payload: { key: "ai.deepseek.apiKey", value: apiKey } });
 
 async function call(name: string, payload: unknown, emit?: (e: unknown) => void) {
   const res = await kernel.handle({ call: name, payload }, { emit });
