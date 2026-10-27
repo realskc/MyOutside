@@ -33,6 +33,9 @@ if (process.env.MYOUTSIDE_SMOKE === "1") {
   app.setPath("userData", join(app.getPath("temp"), "myoutside-smoke-profile"));
 }
 
+/** 冒烟测试默认在后台运行：不显示窗口、不抢焦点、不在 Dock 出现；MYOUTSIDE_SMOKE_SHOW=1 时显示（调试用） */
+const SMOKE_HIDDEN = process.env.MYOUTSIDE_SMOKE === "1" && process.env.MYOUTSIDE_SMOKE_SHOW !== "1";
+
 protocol.registerSchemesAsPrivileged([
   { scheme: "app", privileges: { standard: true, secure: true, supportFetchAPI: true, corsEnabled: true } },
 ]);
@@ -99,12 +102,15 @@ async function createMainWindow(): Promise<BrowserWindow> {
     height: 860,
     title: "MyOutside",
     backgroundColor: "#f6f7f9",
+    show: !SMOKE_HIDDEN,
     webPreferences: {
       preload: join(__dirname, "preload.cjs"),
       contextIsolation: true,
       sandbox: false,
       nodeIntegration: false,
       nodeIntegrationInSubFrames: true,
+      // 后台冒烟：窗口不可见时照常渲染，截图才有内容
+      ...(SMOKE_HIDDEN ? { backgroundThrottling: false, paintWhenInitiallyHidden: true } : {}),
     },
   });
   await win.loadURL("app://shell/index.html");
@@ -230,8 +236,10 @@ function prepareSmokeDataDir(realDataDir: string): string {
 
 /** 冒烟截图：先确保窗口可见（被遮挡时 capturePage 会失败），失败自动重试 */
 async function captureWindow(win: BrowserWindow, attempts: number, delayMs: number): Promise<Buffer> {
-  win.show();
-  win.focus();
+  if (!SMOKE_HIDDEN) {
+    win.show();
+    win.focus();
+  }
   for (let attempt = 0; attempt < attempts; attempt += 1) {
     await new Promise((resolve) => setTimeout(resolve, delayMs));
     try {
@@ -455,6 +463,7 @@ async function runSmoke(win: BrowserWindow): Promise<void> {
 }
 
 app.whenReady().then(async () => {
+  if (SMOKE_HIDDEN) app.dock?.hide();
   // 单实例：重复双击时聚焦已有窗口
   if (!app.requestSingleInstanceLock()) {
     app.quit();
