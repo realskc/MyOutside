@@ -17,7 +17,7 @@ ZHEYE-0001～0008 是早期决策（由 git 历史复原），不一定可靠，
 | 编号 | 标题 | 状态 |
 |---|---|---|
 | [ZHEYE-0001](ZHEYE-0001-zheye-explanation-units.md) | 哲野的讲解单元：词 / 句 / 文三种，三种来源 | 已废弃（讲解设计重新讨论中） |
-| [ZHEYE-0002](ZHEYE-0002-zheye-prerequisites.md) | 哲野的前置检查：轻 / 重前置，只问重前置，全递归 | 有效（未实现） |
+| [ZHEYE-0002](ZHEYE-0002-zheye-prerequisites.md) | 哲野的前置检查：轻 / 重前置，只问重前置，全递归 | 部分被取代（→ ZHEYE-0016） |
 | [ZHEYE-0003](ZHEYE-0003-zheye-generation.md) | 哲野的生成：自动开始，全局串行，按依赖顺序，生成后固定 | 有效（未实现） |
 | [ZHEYE-0004](ZHEYE-0004-zheye-article-templates.md) | 哲野的三类文章模板 | 已废弃（讲解设计重新讨论中） |
 | [ZHEYE-0005](ZHEYE-0005-zheye-rubric.md) | 哲野的质量标准（rubric） | 已被取代（→ ZHEYE-0013） |
@@ -31,3 +31,4 @@ ZHEYE-0001～0008 是早期决策（由 git 历史复原），不一定可靠，
 | [ZHEYE-0013](ZHEYE-0013-quality-standard.md) | 哲野的质量标准：三类共用的通用标准 + 按类型检查讲法 | 有效（未实现） |
 | [ZHEYE-0014](ZHEYE-0014-web-research.md) | 哲野讲解时联网搜集资料 | 有效（未实现） |
 | [ZHEYE-0015](ZHEYE-0015-entry.md) | 入口：投递材料与直接提出，讲成哪一类 | 有效（未实现） |
+| [ZHEYE-0016](ZHEYE-0016-prerequisite-levels.md) | 前置：P0 / P1 / P2 三个等级，三个选项，超时默认正文带过 | 有效（未实现） |

@@ -78,7 +78,7 @@
 ## 长期积累
 
 - **写过的文章长期保存，以后直接复用**：以后学别的东西时，需要的前置如果曾经写过，就直接用那一篇，不再重写（实现见 [ZHEYE-0011](decisions/ZHEYE-0011-reuse-prerequisite-articles.md)）。
-- **哲野记住作者对每个概念的了解情况**：问过一次「了解吗」，以后不再问（实现见 [ZHEYE-0012](decisions/ZHEYE-0012-remember-known-concepts.md)）。这是关于作者知识状态的任务数据，与「愉悦」里否掉的口味画像是两回事。了解程度会随时间变化的问题，先做出一版再解决。
+- **哲野记住作者对前置的了解情况**（长期记忆 / 知识库）：作者选过「已了解」或「单独讲解」的，以后不再问；选「正文带过」的不记（实现见 [ZHEYE-0012](decisions/ZHEYE-0012-remember-known-concepts.md)、[ZHEYE-0016](decisions/ZHEYE-0016-prerequisite-levels.md)）。这是关于作者知识状态的任务数据，与「愉悦」里否掉的口味画像是两回事。了解程度会随时间变化的问题，先做出一版再解决。
 
 ## 工作流与提示词由作者把关
 
@@ -90,7 +90,7 @@
 > ZHEYE-0001～0008 是早期（2026-10-07）的决策，由 git 历史复原：**不一定可靠**，其中有些可能是 agent 的想法、并非作者的；作者已忘记其中不少当时的想法。与作者最新的说法冲突时，以作者最新的说法为准。讲解方面的设计（讲解对象、模板、质量标准）正在重新讨论，见上文「讲解的对象与方法」。ZHEYE-0009 起是 2026-10-27 之后讨论确定的。
 
 - 讲解单元与来源：[ZHEYE-0001](decisions/ZHEYE-0001-zheye-explanation-units.md)（已废弃）
-- 前置检查：[ZHEYE-0002](decisions/ZHEYE-0002-zheye-prerequisites.md)
+- 前置检查：[ZHEYE-0002](decisions/ZHEYE-0002-zheye-prerequisites.md)（部分被 ZHEYE-0016 取代）
 - 生成方式：[ZHEYE-0003](decisions/ZHEYE-0003-zheye-generation.md)
 - 三类文章模板：[ZHEYE-0004](decisions/ZHEYE-0004-zheye-article-templates.md)（已废弃）
 - 质量标准：[ZHEYE-0005](decisions/ZHEYE-0005-zheye-rubric.md)（已被 ZHEYE-0013 取代）
@@ -104,6 +104,7 @@
 - 质量标准：[ZHEYE-0013](decisions/ZHEYE-0013-quality-standard.md)
 - 联网搜集资料：[ZHEYE-0014](decisions/ZHEYE-0014-web-research.md)
 - 入口（投递材料、直接提出、讲成哪一类）：[ZHEYE-0015](decisions/ZHEYE-0015-entry.md)
+- 前置的等级、询问与记录：[ZHEYE-0016](decisions/ZHEYE-0016-prerequisite-levels.md)
 
 ## 未定
 
