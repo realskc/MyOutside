@@ -24,3 +24,5 @@
 | [ZHEYE-0008](ZHEYE-0008-zheye-v1-scope.md) | 哲野 v1 的范围 | 有效（未实现） |
 | [ZHEYE-0009](ZHEYE-0009-resume-on-startup.md) | MyOutside 启动时自动接着生成，不必打开哲野 | 有效（未实现） |
 | [ZHEYE-0010](ZHEYE-0010-flash-max.md) | 哲野用 deepseek-flash，思考强度最高 | 有效（未实现） |
+| [ZHEYE-0011](ZHEYE-0011-reuse-prerequisite-articles.md) | 前置复用已有的文章：按「同一个概念、同一种含义」判断 | 有效（未实现） |
+| [ZHEYE-0012](ZHEYE-0012-remember-known-concepts.md) | 记住作者对每个概念的了解情况，问过的不再问 | 有效（未实现） |
