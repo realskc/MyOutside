@@ -1,6 +1,6 @@
 import { DatabaseSync } from "node:sqlite";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { createKernel, type DbAdapter, type SqlValue } from "../src/index.js";
+import { createKernel, estimateCost, isPeak, type DbAdapter, type SqlValue } from "../src/index.js";
 
 function createMemoryAdapter(): DbAdapter {
   const db = new DatabaseSync(":memory:");
@@ -302,5 +302,72 @@ describe("platform AI / web", () => {
     if (r.ok) return;
     expect(r.error.code).toBe("UPSTREAM");
     expect(r.error.details).toMatchObject({ retryable: true, partial: { content: "写到一半", reasoning: "想" } });
+  });
+  it("计费：高峰 / 空闲时段按北京时间划分（D-0074）", () => {
+    const beijing = (iso: string) => Date.parse(`${iso}+08:00`);
+    expect(isPeak(beijing("2026-10-26T09:00:00"))).toBe(true); // 周一 9:00
+    expect(isPeak(beijing("2026-10-26T08:59:00"))).toBe(false);
+    expect(isPeak(beijing("2026-10-26T12:00:00"))).toBe(false); // 午休
+    expect(isPeak(beijing("2026-10-26T17:59:00"))).toBe(true);
+    expect(isPeak(beijing("2026-10-26T18:00:00"))).toBe(false);
+    expect(isPeak(beijing("2026-10-31T10:00:00"))).toBe(false); // 周六
+  });
+
+  it("计费：缓存命中 / 未命中 / 输出分别计价，空闲时段半价；搜索与抓取按次", () => {
+    const peak = Date.parse("2026-10-26T10:00:00+08:00");
+    const idle = Date.parse("2026-10-26T20:00:00+08:00");
+    const usage = { kind: "ai.chat", model: "deepseek-flash", promptTokens: 1_000_000, cacheHitTokens: 400_000, completionTokens: 100_000 };
+    // 高峰：40 万 × 0.04 + 60 万 × 2 + 10 万 × 8（元 / 百万）= 0.016 + 1.2 + 0.8
+    expect(estimateCost({ ...usage, createdAt: peak })).toBeCloseTo(2.016, 6);
+    expect(estimateCost({ ...usage, createdAt: idle })).toBeCloseTo(1.008, 6);
+    expect(estimateCost({ ...usage, model: "deepseek-v4-pro", createdAt: peak })).toBeCloseTo(0.12 + 5.4 + 2.7, 6);
+    expect(estimateCost({ kind: "web.search", createdAt: peak })).toBe(0.005);
+    expect(estimateCost({ kind: "ai.chat", model: "deepseek-flash", createdAt: peak })).toBe(0);
+  });
+
+  it("用量汇总：按调用者分组、带估算花费；只给外壳；可按时间筛选", async () => {
+    const storage = createMemoryAdapter();
+    const kernel = createKernel({ storage });
+    kernel.start();
+    await kernel.handle({ call: "platform.settings.set", payload: { key: "ai.deepseek.apiKey", value: "sk-test" } });
+    vi.stubGlobal("fetch", async (url: string) => {
+      if (url.endsWith("/v1/tools/search")) return jsonResponse({ results: [{ title: "t", url: "https://a.com" }] });
+      return jsonResponse({
+        choices: [{ message: { content: "ok" }, finish_reason: "stop" }],
+        usage: { prompt_tokens: 1000, completion_tokens: 100, total_tokens: 1100, prompt_cache_hit_tokens: 800 },
+      });
+    });
+    await kernel.handle({ call: "platform.ai.chat", payload: { messages: [{ role: "user", content: "hi" }] } });
+    await kernel.handle({ call: "platform.ai.chat", payload: { messages: [{ role: "user", content: "hi" }] } });
+    await kernel.handle({ call: "platform.web.search", payload: { query: "x" } });
+    await flush();
+
+    const denied = await kernel.handle({ call: "platform.usage.summary", payload: {} }, { caller: "dialog" });
+    expect(denied.ok).toBe(false);
+    const r = await kernel.handle({ call: "platform.usage.summary", payload: {} }, { caller: "shell" });
+    expect(r.ok).toBe(true);
+    if (!r.ok) return;
+    const [row] = r.result as Array<Record<string, number | string>>;
+    expect(row).toMatchObject({ caller: "platform", aiCalls: 2, promptTokens: 2000, cacheHitTokens: 1600, completionTokens: 200, searches: 1, fetches: 0 });
+    expect(row!.costYuan as number).toBeGreaterThan(0.005);
+
+    const later = await kernel.handle({ call: "platform.usage.summary", payload: { since: Date.now() + 60_000 } }, { caller: "shell" });
+    expect(later.ok && later.result).toEqual([]);
+  });
+
+  it("早期没有花费列的用量表：启动时补列，并按当时的时段补算花费", () => {
+    const storage = createMemoryAdapter();
+    storage.execute(
+      `CREATE TABLE platform_usage (id INTEGER PRIMARY KEY AUTOINCREMENT, caller TEXT NOT NULL, kind TEXT NOT NULL, model TEXT,
+         prompt_tokens INTEGER, completion_tokens INTEGER, reasoning_tokens INTEGER, cache_hit_tokens INTEGER, created_at INTEGER NOT NULL)`,
+    );
+    const idle = Date.parse("2026-10-25T20:00:00+08:00"); // 周日
+    storage.execute(
+      "INSERT INTO platform_usage (caller, kind, model, prompt_tokens, completion_tokens, cache_hit_tokens, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)",
+      ["dialog", "ai.chat", "deepseek-flash", 1_000_000, 0, 0, idle],
+    );
+    createKernel({ storage }).start();
+    const [row] = storage.select<{ cost_yuan: number }>("SELECT cost_yuan FROM platform_usage");
+    expect(row!.cost_yuan).toBeCloseTo(1, 6); // 100 万未命中输入 × 2 元 × 空闲半价
   });
 });

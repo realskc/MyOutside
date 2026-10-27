@@ -135,6 +135,7 @@
 | [D-0071](0071-dialog-generation-implementation.md) | 对话回复的生成与保存方式 | 弃用（→ DIALOG-0016） |
 | [D-0072](0072-dev-lan-preview.md) | 开发用 LAN 预览：Electron 主进程内加可选 HTTP 宿主 | 有效 |
 | [D-0073](0073-app-local-decisions.md) | 应用自包含：spec/docs/decisions 在 apps/<app>/ 内按层组织 | 有效 |
+| [D-0074](0074-usage-and-cost-display.md) | 用量与花费：按子应用统计，按官方价格与调用时段估算 | 有效 |
 
 ## 应用专属决策
 

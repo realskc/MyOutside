@@ -293,7 +293,7 @@ async function runSmoke(win: BrowserWindow): Promise<void> {
     }
 
     const settingsCheck = await win.webContents.executeJavaScript(
-      `(async () => { document.getElementById("btn-settings").click(); await new Promise((r) => setTimeout(r, 400)); return { hasLangSelect: !!document.getElementById("set-lang"), hasApiKey: !!document.getElementById("set-api-key"), brand: document.querySelector(".brand").textContent }; })()`,
+      `(async () => { document.getElementById("btn-settings").click(); await new Promise((r) => setTimeout(r, 400)); return { hasLangSelect: !!document.getElementById("set-lang"), hasApiKey: !!document.getElementById("set-api-key"), brand: document.querySelector(".brand").textContent, usageRows: (await new Promise((r) => setTimeout(r, 400)), document.querySelectorAll("#usage-table tbody tr").length) }; })()`,
     );
     console.log("[smoke] settings:", JSON.stringify(settingsCheck));
 

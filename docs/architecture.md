@@ -173,6 +173,7 @@ get(table, where) / all(table, where?, { orderBy?, limit?, offset? }) / count(ta
 | `platform.ai.chat` | 只读 | 子应用（需声明） | DeepSeek 对话（D-0014） |
 | `platform.web.search` | 只读 | 子应用（需声明） | DeepSeek 网页搜索（D-0050） |
 | `platform.web.fetch` | 只读 | 子应用（需声明） | DeepSeek 网页抓取，返回 Markdown 正文（D-0050） |
+| `platform.usage.summary` | 只读 | 只给外壳 | 用量与估算花费，按调用者汇总（D-0074） |
 
 实现：`packages/kernel/src/platform-ai.ts`、`platform-web.ts`、`deepseek.ts`（密钥读取、请求、错误整理、SSE 解析）。
 
@@ -198,7 +199,7 @@ get(table, where) / all(table, where?, { orderBy?, limit?, offset? }) / count(ta
 
 ### 6.4 用量计量
 
-每次成功调用按**调用者**记一条到 `platform_usage`（`caller`、`kind`：`ai.chat` / `web.search` / `web.fetch`、`model`、各类 token 数、时间），经写队列写入，不改变 DataVersion。为将来按子应用的用量显示与管控打基础。
+每次成功调用按**调用者**记一条到 `platform_usage`（`caller`、`kind`：`ai.chat` / `web.search` / `web.fetch`、`model`、各类 token 数、`cost_yuan`、时间），经写队列写入，不改变 DataVersion。`cost_yuan` 在写入时按当时的官方价格与调用时段（高峰全价、空闲半价）估算（`pricing.ts`，D-0074）。设置页「用量与花费」经 `platform.usage.summary` 按子应用显示。
 
 ## 7. AI 辅助的写操作（D-0008）
 

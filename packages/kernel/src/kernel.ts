@@ -3,6 +3,7 @@ import { createAppDb, createMigrationCtx, createReadonlyAppDb } from "./appdb.js
 import { KernelError } from "./errors.js";
 import { createPlatformAiDefinition, type UsageRecord } from "./platform-ai.js";
 import { createWebFetchDefinition, createWebSearchDefinition } from "./platform-web.js";
+import { estimateCost } from "./pricing.js";
 import type {
   ApiDefinition,
   AppManifest,
@@ -124,14 +125,23 @@ export function createKernel({ storage }: KernelOptions) {
       return { ok: true as const };
     },
   });
-  /** 平台用量按调用者记录（经写队列写入；不改变 DataVersion） */
+  /** 平台用量按调用者记录（经写队列写入；不改变 DataVersion）；写入时按当时的价格估算花费（D-0074） */
   function recordUsage(record: UsageRecord): void {
     const usage = record.usage ?? null;
+    const createdAt = Date.now();
+    const cost = estimateCost({
+      kind: record.kind,
+      model: record.model ?? null,
+      promptTokens: usage?.promptTokens ?? null,
+      completionTokens: usage?.completionTokens ?? null,
+      cacheHitTokens: usage?.cacheHitTokens ?? null,
+      createdAt,
+    });
     void enqueue(() =>
       storage.execute(
         `INSERT INTO platform_usage
-           (caller, kind, model, prompt_tokens, completion_tokens, reasoning_tokens, cache_hit_tokens, created_at)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+           (caller, kind, model, prompt_tokens, completion_tokens, reasoning_tokens, cache_hit_tokens, cost_yuan, created_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         [
           record.caller ?? PLATFORM,
           record.kind,
@@ -140,7 +150,8 @@ export function createKernel({ storage }: KernelOptions) {
           usage?.completionTokens ?? null,
           usage?.reasoningTokens ?? null,
           usage?.cacheHitTokens ?? null,
-          Date.now(),
+          cost,
+          createdAt,
         ],
       ),
     ).catch(() => {
@@ -151,6 +162,51 @@ export function createKernel({ storage }: KernelOptions) {
   definePlatform("platform.ai.chat", "apps", createPlatformAiDefinition(storage, recordUsage));
   definePlatform("platform.web.search", "apps", createWebSearchDefinition(storage, recordUsage));
   definePlatform("platform.web.fetch", "apps", createWebFetchDefinition(storage, recordUsage));
+  /** 用量与估算花费，按调用者（子应用）汇总（D-0074）；只给外壳 */
+  definePlatform("platform.usage.summary", "shell", {
+    kind: "read",
+    visibility: "public",
+    input: z.object({ since: z.number().int().optional() }),
+    handler: (_ctx, input: { since?: number }) => {
+      const rows = storage.select<{
+        caller: string;
+        ai_calls: number;
+        prompt_tokens: number;
+        cache_hit_tokens: number;
+        completion_tokens: number;
+        reasoning_tokens: number;
+        searches: number;
+        fetches: number;
+        cost_yuan: number;
+      }>(
+        `SELECT caller,
+                SUM(kind = 'ai.chat') AS ai_calls,
+                COALESCE(SUM(prompt_tokens), 0) AS prompt_tokens,
+                COALESCE(SUM(cache_hit_tokens), 0) AS cache_hit_tokens,
+                COALESCE(SUM(completion_tokens), 0) AS completion_tokens,
+                COALESCE(SUM(reasoning_tokens), 0) AS reasoning_tokens,
+                SUM(kind = 'web.search') AS searches,
+                SUM(kind = 'web.fetch') AS fetches,
+                COALESCE(SUM(cost_yuan), 0) AS cost_yuan
+           FROM platform_usage
+          WHERE created_at >= ?
+          GROUP BY caller
+          ORDER BY cost_yuan DESC`,
+        [input.since ?? 0],
+      );
+      return rows.map((row) => ({
+        caller: row.caller,
+        aiCalls: Number(row.ai_calls),
+        promptTokens: Number(row.prompt_tokens),
+        cacheHitTokens: Number(row.cache_hit_tokens),
+        completionTokens: Number(row.completion_tokens),
+        reasoningTokens: Number(row.reasoning_tokens),
+        searches: Number(row.searches),
+        fetches: Number(row.fetches),
+        costYuan: Number(row.cost_yuan),
+      }));
+    },
+  });
 
   function registerApp(app: AppModule, manifest?: AppManifest): void {
     if (started) throw new Error("内核已启动，应用必须在 start() 之前注册");
@@ -201,9 +257,37 @@ export function createKernel({ storage }: KernelOptions) {
          completion_tokens INTEGER,
          reasoning_tokens INTEGER,
          cache_hit_tokens INTEGER,
+         cost_yuan REAL,
          created_at INTEGER NOT NULL
        )`,
     );
+    // 早期的用量表没有花费列：补上，并按每条记录当时的时段补算一次
+    const usageColumns = storage.select<{ name: string }>("PRAGMA table_info(platform_usage)").map((column) => column.name);
+    if (!usageColumns.includes("cost_yuan")) {
+      storage.execute("ALTER TABLE platform_usage ADD COLUMN cost_yuan REAL");
+      const old = storage.select<{
+        id: number;
+        kind: string;
+        model: string | null;
+        prompt_tokens: number | null;
+        completion_tokens: number | null;
+        cache_hit_tokens: number | null;
+        created_at: number;
+      }>("SELECT id, kind, model, prompt_tokens, completion_tokens, cache_hit_tokens, created_at FROM platform_usage");
+      storage.transaction(() => {
+        for (const row of old) {
+          const cost = estimateCost({
+            kind: row.kind,
+            model: row.model,
+            promptTokens: row.prompt_tokens,
+            completionTokens: row.completion_tokens,
+            cacheHitTokens: row.cache_hit_tokens,
+            createdAt: row.created_at,
+          });
+          storage.execute("UPDATE platform_usage SET cost_yuan = ? WHERE id = ?", [cost, row.id]);
+        }
+      });
+    }
     storage.transaction(() => {
       for (const { appId, migration } of migrationList) {
         const row = storage.select<{ c: number }>(

@@ -17,6 +17,23 @@ const DICT = {
     apiKeyPlaceholder: "尚未设置",
     apiKeyPlaceholderSet: "已设置（重新输入可覆盖）",
     dataVersion: (v) => `数据版本 ${v}`,
+    usageTitle: "用量与花费",
+    usageToday: "今天",
+    usage7d: "近 7 天",
+    usage30d: "近 30 天",
+    usageAll: "全部",
+    usageApp: "子应用",
+    usageAiCalls: "AI 调用",
+    usageInput: "输入 tokens（命中缓存）",
+    usageOutput: "输出 tokens（思考）",
+    usageWeb: "搜索 / 抓取",
+    usageCost: "估算花费",
+    usageTotal: "合计",
+    usageNone: "这段时间没有用量。",
+    usageShell: "外壳",
+    usagePlatform: "平台内部（脚本等）",
+    usageHint:
+      "按 DeepSeek 官方价格估算：区分高峰 / 空闲时段（空闲半价），法定节假日按工作日计；被停止的回复拿不到用量，不计入。实际以 DeepSeek 账单为准。",
   },
   en: {
     appName: "MyOutside",
@@ -34,6 +51,23 @@ const DICT = {
     apiKeyPlaceholder: "Not set",
     apiKeyPlaceholderSet: "Set (type to overwrite)",
     dataVersion: (v) => `Data version ${v}`,
+    usageTitle: "Usage & cost",
+    usageToday: "Today",
+    usage7d: "Last 7 days",
+    usage30d: "Last 30 days",
+    usageAll: "All time",
+    usageApp: "App",
+    usageAiCalls: "AI calls",
+    usageInput: "Input tokens (cache hit)",
+    usageOutput: "Output tokens (reasoning)",
+    usageWeb: "Search / fetch",
+    usageCost: "Est. cost",
+    usageTotal: "Total",
+    usageNone: "No usage in this period.",
+    usageShell: "Shell",
+    usagePlatform: "Platform (scripts etc.)",
+    usageHint:
+      "Estimated from DeepSeek's official prices, with peak / off-peak rates (off-peak is half price; public holidays are treated as workdays). Stopped replies report no usage and are not counted. DeepSeek's bill is authoritative.",
   },
 };
 
@@ -193,7 +227,17 @@ async function renderSettings() {
     `<input id="set-api-key" type="password" placeholder="${hasKey ? t("apiKeyPlaceholderSet") : t("apiKeyPlaceholder")}" />` +
     `<div class="setting-actions"><button id="save-api-key">${t("save")}</button>` +
     `<span class="hint">${hasKey ? t("saved") : t("notSet")}</span></div>` +
-    `<p class="hint">${t("apiKeyHint")}</p></div>`;
+    `<p class="hint">${t("apiKeyHint")}</p></div>` +
+    `<div class="setting-row usage-row"><label>${t("usageTitle")}</label>` +
+    `<select id="usage-period">` +
+    `<option value="today">${t("usageToday")}</option><option value="7d">${t("usage7d")}</option>` +
+    `<option value="30d" selected>${t("usage30d")}</option><option value="all">${t("usageAll")}</option></select>` +
+    `<div id="usage-table" class="usage-table"></div>` +
+    `<p class="hint">${t("usageHint")}</p></div>`;
+
+  const periodSelect = document.getElementById("usage-period");
+  periodSelect.addEventListener("change", () => void renderUsage(periodSelect.value));
+  void renderUsage(periodSelect.value);
 
   const langSelect = document.getElementById("set-lang");
   langSelect.value = lang;
@@ -209,6 +253,59 @@ async function renderSettings() {
     input.value = "";
     await renderSettings();
   });
+}
+
+// ---- 用量与花费（D-0074） ----
+
+function periodStart(period) {
+  const now = new Date();
+  if (period === "today") return new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
+  if (period === "7d") return now.getTime() - 7 * 86_400_000;
+  if (period === "30d") return now.getTime() - 30 * 86_400_000;
+  return 0;
+}
+
+async function renderUsage(period) {
+  const el = document.getElementById("usage-table");
+  if (!el) return;
+  const [summary, apps] = await Promise.all([
+    call("platform.usage.summary", { since: periodStart(period) }),
+    call("platform.listApps", {}),
+  ]);
+  if (!summary.ok) {
+    el.textContent = summary.error.message;
+    return;
+  }
+  const rows = summary.result;
+  if (rows.length === 0) {
+    el.innerHTML = `<p class="hint">${t("usageNone")}</p>`;
+    return;
+  }
+  const names = new Map((apps.ok ? apps.result : []).map((app) => [app.id, app.name]));
+  const nameOf = (caller) =>
+    caller === "shell" ? t("usageShell") : caller === "platform" ? t("usagePlatform") : names.get(caller) || caller;
+  const num = (value) => value.toLocaleString(lang === "zh" ? "zh-CN" : "en-US");
+  const money = (value) => `¥${value < 0.01 && value > 0 ? value.toFixed(4) : value.toFixed(2)}`;
+  const escape = (text) => String(text).replace(/[&<>"']/g, (ch) => `&#${ch.charCodeAt(0)};`);
+  const total = rows.reduce(
+    (sum, row) => {
+      for (const key of Object.keys(sum)) sum[key] += row[key];
+      return sum;
+    },
+    { aiCalls: 0, promptTokens: 0, cacheHitTokens: 0, completionTokens: 0, reasoningTokens: 0, searches: 0, fetches: 0, costYuan: 0 },
+  );
+  const paren = (value) => (lang === "zh" ? `（${num(value)}）` : ` (${num(value)})`);
+  const line = (name, row, cls = "") =>
+    `<tr class="${cls}"><td>${escape(name)}</td><td>${num(row.aiCalls)}</td>` +
+    `<td>${num(row.promptTokens)}${paren(row.cacheHitTokens)}</td>` +
+    `<td>${num(row.completionTokens)}${paren(row.reasoningTokens)}</td>` +
+    `<td>${num(row.searches)} / ${num(row.fetches)}</td><td>${money(row.costYuan)}</td></tr>`;
+  el.innerHTML =
+    `<table><thead><tr><th>${t("usageApp")}</th><th>${t("usageAiCalls")}</th><th>${t("usageInput")}</th>` +
+    `<th>${t("usageOutput")}</th><th>${t("usageWeb")}</th><th>${t("usageCost")}</th></tr></thead><tbody>` +
+    rows.map((row) => line(nameOf(row.caller), row)).join("") +
+    (rows.length > 1 ? line(t("usageTotal"), total, "total") : "") +
+    `</tbody></table>`;
 }
 
 // ---- 事件与启动 ----

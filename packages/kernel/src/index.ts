@@ -3,6 +3,7 @@ export { defineAsync, defineRead, defineTx, type ApiOptions } from "./api.js";
 export { KernelError, type KernelErrorCode } from "./errors.js";
 export { createPlatformAiDefinition, AiChatInputSchema, type AiChatInput, type AiUsage } from "./platform-ai.js";
 export { WebFetchInputSchema, WebSearchInputSchema } from "./platform-web.js";
+export { estimateCost, isPeak, WEB_REQUEST_PRICE } from "./pricing.js";
 export { createAppDb, createMigrationCtx, createReadonlyAppDb, physicalTableName } from "./appdb.js";
 export type {
   ApiDefinition,
