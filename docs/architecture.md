@@ -235,7 +235,7 @@ get(table, where) / all(table, where?, { orderBy?, limit?, offset? }) / count(ta
 - 外链：`host.openExternal` 只接受 http/https，用系统浏览器打开；
 - 菜单：文件 / 编辑 / 视图；「编辑」菜单让 macOS 上的剪贴板快捷键生效；中英文跟随 `ui.language`；
 - 单实例锁（D-0016）；数据目录：`app.getPath("userData")`（应用名 MyOutside）；
-- 冒烟模式（`pnpm smoke`，`MYOUTSIDE_SMOKE=1`）：复制真实数据库到临时目录，自检外壳与各子应用、做演示写入、截图后退出；默认后台运行（窗口不显示、不抢焦点），`MYOUTSIDE_SMOKE_SHOW=1` 时显示；使用独立的临时配置目录，可与正在运行的 MyOutside 同时运行（D-0046）；
+- 冒烟模式（`pnpm smoke`，`MYOUTSIDE_SMOKE=1`）：复制真实数据库到临时目录，自检外壳与各子应用、做演示写入、截图后退出；默认后台运行（窗口不显示、不抢焦点），`MYOUTSIDE_SMOKE_SHOW=1` 时显示；使用独立的临时配置目录、打包到独立的 `dist-smoke/`，可与正在运行的 MyOutside 同时运行、互不影响（D-0046）；
 - LAN 预览（`pnpm dev:lan`，D-0072）：主进程额外启动 HTTP 宿主，服务外壳与 `apps/<id>/ui`，并注入浏览器版 `window.outside`（`POST /__myoutside/call` → `kernel.handle`）；默认不启用，无鉴权，仅供可信热点上的临时多设备调试；不是正式多端方案（正式方向见 D-0013）；
 - 构建：`scripts/build.mjs`（esbuild 打包主进程与 preload）、`scripts/run.mjs`（启动 Electron）。
 

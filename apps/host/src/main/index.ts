@@ -62,7 +62,8 @@ function mimeFor(file: string): string {
 }
 
 function buildUiDirs(kernel: Kernel): Record<string, string> {
-  const appPath = app.getAppPath(); // apps/host
+  // apps/host：按打包文件所在位置推算（dist/ 或冒烟测试的 dist-smoke/ 都在 apps/host 下）
+  const appPath = resolve(__dirname, "..");
   const uiDirs: Record<string, string> = {
     shell: resolve(appPath, "renderer"),
   };

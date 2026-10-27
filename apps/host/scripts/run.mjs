@@ -3,7 +3,8 @@ import electron from "electron";
 
 const smoke = process.argv.includes("--smoke");
 const lan = process.argv.includes("--lan");
-const child = spawn(electron, ["."], {
+// 冒烟测试从它自己的输出目录 dist-smoke/ 启动（见 scripts/build.mjs）
+const child = spawn(electron, [smoke ? "dist-smoke" : "."], {
   stdio: "inherit",
   env: {
     ...process.env,
