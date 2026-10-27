@@ -30,3 +30,4 @@ ZHEYE-0001～0008 是早期决策（由 git 历史复原），不一定可靠，
 | [ZHEYE-0012](ZHEYE-0012-remember-known-concepts.md) | 记住作者对每个概念的了解情况，问过的不再问 | 有效（未实现） |
 | [ZHEYE-0013](ZHEYE-0013-quality-standard.md) | 哲野的质量标准：三类共用的通用标准 + 按类型检查讲法 | 有效（未实现） |
 | [ZHEYE-0014](ZHEYE-0014-web-research.md) | 哲野讲解时联网搜集资料 | 有效（未实现） |
+| [ZHEYE-0015](ZHEYE-0015-entry.md) | 入口：投递材料与直接提出，讲成哪一类 | 有效（未实现） |
