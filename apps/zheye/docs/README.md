@@ -115,8 +115,8 @@ zheye.deleteSource({ sourceId }) → { ok }
 串行生成：从最深的前置开始，一篇一篇（generating → ready）
 ```
 
-- 讲解方法：见 spec「讲解的对象与方法」（重新讨论中；早期的模板 ZHEYE-0004 已废弃）；质量标准：ZHEYE-0005（早期决策，不一定可靠）；
-- 读者模型、真实性约束：`apps/zheye/user-spec/README.md`。
+- 讲解方法：见 spec「讲解的对象与方法」（重新讨论中；早期的模板 ZHEYE-0004 已废弃）；质量标准：ZHEYE-0013；联网搜集资料：ZHEYE-0014；
+- 讲解风格、真实性约束：`apps/zheye/user-spec/README.md`。
 
 ## 6. 配方（ZHEYE-0007）
 

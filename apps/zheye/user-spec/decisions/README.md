@@ -20,7 +20,7 @@ ZHEYE-0001～0008 是早期决策（由 git 历史复原），不一定可靠，
 | [ZHEYE-0002](ZHEYE-0002-zheye-prerequisites.md) | 哲野的前置检查：轻 / 重前置，只问重前置，全递归 | 有效（未实现） |
 | [ZHEYE-0003](ZHEYE-0003-zheye-generation.md) | 哲野的生成：自动开始，全局串行，按依赖顺序，生成后固定 | 有效（未实现） |
 | [ZHEYE-0004](ZHEYE-0004-zheye-article-templates.md) | 哲野的三类文章模板 | 已废弃（讲解设计重新讨论中） |
-| [ZHEYE-0005](ZHEYE-0005-zheye-rubric.md) | 哲野的质量标准（rubric） | 有效（未实现） |
+| [ZHEYE-0005](ZHEYE-0005-zheye-rubric.md) | 哲野的质量标准（rubric） | 已被取代（→ ZHEYE-0013） |
 | [ZHEYE-0006](ZHEYE-0006-zheye-no-profiling.md) | 哲野不做口味档案、不做应用内反馈；不要求高保真 | 有效 |
 | [ZHEYE-0007](ZHEYE-0007-zheye-recipes-in-repo.md) | 哲野的配方以人可读文件随仓库版本化 | 有效（未实现） |
 | [ZHEYE-0008](ZHEYE-0008-zheye-v1-scope.md) | 哲野 v1 的范围 | 有效（未实现） |
@@ -28,3 +28,5 @@ ZHEYE-0001～0008 是早期决策（由 git 历史复原），不一定可靠，
 | [ZHEYE-0010](ZHEYE-0010-flash-max.md) | 哲野用 deepseek-flash，思考强度最高 | 有效（未实现） |
 | [ZHEYE-0011](ZHEYE-0011-reuse-prerequisite-articles.md) | 前置复用已有的文章：按「同一个概念、同一种含义」判断 | 有效（未实现） |
 | [ZHEYE-0012](ZHEYE-0012-remember-known-concepts.md) | 记住作者对每个概念的了解情况，问过的不再问 | 有效（未实现） |
+| [ZHEYE-0013](ZHEYE-0013-quality-standard.md) | 哲野的质量标准：三类共用的通用标准 + 按类型检查讲法 | 有效（未实现） |
+| [ZHEYE-0014](ZHEYE-0014-web-research.md) | 哲野讲解时联网搜集资料 | 有效（未实现） |
