@@ -20,7 +20,7 @@ pnpm.cmd install    # 安装依赖
 pnpm.cmd test       # 单元 / 集成测试（kernel、vocab、适配器）
 pnpm.cmd typecheck  # 全部类型检查
 pnpm.cmd simulate   # 模拟「对话应用」经内核调用 vocab（跨应用路径演示）
-pnpm.cmd ai:ping    # 做一次真实 AI 调用（验证 key、模型与思考强度）；密钥由环境变量 DEEPSEEK_API_KEY 提供
+pnpm.cmd ai:check   # 用真实接口检查平台 AI / 搜索 / 抓取：后台运行、在数据副本上、花几分钱；密钥从系统钥匙串解密，只在内存里使用
 pnpm.cmd import:vocabry  # 从旧 Vocabry 库 + Anki 迁移卡片（近似迁移复习状态；可重复运行）
 pnpm.cmd build:toefl # 从《词以类记》分级结果重新生成参考词表数据（源：D:\Resource\TOEFL）
 pnpm.cmd dev        # 启动桌面端（Electron 窗口）

@@ -9,7 +9,8 @@
     "dev": "node scripts/build.mjs && node scripts/run.mjs",
     "dev:lan": "node scripts/build.mjs && node scripts/run.mjs --lan",
     "smoke": "node scripts/build.mjs --out dist-smoke && node scripts/run.mjs --smoke",
-    "typecheck": "tsc --noEmit -p tsconfig.json"
+    "typecheck": "tsc --noEmit -p tsconfig.json",
+    "ai:check": "node scripts/build.mjs --out dist-smoke && node scripts/run.mjs --smoke --ai-check"
   },
   "dependencies": {
     "@myoutside/kernel": "workspace:*",

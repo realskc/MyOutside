@@ -20,6 +20,7 @@ import dialogManifest from "@myoutside/dialog/manifest.json";
 import { goApp } from "@myoutside/go";
 import goManifest from "@myoutside/go/manifest.json";
 import { startLanServer } from "./lan-server";
+import { runAiCheck } from "./ai-check";
 
 // 数据目录使用正式名称：%APPDATA%/MyOutside
 app.setName("MyOutside");
@@ -513,6 +514,13 @@ app.whenReady().then(async () => {
   kernel.registerApp(dialogApp, dialogManifest);
   kernel.registerApp(goApp, goManifest);
   kernel.start();
+
+  // pnpm ai:check：在临时数据副本上用真实接口检查平台 AI / 搜索 / 抓取，不打开窗口，结束即退出
+  if (process.env.MYOUTSIDE_AI_CHECK === "1") {
+    const passed = await runAiCheck(kernel);
+    app.exit(passed ? 0 : 1);
+    return;
+  }
   const appIds = new Set(kernel.listApps().map((item) => item.id));
 
   /** 调用者 = 发起 IPC 的页面所属的子应用（app://<id>/）；外壳 = 平台自身 */
