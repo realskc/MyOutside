@@ -1,6 +1,6 @@
 import { createKernel, type Kernel } from "@myoutside/kernel";
 import { createNodeSqliteAdapter } from "@myoutside/kernel-node";
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { vocabApp } from "../backend/src/index.js";
 import vocabManifest from "../manifest.json";
 
@@ -17,6 +17,10 @@ async function call<T>(kernel: Kernel, name: string, payload?: unknown): Promise
   if (!res.ok) throw new Error(`${res.error.code}: ${res.error.message}`);
   return res.result as T;
 }
+
+afterEach(() => {
+  vi.unstubAllGlobals();
+});
 
 describe("vocab backend", () => {
   it("addCard + getDue（term 归一化、display 保留原样）", async () => {
@@ -177,5 +181,37 @@ describe("vocab backend", () => {
     expect(kernel.dataVersion).toBe(1);
     await call(kernel, "vocab.listCards", {});
     expect(kernel.dataVersion).toBe(1);
+  });
+  it("resolveCard：查重用低强度思考；返回判断时看到的卡片 id（VOCAB-0010）", async () => {
+    const kernel = setup();
+    await call(kernel, "platform.settings.set", { key: "ai.deepseek.apiKey", value: "test-key" });
+    const { cardId } = await call<{ cardId: string }>(kernel, "vocab.addCard", { term: "run", sense: "跑" });
+    let body: Record<string, unknown> = {};
+    vi.stubGlobal("fetch", async (_url: string, init: { body: string }) => {
+      body = JSON.parse(init.body);
+      const message = { content: "", tool_calls: [{ id: "c1", type: "function", function: { name: "submit_decision", arguments: '{"matchIndex":1}' } }] };
+      return new Response(JSON.stringify({ choices: [{ message, finish_reason: "tool_calls" }] }), { status: 200 });
+    });
+    const r = await call<{ action: string; cardId: string; knownCardIds: string[] }>(kernel, "vocab.resolveCard", { term: "Run", sense: "奔跑" });
+    expect(body.reasoning_effort).toBe("low");
+    expect(r).toEqual({ action: "match", cardId, knownCardIds: [cardId] });
+  });
+
+  it("addCard 提交时校验：判断之后这个拼写又多出卡片 → CONFLICT；看到的卡片没变则正常添加（VOCAB-0010）", async () => {
+    const kernel = setup();
+    const resolved = await call<{ knownCardIds: string[] }>(kernel, "vocab.resolveCard", { term: "set", sense: "放置" });
+    expect(resolved.knownCardIds).toEqual([]);
+    // 判断之后、提交之前，别处先添加了同一个词
+    await call(kernel, "vocab.addCard", { term: "set", sense: "一套" });
+    const stale = await kernel.handle({
+      call: "vocab.addCard",
+      payload: { term: "set", sense: "放置", knownCardIds: resolved.knownCardIds },
+    });
+    expect(stale.ok).toBe(false);
+    if (!stale.ok) expect(stale.error.code).toBe("CONFLICT");
+
+    const fresh = await call<Array<{ id: string }>>(kernel, "vocab.listCards", { term: "set" });
+    await call(kernel, "vocab.addCard", { term: "set", sense: "放置", knownCardIds: fresh.map((card) => card.id) });
+    expect(await call<unknown[]>(kernel, "vocab.listCards", { term: "set" })).toHaveLength(2);
   });
 });

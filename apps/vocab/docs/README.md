@@ -53,10 +53,10 @@ vocab.listCards({ term?, query?, status?, limit?, offset? }) → Card[]
   // term：按归一化拼写精确匹配；query：按 display 模糊匹配；按 created_at 倒序，默认 200
 vocab.getStats({}) → { cards, learning, mastered, dueNow }
 vocab.previewReview({ cardId }) → { again, hard, good, easy: { due, scheduledDays } }
-vocab.resolveCard({ term, sense, meaning?, context? }) → { action: "new" } | { action: "match", cardId }
+vocab.resolveCard({ term, sense, meaning?, context? }) → { action: "new", knownCardIds } | { action: "match", cardId, knownCardIds }
 
 // —— 写 ——
-vocab.addCard({ term, display?, sense, meaning?, phonetic?, context?, source?, scheduling? }) → { cardId }
+vocab.addCard({ term, display?, sense, meaning?, phonetic?, context?, source?, scheduling?, knownCardIds? }) → { cardId }
 vocab.updateCard({ cardId, patch: { sense?, meaning?, phonetic?, context? } }) → { ok }
 vocab.submitReview({ cardId, rating: "again" | "hard" | "good" | "easy" }) → { state, due, scheduledDays }
 vocab.setMastered({ cardId, mastered }) → { ok }
@@ -64,14 +64,16 @@ vocab.setMastered({ cardId, mastered }) → { ok }
 
 - `getDue` / `listCards` 返回的 Card 带 `level`（命中参考词表时为 A–D，否则 `null`）；
 - `addCard` 只负责新建，不查重；`scheduling` 用于导入 / 恢复调度状态，普通添加不传；
+- `addCard` 的 `knownCardIds`：提交时校验（VOCAB-0010）——传入判断重复时看到的这个拼写的全部卡片 id，提交时多出了别的卡片就 `CONFLICT`；不传不校验；
 - `previewReview` 只读；ts-fsrs fuzz 关闭，预览与实际结果一致。
 
 ## 4. 添加流程（VOCAB-0002、D-0008）
 
-1. `vocab.resolveCard`：按 `term` 查已有卡片；没有 → `new`；有 → 调用 `platform.ai.chat`，提供已有卡片的「单词 + 意项 + 释义」列表，强制调用 `submit_decision` 工具返回 `matchIndex`（temperature 0）；解析失败视为无同类；
+1. `vocab.resolveCard`：按 `term` 查已有卡片；没有 → `new`；有 → 调用 `platform.ai.chat`，提供已有卡片的「单词 + 意项 + 释义」列表，要求调用 `submit_decision` 工具返回 `matchIndex`（temperature 0，思考强度 `low`，VOCAB-0010）；解析失败视为无同类；返回判断时看到的卡片 id（`knownCardIds`）；
 2. 界面根据结果：
-   - `new` → `vocab.addCard`；
-   - `match` → 展示已有卡片，用户选择：替换（`vocab.updateCard`，保留调度）/ 仍新增（`vocab.addCard`）/ 放弃；
+   - `new` → `vocab.addCard`（带 `knownCardIds`）；
+   - `match` → 展示已有卡片，用户选择：替换（`vocab.updateCard`，保留调度）/ 仍新增（`vocab.addCard`，带 `knownCardIds`）/ 放弃；
+   - 添加时遇到 `CONFLICT`（判断之后这个词又多出了卡片）→ 自动重新判断一次；
 3. 未配置 AI 密钥或调用失败时，界面回退为只做机械检查。
 
 ## 5. 查词（VOCAB-0007、VOCAB-0004）

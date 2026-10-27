@@ -66,6 +66,11 @@ export const AddCardInput = z.object({
   context: z.string().optional(),
   source: z.string().optional(),
   scheduling: CardSchedulingInput.optional(),
+  /**
+   * 提交时校验（VOCAB-0010）：判断重复时看到的这个拼写的全部卡片 id（来自 resolveCard / listCards）。
+   * 提交时这个拼写若多出了别的卡片，拒绝写入（CONFLICT），调用方应重新判断。不传则不校验。
+   */
+  knownCardIds: z.array(z.string()).optional(),
 });
 export type AddCardInput = z.infer<typeof AddCardInput>;
 
@@ -155,8 +160,8 @@ export const ResolveCardInput = z.object({
 export type ResolveCardInput = z.infer<typeof ResolveCardInput>;
 
 export const ResolveCardOutput = z.union([
-  z.object({ action: z.literal("new") }),
-  z.object({ action: z.literal("match"), cardId: z.string() }),
+  z.object({ action: z.literal("new"), knownCardIds: z.array(z.string()) }),
+  z.object({ action: z.literal("match"), cardId: z.string(), knownCardIds: z.array(z.string()) }),
 ]);
 export type ResolveCardOutput = z.infer<typeof ResolveCardOutput>;
 

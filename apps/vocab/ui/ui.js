@@ -356,9 +356,24 @@
 
   // ---- 添加（两步：解析 → 提交；AI 不可用时回退机械流程）----
 
-  async function runAddFlow(values, container, onFinished) {
+  async function runAddFlow(values, container, onFinished, retried = false) {
     const finish = () => {
       if (onFinished) onFinished();
+    };
+    /** 添加卡片；判断重复之后这个词又多出了卡片（CONFLICT）时，重新走一遍判断（VOCAB-0010） */
+    const add = async (knownCardIds, toastKey) => {
+      try {
+        await call("vocab.addCard", { ...values, knownCardIds });
+      } catch (error) {
+        if (error.code === "CONFLICT" && !retried) {
+          toast(error.message);
+          await runAddFlow(values, container, onFinished, true);
+          return;
+        }
+        throw error;
+      }
+      toast(t(toastKey));
+      finish();
     };
     container.innerHTML = "";
     container.classList.remove("hidden");
@@ -375,33 +390,30 @@
       }
 
       if (resolved && resolved.action === "new") {
-        await call("vocab.addCard", values);
-        toast(t("toastCreated"));
-        finish();
+        await add(resolved.knownCardIds, "toastCreated");
         return;
       }
 
       if (resolved && resolved.action === "match") {
         const cards = await call("vocab.listCards", { term: values.term });
         const matched = cards.filter((card) => card.id === resolved.cardId);
-        renderChoices(container, matched, values, true, finish);
+        renderChoices(container, matched, values, true, finish, add, resolved.knownCardIds);
         return;
       }
 
       const existing = await call("vocab.listCards", { term: values.term });
+      const knownCardIds = existing.map((card) => card.id);
       if (existing.length === 0) {
-        await call("vocab.addCard", values);
-        toast(t("toastCreated"));
-        finish();
+        await add(knownCardIds, "toastCreated");
         return;
       }
-      renderChoices(container, existing, values, false, finish);
+      renderChoices(container, existing, values, false, finish, add, knownCardIds);
     } catch (error) {
       toast(error.message, true);
     }
   }
 
-  function renderChoices(container, cards, values, aiMatched, finish) {
+  function renderChoices(container, cards, values, aiMatched, finish, add, knownCardIds) {
     container.innerHTML = "";
     const notice = document.createElement("div");
     notice.className = "notice";
@@ -449,9 +461,7 @@
       addAnyway.textContent = t("addAnyway");
       addAnyway.addEventListener("click", async () => {
         try {
-          await call("vocab.addCard", values);
-          toast(t("toastAdded"));
-          finish();
+          await add(knownCardIds, "toastAdded");
         } catch (error) {
           toast(error.message, true);
         }

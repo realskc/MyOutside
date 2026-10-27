@@ -109,6 +109,14 @@ export const vocabApp: AppModule = {
 
   api: {
     addCard: defineTx(AddCardInput, (ctx, input) => {
+      if (input.knownCardIds) {
+        // 提交时校验（VOCAB-0010）：判断重复之后，这个拼写又多出了卡片 → 拒绝，让调用方重新判断
+        const known = new Set(input.knownCardIds);
+        const current = ctx.db.all<CardRow>("card", { term: normalizeTerm(input.term) });
+        if (current.some((row) => !known.has(row.id))) {
+          throw new KernelError("CONFLICT", "判断重复之后，这个单词又新增了卡片，请重新检查");
+        }
+      }
       const now = new Date();
       const id = randomUUID();
       const scheduling = input.scheduling ?? fsrsToColumns(createEmptyCard(now));
@@ -178,7 +186,8 @@ export const vocabApp: AppModule = {
     resolveCard: defineRead(ResolveCardInput, async (ctx, input) => {
       const term = normalizeTerm(input.term);
       const existing = ctx.db.all<CardRow>("card", { term }, { orderBy: "created_at" });
-      if (existing.length === 0) return { action: "new" as const };
+      const knownCardIds = existing.map((row) => row.id);
+      if (existing.length === 0) return { action: "new" as const, knownCardIds };
 
       const existingBrief = existing
         .map((row, index) => `${index + 1}. ${row.display} —— 意项：${row.sense}；释义：${row.meaning || "（无）"}`)
@@ -219,6 +228,8 @@ export const vocabApp: AppModule = {
           },
         ],
         temperature: 0,
+        // 只是判断两个意项是否相同，低强度思考足够，更快更省（VOCAB-0010）
+        reasoningEffort: "low",
       })) as { toolCalls: Array<{ function: { name: string; arguments: string } }> };
 
       const decision = response.toolCalls.find((call) => call.function.name === "submit_decision");
@@ -227,12 +238,12 @@ export const vocabApp: AppModule = {
           const args = JSON.parse(decision.function.arguments) as { matchIndex?: number | null };
           const index = typeof args.matchIndex === "number" ? args.matchIndex - 1 : -1;
           const matched = existing[index];
-          if (matched) return { action: "match" as const, cardId: matched.id };
+          if (matched) return { action: "match" as const, cardId: matched.id, knownCardIds };
         } catch {
           /* 解析失败 → 视为无同类 */
         }
       }
-      return { action: "new" as const };
+      return { action: "new" as const, knownCardIds };
     }, { visibility: "public" }),
 
     getDue: defineRead(GetDueInput, (ctx, input) => {
