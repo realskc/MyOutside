@@ -20,4 +20,4 @@ DeepSeek Search / Fetch 包装成平台 API `platform.web.search` / `platform.we
 
 ## 相关文档
 
-- `docs/agent.md` §5
+- `docs/agent.md` §4、§5.4

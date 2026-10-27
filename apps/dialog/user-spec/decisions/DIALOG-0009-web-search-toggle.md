@@ -22,4 +22,4 @@
 
 ## 相关文档
 
-- `docs/agent.md` §11
+- `docs/agent.md` §1；`apps/dialog/docs/README.md` §4

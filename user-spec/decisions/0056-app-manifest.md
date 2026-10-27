@@ -39,7 +39,7 @@ API 函数与迁移仍由后端代码提供（它们本来就是代码）。
 
 ## 相关文档
 
-- `docs/architecture.md` §2.1；`docs/agent.md` §7.2
+- `docs/architecture.md` §2.1；`docs/agent.md` §6.1
 
 ## 修订记录
 

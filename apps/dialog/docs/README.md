@@ -124,6 +124,4 @@ dialog.renameConversation / setSystemPrompt / setReasoningEffort / setWebSearch 
 
 ### 6.3 其他
 
-- 助手回复重新生成：创建助手消息的兄弟节点并切换选中（树形模型已具备）；
-- 流式输出：需扩展 `platform.ai.chat` 的传输（SSE + IPC 转发）与界面；
-- 将来的 builder 可能复用聊天界面 / 消息模型（届时评估，不预先抽象）。
+- 将来的 builder 可能复用聊天界面 / 消息模型（届时评估，不预先抽象；消息树基类见 D-0061）。

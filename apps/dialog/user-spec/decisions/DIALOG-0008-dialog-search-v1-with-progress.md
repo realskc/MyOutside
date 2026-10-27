@@ -21,4 +21,4 @@
 
 ## 相关文档
 
-- `docs/agent.md` §3.2、§11
+- `docs/agent.md` §1、§2.2

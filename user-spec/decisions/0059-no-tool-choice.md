@@ -21,4 +21,4 @@ DeepSeek 在思考模式下不支持 `required` 与指定工具（返回 400）�
 
 ## 相关文档
 
-- `docs/agent.md` §4
+- `docs/agent.md` §3

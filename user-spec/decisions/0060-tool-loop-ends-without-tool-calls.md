@@ -27,4 +27,4 @@
 
 ## 相关文档
 
-- `docs/agent.md` §6.2
+- `docs/agent.md` §5.2

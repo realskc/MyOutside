@@ -110,7 +110,7 @@
 | [D-0046](0046-smoke-on-temp-data-copy.md) | 冒烟测试在真实数据的临时副本上运行 | 有效 |
 | [D-0047](0047-current-stage-non-goals.md) | 现阶段不做的事 | 有效 |
 | [D-0048](0048-self-built-agent-library.md) | agent 框架自研，不引入开源 agent 框架 | 有效 |
-| [D-0049](0049-agent-layering.md) | agent 能力分四部分：执行层承载循环，循环调用模型层与工具层 | 有效 |
+| [D-0049](0049-agent-layering.md) | agent 能力分四部分：执行层承载循环，循环调用模型层与工具层 | 部分被取代（→ D-0061、D-0062、D-0063） |
 | [D-0050](0050-web-tools-as-platform-api.md) | 搜索与抓取做成平台 API | 有效 |
 | [D-0051](0051-event-centric-agent-runs.md) | agent 运行以事件为中心；流式输出与进度显示共用推送通道 | 有效 |
 | [D-0052](0052-agent-execution-modes.md) | agent 的两种运行模式：调用内运行先行，后台任务后置 | 已取代（→ D-0061、D-0062、D-0063） |

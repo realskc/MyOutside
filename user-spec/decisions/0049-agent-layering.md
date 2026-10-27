@@ -1,6 +1,6 @@
 # D-0049 agent 能力分四部分：执行层承载循环，循环调用模型层与工具层
 
-- 状态：有效
+- 状态：部分被取代（→ [D-0061](0061-agent-structures-as-platform-base-classes.md)、[D-0062](0062-workflow-persistence-is-app-responsibility.md)、[D-0063](0063-internal-apis-may-be-async-functions.md)）：「执行层」被取代——工作流就是子应用的代码，跑在它的内部 API（普通的异步函数）里，暂停与恢复由子应用自己解决；模型层 / 循环库 / 工具层的划分仍然有效
 - 日期：2026-10-21
 - 决策者：agent（作者认可了分层的大方向）
 - 服务于：
@@ -26,4 +26,4 @@
 
 ## 相关文档
 
-- `docs/agent.md` §2
+- `docs/agent.md` §1

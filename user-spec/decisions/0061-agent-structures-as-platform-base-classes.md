@@ -72,4 +72,4 @@
 
 ## 相关文档
 
-- `docs/agent.md` §9
+- `docs/agent.md` §7
