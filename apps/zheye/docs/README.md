@@ -1,12 +1,12 @@
 # 哲野（zheye）技术文档
 
 > 应用 id：`zheye`；显示名「哲野」。**未实现**，本文是技术设计草案。
-> 作者的预期见 [`../user-spec/README.md`](../user-spec/README.md)，决策见 [`../user-spec/decisions/`](../user-spec/decisions/README.md)；核心机制见 ZHEYE-0001 ~ ZHEYE-0008。
+> 作者的预期见 [`../user-spec/README.md`](../user-spec/README.md)，决策见 [`../user-spec/decisions/`](../user-spec/decisions/README.md)。早期决策 ZHEYE-0001～0008 不一定可靠，讲解设计正在重新讨论；本文是早期草案，实现前重写。
 
 ## 1. 核心概念
 
 - **源材料（source）**：用户投递的原始内容（v1 = 一段粘贴的文本，ZHEYE-0008）；
-- **讲解单元（unit）**：应用的中心对象，三种类型（词 concept / 句 statement / 文 doc），「单元 → 文章」一对一（ZHEYE-0001）；
+- **讲解单元（unit）**：应用的中心对象，「单元 → 文章」一对一；类型按作者重新讨论的讲解设计：概念 / 断言 / 产品（名称暂定，见 spec「讲解的对象与方法」；早期的「词 / 句 / 文」已废弃）；
 - **前置（prerequisite）**：单元到前置要素的边（词 / 句文本 + 轻 / 重 + 用户的回答，ZHEYE-0002）；
 - **文章（article）**：讲解成果，生成后固定（ZHEYE-0003）。
 
@@ -115,7 +115,7 @@ zheye.deleteSource({ sourceId }) → { ok }
 串行生成：从最深的前置开始，一篇一篇（generating → ready）
 ```
 
-- 文章模板：ZHEYE-0004；质量标准：ZHEYE-0005；
+- 讲解方法：见 spec「讲解的对象与方法」（重新讨论中；早期的模板 ZHEYE-0004 已废弃）；质量标准：ZHEYE-0005（早期决策，不一定可靠）；
 - 读者模型、真实性约束：`apps/zheye/user-spec/README.md`。
 
 ## 6. 配方（ZHEYE-0007）

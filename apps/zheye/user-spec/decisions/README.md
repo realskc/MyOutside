@@ -12,12 +12,14 @@
 
 ## 索引
 
+ZHEYE-0001～0008 是早期决策（由 git 历史复原），不一定可靠，有的可能是 agent 的想法；与作者最新的说法冲突时以后者为准。
+
 | 编号 | 标题 | 状态 |
 |---|---|---|
-| [ZHEYE-0001](ZHEYE-0001-zheye-explanation-units.md) | 哲野的讲解单元：词 / 句 / 文三种，三种来源 | 有效（未实现） |
+| [ZHEYE-0001](ZHEYE-0001-zheye-explanation-units.md) | 哲野的讲解单元：词 / 句 / 文三种，三种来源 | 已废弃（讲解设计重新讨论中） |
 | [ZHEYE-0002](ZHEYE-0002-zheye-prerequisites.md) | 哲野的前置检查：轻 / 重前置，只问重前置，全递归 | 有效（未实现） |
 | [ZHEYE-0003](ZHEYE-0003-zheye-generation.md) | 哲野的生成：自动开始，全局串行，按依赖顺序，生成后固定 | 有效（未实现） |
-| [ZHEYE-0004](ZHEYE-0004-zheye-article-templates.md) | 哲野的三类文章模板 | 有效（未实现） |
+| [ZHEYE-0004](ZHEYE-0004-zheye-article-templates.md) | 哲野的三类文章模板 | 已废弃（讲解设计重新讨论中） |
 | [ZHEYE-0005](ZHEYE-0005-zheye-rubric.md) | 哲野的质量标准（rubric） | 有效（未实现） |
 | [ZHEYE-0006](ZHEYE-0006-zheye-no-profiling.md) | 哲野不做口味档案、不做应用内反馈；不要求高保真 | 有效 |
 | [ZHEYE-0007](ZHEYE-0007-zheye-recipes-in-repo.md) | 哲野的配方以人可读文件随仓库版本化 | 有效（未实现） |
