@@ -78,7 +78,7 @@
 | [D-0014](0014-deepseek-as-ai-provider.md) | 平台 AI 使用 DeepSeek | 有效 |
 | [D-0015](0015-bilingual-ui.md) | 界面中英双语 | 有效 |
 | [D-0016](0016-single-instance-and-launcher.md) | 单实例运行；Windows 双击快捷方式、macOS 终端命令启动 | 有效 |
-| [D-0017](0017-per-app-hot-reload.md) | 开发时按子应用热重载（reloadApp） | 有效（未实现） |
+| [D-0017](0017-per-app-hot-reload.md) | 开发时按子应用热重载（reloadApp） | 有效（未实现；推迟到做 builder 时） |
 | [D-0018](0018-iframe-panel-and-app-protocol.md) | 子应用面板：一个 iframe + app:// 自定义协议 | 有效 |
 | [D-0019](0019-api-key-in-platform-settings.md) | AI 密钥存在平台设置里（明文） | 有效（临时方案） |
 | [D-0020](0020-mobile-via-web-ui.md) | 移动端用同一套 Web 界面承载，不做原生 App | 有效（未实施） |
