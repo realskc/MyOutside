@@ -137,6 +137,7 @@
 | [D-0073](0073-app-local-decisions.md) | 应用自包含：spec/docs/decisions 在 apps/<app>/ 内按层组织 | 有效 |
 | [D-0074](0074-usage-and-cost-display.md) | 用量与花费：按子应用统计，按官方价格与调用时段估算 | 有效 |
 | [D-0075](0075-credentials-encrypted-with-keychain.md) | 凭据用系统钥匙串加密保存 | 有效 |
+| [D-0076](0076-app-background-work-on-startup.md) | 子应用可以在 MyOutside 启动时开始后台工作 | 有效（未实现） |
 
 ## 应用专属决策
 

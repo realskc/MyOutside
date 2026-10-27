@@ -33,7 +33,7 @@
 
 ## 实现相关的决策
 
-以下决策都是作者认真思考后敲定的：
+以下决策中，ZHEYE-0001～0004、0006～0008 是作者认真思考后敲定的；其余见各自的「决策者」：
 
 - 讲解单元与来源：[ZHEYE-0001](decisions/ZHEYE-0001-zheye-explanation-units.md)
 - 前置检查：[ZHEYE-0002](decisions/ZHEYE-0002-zheye-prerequisites.md)
@@ -43,6 +43,8 @@
 - 不做画像与应用内反馈；不要求高保真：[ZHEYE-0006](decisions/ZHEYE-0006-zheye-no-profiling.md)
 - 配方的管理方式：[ZHEYE-0007](decisions/ZHEYE-0007-zheye-recipes-in-repo.md)
 - v1 的范围：[ZHEYE-0008](decisions/ZHEYE-0008-zheye-v1-scope.md)
+- 启动时自动接着生成：[ZHEYE-0009](decisions/ZHEYE-0009-resume-on-startup.md)
+- 模型与思考强度：[ZHEYE-0010](decisions/ZHEYE-0010-flash-max.md)
 
 ## 未定
 

@@ -22,3 +22,5 @@
 | [ZHEYE-0006](ZHEYE-0006-zheye-no-profiling.md) | 哲野不做口味档案、不做应用内反馈；不要求高保真 | 有效 |
 | [ZHEYE-0007](ZHEYE-0007-zheye-recipes-in-repo.md) | 哲野的配方以人可读文件随仓库版本化 | 有效（未实现） |
 | [ZHEYE-0008](ZHEYE-0008-zheye-v1-scope.md) | 哲野 v1 的范围 | 有效（未实现） |
+| [ZHEYE-0009](ZHEYE-0009-resume-on-startup.md) | MyOutside 启动时自动接着生成，不必打开哲野 | 有效（未实现） |
+| [ZHEYE-0010](ZHEYE-0010-flash-max.md) | 哲野用 deepseek-flash，思考强度最高 | 有效（未实现） |
