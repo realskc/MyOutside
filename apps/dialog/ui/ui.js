@@ -50,6 +50,8 @@
       stopped: "已停止生成。",
       stoppedTag: "已停止",
       stoppedTitle: "生成被停止，这是停止前已生成的部分",
+      interruptedTag: "已中断",
+      interruptedTitle: (reason) => `生成出错中断，这是中断前已生成的部分。原因：${reason}`,
       errorPrefix: "生成失败：",
       needKey: "请先在「设置」里配置 DeepSeek API Key。",
       confirmDelete: (title) => `删除会话「${title}」？此操作不可恢复。`,
@@ -105,6 +107,8 @@
       stopped: "Generation stopped.",
       stoppedTag: "Stopped",
       stoppedTitle: "Generation was stopped; this is what had been generated",
+      interruptedTag: "Interrupted",
+      interruptedTitle: (reason) => `Generation failed midway; this is what had been generated. Reason: ${reason}`,
       errorPrefix: "Generation failed: ",
       needKey: "Configure the DeepSeek API key in Settings first.",
       confirmDelete: (title) => `Delete conversation “${title}”? This cannot be undone.`,
@@ -457,11 +461,11 @@
     role.className = "msg-role";
     role.textContent = t(roleKey);
     head.appendChild(role);
-    if (message && message.stopped) {
+    if (message && (message.stopped || message.error)) {
       const tag = document.createElement("span");
-      tag.className = "stopped-tag";
-      tag.textContent = t("stoppedTag");
-      tag.title = t("stoppedTitle");
+      tag.className = "stopped-tag" + (message.error ? " interrupted" : "");
+      tag.textContent = message.error ? t("interruptedTag") : t("stoppedTag");
+      tag.title = message.error ? t("interruptedTitle", message.error) : t("stoppedTitle");
       head.appendChild(tag);
     }
     if (message && message.siblingCount > 1) head.appendChild(buildBranchSwitcher(message));
@@ -767,6 +771,13 @@
           run.rounds.push({ reasoning: "", content: "", tools: [] });
         }
         break;
+      case "round_retry": {
+        // 这一轮出错、即将从头重试：丢掉已显示的半截
+        const round = current();
+        round.reasoning = "";
+        round.content = "";
+        break;
+      }
       case "ai_delta":
         if (event.reasoning) current().reasoning += event.reasoning;
         if (event.content) current().content += event.content;

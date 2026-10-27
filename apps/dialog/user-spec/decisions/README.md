@@ -31,3 +31,4 @@
 | [DIALOG-0015](DIALOG-0015-markdown-and-latex.md) | 对话回复渲染完整的 Markdown 与 LaTeX 公式 | 有效 |
 | [DIALOG-0016](DIALOG-0016-dialog-generation-implementation.md) | 对话回复的生成与保存方式 | 部分被取代（→ DIALOG-0017） |
 | [DIALOG-0017](DIALOG-0017-keep-partial-reply-on-stop.md) | 停止生成或正常关闭时，保存已生成的部分 | 有效 |
+| [DIALOG-0018](DIALOG-0018-keep-partial-reply-on-error.md) | 生成出错中断（例如断网）时，保存已生成的部分 | 有效 |

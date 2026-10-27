@@ -67,6 +67,8 @@ export const MessageSchema = z.object({
   contextTokens: z.number().int().nullable(),
   /** 生成被停止（按停止或正常关闭 MyOutside），内容是停止前已生成的部分 */
   stopped: z.boolean(),
+  /** 生成被错误中断（例如断网、重试都失败）时的原因；内容是中断前已生成的部分 */
+  error: z.string().nullable(),
   activeChildId: z.string().nullable(),
   createdAt: z.number().int(),
 });
@@ -142,8 +144,8 @@ export const GenerateOutput = z.object({
   messageId: z.string(),
   /** 回答的那条用户消息 */
   parentId: z.string(),
-  /** stopped：被停止，已生成的部分已保存 */
-  stopReason: z.enum(["done", "max_rounds", "stopped"]),
+  /** stopped：被停止，已生成的部分已保存；interrupted：出错中断，已生成的部分已保存 */
+  stopReason: z.enum(["done", "max_rounds", "stopped", "interrupted"]),
 });
 export type GenerateOutput = z.infer<typeof GenerateOutput>;
 
@@ -159,6 +161,7 @@ export const SaveReplyInput = z.object({
   sources: z.array(ReplySourceSchema).nullable(),
   contextTokens: z.number().int().nullable(),
   stopped: z.boolean().optional(),
+  error: z.string().nullable().optional(),
 });
 export type SaveReplyInput = z.infer<typeof SaveReplyInput>;
 

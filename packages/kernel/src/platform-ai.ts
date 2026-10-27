@@ -107,6 +107,7 @@ export type RecordUsage = (record: UsageRecord) => void;
  * - 响应返回内容、思考过程、工具调用、可直接追加进历史的 assistant 消息、结束原因与 usage；
  * - stream = true 时，增量经 ctx.emit 推送：{ type: "ai_delta", content?, reasoning? }；
  *   中途被取消时不报错，返回已经收到的部分，finishReason = "aborted"（未拼完的工具调用丢弃；拿不到 usage）；
+ *   中途出错（例如断网）时照常报错，已经收到的部分放在错误的 details.partial = { content, reasoning } 里；
  * - 每次成功调用按调用者记一条用量。
  */
 export function createPlatformAiDefinition(storage: DbAdapter, recordUsage: RecordUsage = () => {}): ApiDefinition {
@@ -178,8 +179,17 @@ export function createPlatformAiDefinition(storage: DbAdapter, recordUsage: Reco
           }
         } catch (cause) {
           // 流式中途被取消：返回已经收到的部分（finishReason = "aborted"），由调用方决定要不要保留
-          if (!(cause instanceof KernelError && cause.code === "ABORTED")) throw cause;
-          finishReason = "aborted";
+          if (cause instanceof KernelError && cause.code === "ABORTED") {
+            finishReason = "aborted";
+          } else if (cause instanceof KernelError && (content !== "" || reasoning !== "")) {
+            // 流式中途出错（例如断网）：已经收到的部分附在错误里（details.partial），由调用方决定要不要保留
+            throw new KernelError(cause.code, cause.message, {
+              ...((cause.details as Record<string, unknown> | undefined) ?? {}),
+              partial: { content, reasoning },
+            });
+          } else {
+            throw cause;
+          }
         }
         toolCalls =
           finishReason === "aborted"

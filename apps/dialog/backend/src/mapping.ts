@@ -26,6 +26,7 @@ export interface MessageRow {
   sources: string | null;
   context_tokens: number | null;
   stopped: number;
+  error: string | null;
   active_child_id: string | null;
   created_at: number;
 }
@@ -74,6 +75,7 @@ export function rowToMessage(row: MessageRow): Message {
     sources: parseJson<ReplySource[]>(row.sources),
     contextTokens: row.context_tokens,
     stopped: row.stopped === 1,
+    error: row.error,
     activeChildId: row.active_child_id,
     createdAt: row.created_at,
   };

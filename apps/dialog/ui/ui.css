@@ -750,3 +750,8 @@ a.cite:hover {
   border-radius: 6px;
   padding: 0 6px;
 }
+
+.stopped-tag.interrupted {
+  color: var(--danger);
+  border-color: #f3c2c4;
+}

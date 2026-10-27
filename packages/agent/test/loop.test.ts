@@ -223,4 +223,17 @@ describe("runToolLoop", () => {
     expect(r.content).toBe("查到的结果是");
     expect(r.reasoning).toBe("整理");
   });
+  it("输出到一半出错：重试前推送 round_retry；重试都失败时，最后收到的半截作为最后一轮保留", async () => {
+    const broken = { code: "UPSTREAM", message: "读取流式响应失败", details: { retryable: true, partial: { content: "写到一半", reasoning: "想" } } };
+    const { ctx, events } = fakeContext([
+      { content: "我先查一下。", toolCalls: [{ id: "1", name: "echo", arguments: '{"text":"a"}' }] },
+      { error: broken },
+      { error: broken },
+    ]);
+    const r = await runToolLoop(ctx, { messages: base, tools: [echoTool], retries: 1 });
+    expect(r.stopReason).toBe("error");
+    expect(events.filter((e) => e.type === "round_retry")).toEqual([{ type: "round_retry", round: 2, attempt: 1 }]);
+    expect(r.rounds).toHaveLength(2);
+    expect(r.rounds[1]).toMatchObject({ content: "写到一半", reasoning: "想", toolCalls: [] });
+  }, 10000);
 });

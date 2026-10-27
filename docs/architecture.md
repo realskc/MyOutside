@@ -193,7 +193,7 @@ get(table, where) / all(table, where?, { orderBy?, limit?, offset? }) / count(ta
 ### 6.3 错误与取消
 
 - 网络错误、408 / 429 / 5xx → `UPSTREAM`，`details.retryable = true`；其余 HTTP 错误 → `UPSTREAM`，`details.status`、`retryable = false`；401 → `PRECONDITION`（密钥无效）；未配置密钥 → `PRECONDITION`；
-- 调用被取消时中止发往 DeepSeek 的请求（流式请求断开后 DeepSeek 会停止生成）：非流式以 `ABORTED` 结束；**流式返回已收到的部分**，`finishReason = "aborted"`（未拼完的工具调用丢弃，拿不到用量），由调用方决定要不要保留（DIALOG-0017）。
+- 调用被取消时中止发往 DeepSeek 的请求（流式请求断开后 DeepSeek 会停止生成）：非流式以 `ABORTED` 结束；**流式返回已收到的部分**，`finishReason = "aborted"`（未拼完的工具调用丢弃，拿不到用量），由调用方决定要不要保留（DIALOG-0017）；流式中途出错（例如断网）照常报错，已收到的部分放在 `details.partial = { content, reasoning }`（DIALOG-0018）。
 - 取消只是通知正在执行的函数「该停了」：内核不因取消而拒绝之后的写入，函数停下来后可以经本应用的事务 API 保存已有的进度。
 
 ### 6.4 用量计量

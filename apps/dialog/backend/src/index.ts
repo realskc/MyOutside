@@ -145,6 +145,12 @@ export const dialogApp: AppModule = {
         ctx.addColumn("message", "stopped INTEGER NOT NULL DEFAULT 0"); // 生成被停止，内容是已生成的部分
       },
     },
+    {
+      id: "0004_error",
+      up: (ctx) => {
+        ctx.addColumn("message", "error TEXT"); // 生成被错误中断时的原因，内容是已生成的部分
+      },
+    },
   ],
 
   api: {
@@ -354,6 +360,7 @@ export const dialogApp: AppModule = {
         sources: input.sources ? JSON.stringify(input.sources) : null,
         context_tokens: input.contextTokens,
         stopped: input.stopped ? 1 : 0,
+        error: input.error ?? null,
         active_child_id: null,
         created_at: now,
       });

@@ -551,6 +551,32 @@ describe("dialog backend", () => {
     expect(reply.steps[0].toolCalls[0]).toMatchObject({ name: "web_search", ok: false, result: "已被用户取消" });
   });
 
+  it("断网中断：重试都失败时，保存已输出的部分并标记已中断（DIALOG-0018）；重试时推送 round_retry", async () => {
+    const kernel = await setupWithKey();
+    const conversationId = await createConversation(kernel, { webSearch: false });
+    let attempts = 0;
+    vi.stubGlobal("fetch", async () => {
+      attempts += 1;
+      const encoder = new TextEncoder();
+      const body = new ReadableStream<Uint8Array>({
+        start(stream) {
+          stream.enqueue(encoder.encode(`data: ${JSON.stringify({ choices: [{ delta: { content: `第 ${attempts} 次写到一半` } }] })}\n\n`));
+          setTimeout(() => stream.error(new TypeError("terminated")), 5);
+        },
+      });
+      return new Response(body, { status: 200 });
+    });
+    const events: any[] = [];
+    const res = await kernel.handle({ call: "dialog.send", payload: { conversationId, content: "讲个故事" } }, { emit: (e) => events.push(e) });
+    expect(res.ok).toBe(true);
+    if (res.ok) expect((res.result as { stopReason: string }).stopReason).toBe("interrupted");
+    expect(attempts).toBe(3);
+    expect(events.filter((e) => e.type === "round_retry")).toHaveLength(2);
+    const reply = (await call<any>(kernel, "dialog.getPath", { conversationId })).messages.at(-1);
+    expect(reply).toMatchObject({ role: "assistant", content: "第 3 次写到一半", stopped: false });
+    expect(reply.error).toContain("读取流式响应失败");
+  }, 15000);
+
   it("内部 API：其他子应用不能调用 dialog.send", async () => {
     const kernel = await setupWithKey();
     const conversationId = await createConversation(kernel);

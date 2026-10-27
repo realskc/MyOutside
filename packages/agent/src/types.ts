@@ -89,6 +89,8 @@ export interface ToolLoopResult {
 /** 工具循环推送的事件（模型输出的增量由平台 AI 推送：{ type: "ai_delta" }） */
 export type LoopEvent =
   | { type: "round_start"; round: number }
+  /** 这一轮出错、即将从头重试：界面应丢掉这一轮已显示的输出 */
+  | { type: "round_retry"; round: number; attempt: number }
   | { type: "tool_start"; round: number; callId: string; tool: string; summary: string }
   | { type: "tool_result"; round: number; callId: string; tool: string; ok: boolean; summary: string }
   | { type: "round_end"; round: number };

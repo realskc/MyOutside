@@ -281,4 +281,26 @@ describe("platform AI / web", () => {
     expect(out.toolCalls).toEqual([]);
     expect(out.usage).toBeNull();
   });
+  it("流式中途断网：照常报可重试的 UPSTREAM，已收到的部分放在 details.partial", async () => {
+    const { kernel } = await setup();
+    vi.stubGlobal("fetch", async () => {
+      const encoder = new TextEncoder();
+      const body = new ReadableStream<Uint8Array>({
+        start(stream) {
+          stream.enqueue(encoder.encode(`data: ${JSON.stringify({ choices: [{ delta: { reasoning_content: "想" } }] })}\n\n`));
+          stream.enqueue(encoder.encode(`data: ${JSON.stringify({ choices: [{ delta: { content: "写到一半" } }] })}\n\n`));
+          setTimeout(() => stream.error(new TypeError("terminated")), 5);
+        },
+      });
+      return new Response(body, { status: 200 });
+    });
+    const r = await kernel.handle({
+      call: "platform.ai.chat",
+      payload: { messages: [{ role: "user", content: "hi" }], stream: true },
+    });
+    expect(r.ok).toBe(false);
+    if (r.ok) return;
+    expect(r.error.code).toBe("UPSTREAM");
+    expect(r.error.details).toMatchObject({ retryable: true, partial: { content: "写到一半", reasoning: "想" } });
+  });
 });

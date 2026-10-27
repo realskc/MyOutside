@@ -353,6 +353,12 @@ async function runSmoke(win: BrowserWindow): Promise<void> {
         const firstUser = pathResult.result.messages.find((message) => message.role === "user");
         await window.outside.call("dialog.editUserMessage", { messageId: firstUser.id, content: ${JSON.stringify("你好！用一句话介绍你自己。")} });
         await window.outside.call("dialog.appendMessage", { conversationId, role: "assistant", content: ${JSON.stringify(demoAssistant)}, reasoning: ${JSON.stringify(demoReasoning)}, model: "deepseek-flash", usage: { promptTokens: 32, completionTokens: 48, totalTokens: 80, reasoningTokens: 18 } });
+        // 被停止 / 出错中断的回复（DIALOG-0017、DIALOG-0018）
+        const base = { conversationId, reasoning: null, model: "deepseek-flash", usage: null, steps: null, sources: null, contextTokens: null };
+        const q1 = await window.outside.call("dialog.appendMessage", { conversationId, role: "user", content: "讲一个长一点的故事。" });
+        await window.outside.call("dialog.saveReply", { ...base, parentId: q1.result.messageId, content: "从前有座山，山里有座庙，", stopped: true });
+        const q2 = await window.outside.call("dialog.appendMessage", { conversationId, role: "user", content: "继续。" });
+        await window.outside.call("dialog.saveReply", { ...base, parentId: q2.result.messageId, content: "庙里有个老和尚，", error: "读取流式响应失败：terminated" });
         return conversationId;
       })()`,
     );
@@ -364,7 +370,7 @@ async function runSmoke(win: BrowserWindow): Promise<void> {
     );
     console.log("[smoke] dialog reasoning toggle:", reasoningOpen);
     const rendering = await win.webContents.executeJavaScript(
-      `({ katex: document.querySelectorAll(".katex").length, display: document.querySelectorAll(".math-display").length, table: !!document.querySelector(".bubble table"), webSearchToggle: !!document.getElementById("web-search-toggle"), context: (document.getElementById("usage-total") || {}).textContent || "" })`,
+      `({ katex: document.querySelectorAll(".katex").length, display: document.querySelectorAll(".math-display").length, table: !!document.querySelector(".bubble table"), webSearchToggle: !!document.getElementById("web-search-toggle"), tags: [...document.querySelectorAll(".stopped-tag")].map((tag) => tag.textContent + "|" + tag.title), context: (document.getElementById("usage-total") || {}).textContent || "" })`,
     );
     console.log("[smoke] dialog rendering:", JSON.stringify(rendering));
     const dialogShotPath = join(app.getPath("temp"), "myoutside-dialog.png");

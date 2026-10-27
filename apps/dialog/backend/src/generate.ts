@@ -106,7 +106,7 @@ const PASS_THROUGH_CODES = new Set<KernelErrorCode>(["PRECONDITION", "UPSTREAM",
  * 1. 沿父指针取出这条用户消息之前的历史，展开、截断；
  * 2. 联网搜索打开时，把搜索 / 抓取工具交给模型，跑工具循环（流式，增量经推送通道发给前端）；
  * 3. 调用事务 API `dialog.saveReply` 把回复挂在这条用户消息下（明确的父节点，生成期间切换分支也不会挂错地方）。
- * 被停止时保存已生成的部分（标记 stopped；一个字都没输出则不保存）；出错时不保存。用户消息保留，可以重试。
+ * 被停止或出错中断时保存已生成的部分（标记 stopped / error；一个字都没输出则不保存，用户消息保留，可以重试）。
  */
 export async function generateReply(ctx: AsyncContext, conversationId: string, parentId: string): Promise<GenerateOutput> {
   if (running.has(conversationId)) throw new KernelError("PRECONDITION", "这个会话正在生成回复");
@@ -132,12 +132,15 @@ export async function generateReply(ctx: AsyncContext, conversationId: string, p
       maxRounds: MAX_ROUNDS,
     });
 
-    // 被停止：有已输出的文字就保存（标记 stopped）；一个字都没输出就不保存，用户消息保留（DIALOG-0017）
+    // 被停止、或出错中断（例如断网、重试都失败）：有已输出的文字就保存（标记 stopped / error）；
+    // 一个字都没输出就不保存，用户消息保留（DIALOG-0017、DIALOG-0018）
     const stopped = result.stopReason === "aborted";
-    if (stopped && !result.rounds.some((round) => round.content.trim() !== "")) {
+    const failed = result.stopReason === "error";
+    const hasText = result.rounds.some((round) => round.content.trim() !== "");
+    if (stopped && !hasText) {
       throw new KernelError("ABORTED", "已停止生成");
     }
-    if (result.stopReason === "error") {
+    if (failed && !hasText) {
       const code = result.error?.code as KernelErrorCode | undefined;
       throw new KernelError(code && PASS_THROUGH_CODES.has(code) ? code : "UPSTREAM", result.error?.message ?? "生成失败");
     }
@@ -170,8 +173,10 @@ export async function generateReply(ctx: AsyncContext, conversationId: string, p
       sources: sources.list().length > 0 ? sources.list() : null,
       contextTokens: [...result.rounds].reverse().find((round) => round.usage)?.usage?.promptTokens ?? null,
       stopped,
+      error: failed ? (result.error?.message ?? "生成失败") : null,
     })) as { messageId: string };
-    return { messageId: saved.messageId, parentId, stopReason: stopped ? "stopped" : result.stopReason === "max_rounds" ? "max_rounds" : "done" };
+    const stopReason = stopped ? "stopped" : failed ? "interrupted" : result.stopReason === "max_rounds" ? "max_rounds" : "done";
+    return { messageId: saved.messageId, parentId, stopReason };
   } finally {
     running.delete(conversationId);
   }
