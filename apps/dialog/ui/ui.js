@@ -477,8 +477,13 @@
     wrap.className = `msg ${message.role}`;
     wrap.appendChild(messageHead(message.role === "user" ? "you" : "assistant", message));
 
-    if (message.role === "assistant" && message.reasoning) {
-      wrap.appendChild(buildCollapsible(t("reasoning"), buildReasoningBody(message.reasoning)));
+    // 思考过程：所有轮的思考按顺序拼在一起（调用了工具的各轮存在 steps 里，最后一轮存在 reasoning 里），与生成中的显示一致
+    const reasoning =
+      message.role === "assistant"
+        ? [...(message.steps || []).map((step) => step.reasoning), message.reasoning].filter(Boolean).join("\n\n")
+        : "";
+    if (reasoning) {
+      wrap.appendChild(buildCollapsible(t("reasoning"), buildReasoningBody(reasoning)));
     }
     if (message.role === "assistant" && message.steps && message.steps.length > 0) {
       wrap.appendChild(buildCollapsible(t("searchProcess", countTools(message.steps)), buildStepsBody(message.steps)));

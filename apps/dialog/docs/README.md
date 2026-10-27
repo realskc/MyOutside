@@ -107,7 +107,7 @@ dialog.renameConversation / setSystemPrompt / setReasoningEffort / setWebSearch 
 - **生成**：前端以运行 ID 调用 `dialog.send` / `generate` / `editAndSend`，订阅推送事件（`outside.onEvent`），实时显示思考过程、搜索过程（每次搜索 / 阅读的状态）与流式正文（按动画帧节流重绘）；生成中发送按钮变为「停止」（`outside.cancel`）；结束后重新读取路径；
 - 生成中可以切到其他会话；离开后重新打开页面，`getPath` 的 `generating` 为真时显示「生成中…」并定时刷新；
 - 失败显示错误 +「重试」；停止后保存了半截的回复在上方标「已停止」（DIALOG-0017），出错中断后保存的标「已中断」、悬停看原因（DIALOG-0018）；没保存（一个字都没输出）、或最后一条是没有回复的用户消息时，显示提示 +「生成回复」；
-- 助手消息：可折叠的「思考过程」与「搜索过程」（默认折叠），正文里的 `[n]` 渲染为指向来源的链接，下方列出这次查过的全部来源、默认折叠（DIALOG-0010）；
+- 助手消息：可折叠的「思考过程」与「搜索过程」（默认折叠；思考过程是所有轮的思考按顺序拼接——调用了工具的各轮在 `steps` 里，最后一轮在 `reasoning` 里，与生成中的显示一致），正文里的 `[n]` 渲染为指向来源的链接，下方列出这次查过的全部来源、默认折叠（DIALOG-0010）；
 - 输入：Enter 发送、Shift+Enter 换行，处理中文输入法组字；
 - **Markdown + LaTeX**（DIALOG-0015，`ui/markdown.js`）：marked 解析，KaTeX 渲染公式（`$…$`、`\(…\)`、`$$…$$`、`\[…\]`；代码里的 `$` 不处理；`$5 和 $10` 这类金额不当公式），DOMPurify 清洗，原始 HTML 一律转义；代码块带复制按钮；链接仅 http/https，经 `outside.openExternal` 用系统浏览器打开；
 - 第三方库放在 `ui/vendor/`，由 `node scripts/vendor-dialog-ui.mjs` 从 devDependencies 复制（版本见 `vendor/VERSIONS.txt`），前端不经构建；

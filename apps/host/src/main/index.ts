@@ -387,7 +387,8 @@ async function runSmoke(win: BrowserWindow): Promise<void> {
         // 被停止 / 出错中断的回复（DIALOG-0017、DIALOG-0018）
         const base = { conversationId, reasoning: null, model: "deepseek-flash", usage: null, steps: null, sources: null, contextTokens: null };
         const q1 = await window.outside.call("dialog.appendMessage", { conversationId, role: "user", content: "讲一个长一点的故事。" });
-        await window.outside.call("dialog.saveReply", { ...base, parentId: q1.result.messageId, content: "从前有座山，山里有座庙，", stopped: true });
+        const steps = [{ reasoning: "先搜一下有没有现成的故事。", content: "", toolCalls: [{ id: "c1", name: "web_search", arguments: "{}", ok: true, summary: "搜索：长故事", result: "" }] }];
+        await window.outside.call("dialog.saveReply", { ...base, parentId: q1.result.messageId, content: "从前有座山，山里有座庙，", reasoning: "组织回答。", steps, stopped: true });
         const q2 = await window.outside.call("dialog.appendMessage", { conversationId, role: "user", content: "继续。" });
         await window.outside.call("dialog.saveReply", { ...base, parentId: q2.result.messageId, content: "庙里有个老和尚，", error: "读取流式响应失败：terminated" });
         return conversationId;
@@ -401,7 +402,7 @@ async function runSmoke(win: BrowserWindow): Promise<void> {
     );
     console.log("[smoke] dialog reasoning toggle:", reasoningOpen);
     const rendering = await win.webContents.executeJavaScript(
-      `({ katex: document.querySelectorAll(".katex").length, display: document.querySelectorAll(".math-display").length, table: !!document.querySelector(".bubble table"), webSearchToggle: !!document.getElementById("web-search-toggle"), tags: [...document.querySelectorAll(".stopped-tag")].map((tag) => tag.textContent + "|" + tag.title), context: (document.getElementById("usage-total") || {}).textContent || "" })`,
+      `({ katex: document.querySelectorAll(".katex").length, display: document.querySelectorAll(".math-display").length, table: !!document.querySelector(".bubble table"), webSearchToggle: !!document.getElementById("web-search-toggle"), tags: [...document.querySelectorAll(".stopped-tag")].map((tag) => tag.textContent + "|" + tag.title), stoppedReasoning: ((document.querySelector(".msg .stopped-tag") || {}).closest ? document.querySelector(".msg .stopped-tag").closest(".msg").querySelector(".reasoning-body").textContent : null), context: (document.getElementById("usage-total") || {}).textContent || "" })`,
     );
     console.log("[smoke] dialog rendering:", JSON.stringify(rendering));
     const dialogShotPath = join(app.getPath("temp"), "myoutside-dialog.png");
