@@ -28,6 +28,8 @@ export interface AgentTool {
   maxChars?: number;
   /** 结果来自不可信来源（网页等）：交给模型时包上边界说明 */
   untrusted?: boolean;
+  /** 以相同参数重复调用时照常执行（结果会随状态变化的工具，例如读取一份正在修改的稿子）；默认不再执行 */
+  repeatable?: boolean;
 }
 
 /** 一轮里的一次工具调用 */
@@ -69,6 +71,8 @@ export interface ToolLoopOptions {
   maxRounds?: number;
   /** 可重试的上游错误最多重试几次（默认 2） */
   retries?: number;
+  /** 每一轮结束（工具都执行完）时调用，例如把这一轮及时保存下来；会等它完成再进入下一轮 */
+  onRound?(round: Round): void | Promise<void>;
 }
 
 export interface ToolLoopResult {

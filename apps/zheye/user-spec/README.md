@@ -122,7 +122,7 @@
 - 三类之间的联系：[ZHEYE-0017](decisions/ZHEYE-0017-links-between-articles.md)
 - 写作流程：[ZHEYE-0018](decisions/ZHEYE-0018-writing-pipeline.md)
 - 编辑工具：[ZHEYE-0019](decisions/ZHEYE-0019-editing-tools.md)
-- 试验台：[ZHEYE-0020](decisions/ZHEYE-0020-trial-bench.md)
+- 试验台：[ZHEYE-0020](decisions/ZHEYE-0020-trial-bench.md)、实现 [ZHEYE-0021](decisions/ZHEYE-0021-trial-bench-implementation.md)
 
 ## 未定
 

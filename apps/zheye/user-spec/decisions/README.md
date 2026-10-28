@@ -36,3 +36,4 @@ ZHEYE-0001～0008 是早期决策（由 git 历史复原），不一定可靠，
 | [ZHEYE-0018](ZHEYE-0018-writing-pipeline.md) | 写作流程：先走一遍线性流程，大纲不要求结构化，任何一步都能推倒重来 | 有效（未实现；讨论中） |
 | [ZHEYE-0019](ZHEYE-0019-editing-tools.md) | 写作用的编辑工具：读取、查找替换、整篇重写 | 有效（未实现） |
 | [ZHEYE-0020](ZHEYE-0020-trial-bench.md) | 试验台：哲野里的一个页面，提示词在仓库文件里，每次试跑都存下 | 有效（未实现） |
+| [ZHEYE-0021](ZHEYE-0021-trial-bench-implementation.md) | 试验台的实现：配方文件的写法、每步一次工具循环、轨迹边跑边存 | 有效 |

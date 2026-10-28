@@ -30,6 +30,8 @@ const outside = {
   cancel: (runId: string) => ipcRenderer.invoke("kernel:cancel", runId),
   /** 用系统浏览器打开外链（仅 http/https） */
   openExternal: (url: string) => ipcRenderer.invoke("host:openExternal", url),
+  /** 用系统默认程序打开本应用目录下的一个文本文件（相对 apps/<id>/，仅 .md / .json / .txt） */
+  openAppFile: (path: string) => ipcRenderer.invoke("host:openAppFile", path) as Promise<{ ok: boolean; error?: string }>,
 };
 
 contextBridge.exposeInMainWorld("outside", outside);

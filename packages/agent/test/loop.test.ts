@@ -131,6 +131,33 @@ describe("runToolLoop", () => {
     expect(r.rounds[1]!.toolCalls[0]!.result).toContain("重复调用");
   });
 
+  it("repeatable 的工具：同样参数也照常执行（例如读取一份正在修改的稿子）", async () => {
+    let executed = 0;
+    const reader: AgentTool = { ...echoTool, repeatable: true, execute: async () => ++executed };
+    const { ctx } = fakeContext([
+      { toolCalls: [{ id: "1", name: "echo", arguments: "{}" }] },
+      { toolCalls: [{ id: "2", name: "echo", arguments: "{}" }] },
+      { content: "好" },
+    ]);
+    const r = await runToolLoop(ctx, { messages: base, tools: [reader] });
+    expect(executed).toBe(2);
+    expect(r.rounds[1]!.toolCalls[0]!.result).toBe("2");
+  });
+
+  it("onRound：每一轮结束（工具执行完）时调用，并等它完成", async () => {
+    const seen: string[] = [];
+    const { ctx } = fakeContext([{ toolCalls: [{ id: "1", name: "echo", arguments: '{"text":"x"}' }] }, { content: "好" }]);
+    await runToolLoop(ctx, {
+      messages: base,
+      tools: [echoTool],
+      onRound: async (round) => {
+        await new Promise((resolve) => setTimeout(resolve, 5));
+        seen.push(`${round.index}:${round.toolCalls.map((call) => call.result).join(",")}`);
+      },
+    });
+    expect(seen).toEqual(['1:{"echoed":"x"}', "2:"]);
+  });
+
   it("达到最大轮数：最后一轮不再提供工具，让模型直接回答", async () => {
     const { ctx, requests } = fakeContext([
       { toolCalls: [{ id: "1", name: "echo", arguments: '{"text":"a"}' }] },

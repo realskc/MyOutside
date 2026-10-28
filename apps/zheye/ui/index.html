@@ -1,0 +1,48 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>哲野 · 试验台</title>
+    <link rel="stylesheet" href="vendor/katex.min.css" />
+    <link rel="stylesheet" href="ui.css" />
+  </head>
+  <body>
+    <header class="topbar">
+      <h1>哲野 <span class="muted">· 试验台</span></h1>
+      <span class="spacer"></span>
+      <span class="muted small">配方在 <code>apps/zheye/recipes/</code>，改了保存即可，下一次试跑生效</span>
+    </header>
+
+    <div class="layout">
+      <aside class="sidebar">
+        <form id="new-run" class="new-run">
+          <input id="subject" maxlength="200" placeholder="讲解对象，例如：通货膨胀" autocomplete="off" />
+          <div class="row">
+            <select id="type"></select>
+            <button id="btn-start" class="primary" type="submit">开始试跑</button>
+          </div>
+          <div class="muted small">每次试跑会多次调用 DeepSeek（思考强度最高）并联网搜索，花费计入设置里的「用量与花费」。</div>
+        </form>
+        <button id="nav-flow" class="nav-item active" type="button">流程与提示词</button>
+        <div class="list-title">试跑记录</div>
+        <div id="run-list" class="run-list"></div>
+      </aside>
+
+      <main class="main">
+        <section id="view-flow" class="view"></section>
+        <section id="view-run" class="view hidden"></section>
+        <section id="view-compare" class="view hidden"></section>
+      </main>
+    </div>
+
+    <div id="toast" class="toast hidden"></div>
+
+    <script src="vendor/marked.umd.js"></script>
+    <script src="vendor/purify.min.js"></script>
+    <script src="vendor/katex.min.js"></script>
+    <script src="markdown.js"></script>
+    <script src="diff.js"></script>
+    <script src="ui.js"></script>
+  </body>
+</html>

@@ -86,12 +86,14 @@ interface AgentTool {
   summarize?(args): string;           // 给界面看的一句话，如「搜索：DeepSeek 发布」
   maxChars?: number;                  // 交给模型的结果最多多少字符（默认 8000）
   untrusted?: boolean;                // 结果来自网页等不可信来源
+  repeatable?: boolean;               // 相同参数重复调用也照常执行（例如读取一份正在修改的稿子）
 }
 
 runToolLoop(ctx, {
   messages, tools, reasoningEffort?, model?, stream?,
   maxRounds?,   // 默认 8；最后一轮不提供工具，让模型直接回答
   retries?,     // 可重试的上游错误最多重试几次，默认 2
+  onRound?,     // 每一轮结束（工具都执行完）时调用，会等它完成；例如把这一轮及时存下（哲野试验台）
 }) → { stopReason: "done" | "max_rounds" | "aborted" | "error", content, reasoning, rounds, messages, usage, model, error? }
 ```
 
@@ -108,7 +110,7 @@ runToolLoop(ctx, {
 | 可重试的上游错误（429 / 5xx / 网络） | 指数退避重试（1 秒、2 秒……）；重试前推送 `round_retry`，界面丢掉这一轮已显示的半截 |
 | 重试都失败 / 不可重试的错误 | 以 `error` 结束；最后一次输出到一半的部分作为最后一轮保留在 `rounds` 里（DIALOG-0018） |
 | 工具不存在、参数不是合法 JSON、执行失败 | 作为工具结果告诉模型，让它自己修正，循环继续 |
-| 同一工具以相同参数重复调用 | 不再执行，告诉模型「请直接使用之前的结果」 |
+| 同一工具以相同参数重复调用 | 不再执行，告诉模型「请直接使用之前的结果」；标了 `repeatable` 的工具照常执行 |
 | 达到最大轮数 | 最后一轮不提供工具，让模型根据已有信息回答（`max_rounds`） |
 | 模型输出到一半被取消 | 已输出的部分作为最后一轮保留，以 `aborted` 结束（DIALOG-0017） |
 | 执行工具时被取消 | 本轮剩下的工具调用补上「已被用户取消」的结果，保证新增的消息仍然合法，以 `aborted` 结束 |
@@ -133,7 +135,7 @@ runToolLoop(ctx, {
 ### 6.2 写操作
 
 - 工具循环跑在普通的异步函数里时，工具可以调用本子应用的事务 API 写数据（每次一个短事务）；跨应用写入要调用对方的公开事务 API，并在清单里声明；
-- 目前唯一的使用者（对话搜索）的工具都是只读的。
+- 对话搜索的工具都是只读的；哲野试验台的草稿工具只改内存里的草稿，每次修改经本应用的事务 API 存进轨迹。
 
 ### 6.3 不可信内容
 

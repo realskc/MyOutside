@@ -273,6 +273,9 @@ importers:
       '@myoutside/vocab':
         specifier: workspace:*
         version: link:../vocab
+      '@myoutside/zheye':
+        specifier: workspace:*
+        version: link:../zheye
     devDependencies:
       '@types/node':
         specifier: ^24.0.0
@@ -295,6 +298,34 @@ importers:
       ts-fsrs:
         specifier: ^5.4.2
         version: 5.4.2
+      zod:
+        specifier: ^3.24.0
+        version: 3.25.76
+    devDependencies:
+      '@myoutside/kernel-node':
+        specifier: workspace:*
+        version: link:../../packages/kernel-node
+      '@types/node':
+        specifier: ^24.0.0
+        version: 24.19.0
+      typescript:
+        specifier: ^5.6.0
+        version: 5.9.3
+      vitest:
+        specifier: ^3.0.0
+        version: 3.2.7(@types/node@24.19.0)(tsx@4.23.15)
+
+  apps/zheye:
+    dependencies:
+      '@myoutside/agent':
+        specifier: workspace:*
+        version: link:../../packages/agent
+      '@myoutside/contracts':
+        specifier: workspace:*
+        version: link:../../packages/contracts
+      '@myoutside/kernel':
+        specifier: workspace:*
+        version: link:../../packages/kernel
       zod:
         specifier: ^3.24.0
         version: 3.25.76

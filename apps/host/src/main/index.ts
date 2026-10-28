@@ -19,6 +19,8 @@ import { dialogApp } from "@myoutside/dialog";
 import dialogManifest from "@myoutside/dialog/manifest.json";
 import { goApp } from "@myoutside/go";
 import goManifest from "@myoutside/go/manifest.json";
+import { createZheyeApp } from "@myoutside/zheye";
+import zheyeManifest from "@myoutside/zheye/manifest.json";
 import { startLanServer } from "./lan-server";
 import { runAiCheck } from "./ai-check";
 
@@ -83,9 +85,16 @@ function mimeFor(file: string): string {
   }
 }
 
+/** apps/host：按打包文件所在位置推算（dist/ 或冒烟测试的 dist-smoke/ 都在 apps/host 下） */
+const HOST_DIR = resolve(__dirname, "..");
+/** 各子应用的目录：apps/<id> */
+const appDir = (id: string) => resolve(HOST_DIR, "..", id);
+
+/** 子应用可以请外壳用系统默认程序打开的文件类型（只限它自己目录下的文本文件，D-0077） */
+const OPENABLE_EXTENSIONS = new Set([".md", ".json", ".txt"]);
+
 function buildUiDirs(kernel: Kernel): Record<string, string> {
-  // apps/host：按打包文件所在位置推算（dist/ 或冒烟测试的 dist-smoke/ 都在 apps/host 下）
-  const appPath = resolve(__dirname, "..");
+  const appPath = HOST_DIR;
   const uiDirs: Record<string, string> = {
     shell: resolve(appPath, "renderer"),
   };
@@ -274,11 +283,124 @@ async function captureWindow(win: BrowserWindow, attempts: number, delayMs: numb
   return Buffer.alloc(0);
 }
 
+async function waitFor(win: BrowserWindow, condition: string, attempts = 40, delayMs = 250): Promise<boolean> {
+  for (let i = 0; i < attempts; i += 1) {
+    if ((await win.webContents.executeJavaScript(condition)) as boolean) return true;
+    await new Promise((resolve) => setTimeout(resolve, delayMs));
+  }
+  return false;
+}
+
+/**
+ * 哲野试验台（ZHEYE-0020）：流程页能读到配方；在临时数据副本里写一次演示试跑，看试跑页能显示；
+ * MYOUTSIDE_SMOKE_ZHEYE_LIVE=1 时再经界面真跑一次（真实调用 DeepSeek，花费几毛钱，最多等 25 分钟）。
+ */
+async function smokeZheye(win: BrowserWindow): Promise<void> {
+  await win.loadURL("app://zheye/index.html");
+  await waitFor(win, 'typeof window.outside === "object" && document.querySelectorAll("#view-flow .node").length > 0');
+  const flow = await win.webContents.executeJavaScript(
+    `(async () => {
+      const r = await window.outside.call("zheye.getRecipe", { type: "concept" });
+      const nodes = [...document.querySelectorAll("#view-flow .node")];
+      if (nodes[4]) nodes[4].click();
+      await new Promise((resolve) => setTimeout(resolve, 300));
+      return { ok: r.ok, stages: r.ok && r.result.recipe ? r.result.recipe.stages.length : null, error: r.ok ? r.result.error : r.error.message,
+        nodes: nodes.length, files: document.querySelectorAll(".file-card").length, rendered: (document.querySelector(".flow-detail .pre") || {}).textContent?.length || 0,
+        hasOpen: typeof window.outside.openAppFile === "function" };
+    })()`,
+  );
+  console.log("[smoke] zheye flow:", JSON.stringify(flow));
+  writeFileSync(join(app.getPath("temp"), "myoutside-zheye-flow.png"), await captureWindow(win, 8, 300));
+
+  // 演示试跑：经内部事务 API 写入（只在临时数据副本里）
+  const demo = await win.webContents.executeJavaScript(
+    `(async () => {
+      const call = async (name, payload) => { const r = await window.outside.call(name, payload); if (!r.ok) throw new Error(name + ": " + r.error.message); return r.result; };
+      const { recipe } = await call("zheye.getRecipe", { type: "concept" });
+      const runId = "smoke-" + Date.now();
+      await call("zheye.trialCreate", { id: runId, subject: "通货膨胀（演示）", type: "concept", flow: recipe.name, recipeHash: recipe.hash, recipe });
+      const usage = { promptTokens: 4200, completionTokens: 900, totalTokens: 5100, reasoningTokens: 600, cacheHitTokens: 1200 };
+      await call("zheye.trialAppend", { runId, stage: "research", kind: "stage_start", data: { name: "搜集资料", system: "（系统提示词）", user: "讲解对象：通货膨胀（概念）" } });
+      await call("zheye.trialAppend", { runId, stage: "research", kind: "doc", data: { doc: "资料", op: "write", content: "- 通胀：物价普遍、持续上涨\\n- 例子：1923 年德国" } });
+      await call("zheye.trialAppend", { runId, stage: "research", kind: "round", data: { index: 1, reasoning: "先搜一下通胀的经典例子。", content: "", usage, model: "deepseek-flash", costYuan: 0.0123, webCalls: 1,
+        toolCalls: [
+          { id: "a", name: "web_search", arguments: JSON.stringify({ query: "恶性通胀 例子" }), ok: true, summary: "搜索：恶性通胀 例子", result: "[1] 魏玛德国恶性通胀\\nhttps://example.com" },
+          { id: "b", name: "write_doc", arguments: JSON.stringify({ name: "资料", content: "- 通胀：物价普遍、持续上涨\\n- 例子：1923 年德国" }), ok: true, summary: "重写「资料」", result: "已写入" } ] } });
+      await call("zheye.trialAppend", { runId, stage: "research", kind: "stage_end", data: { stopReason: "done", error: null, costYuan: 0.0123 } });
+      await call("zheye.trialAppend", { runId, stage: "write", kind: "stage_start", data: { name: "编写文章", system: "（系统提示词）", user: "（草稿）" } });
+      const article = "## 从一个例子说起\\n\\n1923 年的德国，面包早上和晚上的价格不一样。\\n\\n## [物价普遍上涨时，存钱的人吃亏](#断言:物价普遍上涨时，存钱的人吃亏)\\n\\n[货币](#概念:货币)的购买力下降……";
+      await call("zheye.trialAppend", { runId, stage: "write", kind: "doc", data: { doc: "文章", op: "write", content: article } });
+      await call("zheye.trialAppend", { runId, stage: "write", kind: "doc", data: { doc: "文章", op: "edit", content: article.replace("不一样", "可能不一样"), old: "不一样", new: "可能不一样" } });
+      await call("zheye.trialAppend", { runId, stage: "write", kind: "round", data: { index: 1, reasoning: "按大纲写。", content: "写好了。", usage, model: "deepseek-flash", costYuan: 0.02, webCalls: 0,
+        toolCalls: [
+          { id: "c", name: "write_doc", arguments: JSON.stringify({ name: "文章", content: article }), ok: true, summary: "重写「文章」", result: "已写入" },
+          { id: "d", name: "edit_doc", arguments: JSON.stringify({ name: "文章", old: "不一样", new: "可能不一样" }), ok: true, summary: "修改「文章」", result: "已修改" } ] } });
+      await call("zheye.trialAppend", { runId, stage: "write", kind: "stage_end", data: { stopReason: "done", error: null, costYuan: 0.02 } });
+      await call("zheye.trialFinish", { runId, status: "done", error: null, docs: {}, usage, costYuan: 0.0323, webCalls: 1 });
+      return runId;
+    })()`,
+  );
+  await win.reload();
+  await waitFor(win, 'document.querySelectorAll(".run-item").length > 0');
+  const runView = await win.webContents.executeJavaScript(
+    `(async () => {
+      document.querySelector(".run-item").click();
+      for (let i = 0; i < 20 && !document.querySelector(".docs-panel .doc-body"); i += 1) await new Promise((r) => setTimeout(r, 150));
+      await new Promise((r) => setTimeout(r, 300));
+      return { stages: document.querySelectorAll(".stage").length, rounds: document.querySelectorAll(".round").length, tools: document.querySelectorAll(".tool").length,
+        marks: document.querySelectorAll(".docs-panel .zy-mark").length, version: (document.querySelector(".doc-bar .small") || {}).textContent || "",
+        strip: document.querySelectorAll(".graph-strip .node").length, title: (document.querySelector(".run-title h2") || {}).textContent || "" };
+    })()`,
+  );
+  console.log("[smoke] zheye demo run:", demo, JSON.stringify(runView));
+  writeFileSync(join(app.getPath("temp"), "myoutside-zheye-run.png"), await captureWindow(win, 8, 300));
+
+  if (process.env.MYOUTSIDE_SMOKE_ZHEYE_LIVE !== "1") return;
+  const subject = process.env.MYOUTSIDE_SMOKE_ZHEYE_SUBJECT ?? "通货膨胀";
+  await win.webContents.executeJavaScript(
+    `(() => { document.getElementById("subject").value = ${JSON.stringify(subject)}; document.getElementById("btn-start").click(); return true; })()`,
+  );
+  const started = Date.now();
+  let midShot = false;
+  let last = "";
+  while (Date.now() - started < 25 * 60_000) {
+    await new Promise((resolve) => setTimeout(resolve, 5000));
+    const state = (await win.webContents.executeJavaScript(
+      `(async () => { const r = await window.outside.call("zheye.trialList", {}); const run = r.ok ? r.result.find((item) => !item.id.startsWith("smoke-")) : null;
+        return run ? { status: run.status, cost: run.costYuan, web: run.webCalls, stages: document.querySelectorAll(".graph-strip .node-done").length, live: !!document.querySelector(".round.live") } : null; })()`,
+    )) as { status: string; cost: number; web: number; stages: number; live: boolean } | null;
+    const line = JSON.stringify(state);
+    if (line !== last) console.log("[smoke] zheye live:", Math.round((Date.now() - started) / 1000) + "s", line);
+    last = line;
+    if (state && !midShot && state.live && state.stages >= 1) {
+      writeFileSync(join(app.getPath("temp"), "myoutside-zheye-live.png"), await captureWindow(win, 4, 100));
+      midShot = true;
+    }
+    if (state && state.status !== "running") break;
+  }
+  await new Promise((resolve) => setTimeout(resolve, 2500));
+  const final = await win.webContents.executeJavaScript(
+    `(async () => { const list = await window.outside.call("zheye.trialList", {}); const run = list.result.find((item) => !item.id.startsWith("smoke-"));
+      const detail = await window.outside.call("zheye.trialGet", { runId: run.id });
+      const docs = {}; for (const e of detail.result.events) if (e.kind === "doc") docs[e.data.doc] = e.data.content;
+      const failures = detail.result.events.filter((e) => e.kind === "round").flatMap((e) => e.data.toolCalls).filter((c) => !c.ok).map((c) => c.name + ": " + c.result.slice(0, 120));
+      return { status: run.status, error: run.error, cost: run.costYuan, web: run.webCalls, usage: run.usage, seconds: Math.round(((run.finishedAt || Date.now()) - run.startedAt) / 1000),
+        events: detail.result.events.length, rounds: detail.result.events.filter((e) => e.kind === "round").length,
+        docLengths: Object.fromEntries(Object.entries(docs).map(([k, v]) => [k, v.length])), failures, article: docs["文章"] || "", prerequisites: docs["前置"] || "" }; })()`,
+  );
+  console.log("[smoke] zheye live final:", JSON.stringify({ ...final, article: undefined, prerequisites: undefined }));
+  writeFileSync(join(app.getPath("temp"), "myoutside-zheye-article.md"), `${final.article}\n\n---\n\n${final.prerequisites}\n`);
+  writeFileSync(join(app.getPath("temp"), "myoutside-zheye-final.png"), await captureWindow(win, 6, 300));
+}
+
 async function runSmoke(win: BrowserWindow): Promise<void> {
-  const guard = setTimeout(() => {
-    console.error("[smoke] 超时，强制退出");
-    app.quit();
-  }, process.env.MYOUTSIDE_SMOKE_LIVE === "1" ? 120000 : 30000);
+  const guard = setTimeout(
+    () => {
+      console.error("[smoke] 超时，强制退出");
+      app.quit();
+    },
+    process.env.MYOUTSIDE_SMOKE_ZHEYE_LIVE === "1" ? 27 * 60_000 : process.env.MYOUTSIDE_SMOKE_LIVE === "1" ? 120000 : 45000,
+  );
   try {
     await new Promise((resolve) => setTimeout(resolve, 1200)); // 等 iframe 加载
     const shell = await win.webContents.executeJavaScript(
@@ -478,6 +600,7 @@ async function runSmoke(win: BrowserWindow): Promise<void> {
     writeFileSync(goShotPath, goPng);
     console.log("[smoke] go screenshot:", goShotPath, `(${goPng.length} bytes)`);
 
+    await smokeZheye(win);
   } catch (error) {
     console.error("[smoke] 失败：", error);
   } finally {
@@ -514,6 +637,8 @@ app.whenReady().then(async () => {
   kernel.registerApp(vocabApp, vocabManifest);
   kernel.registerApp(dialogApp, dialogManifest);
   kernel.registerApp(goApp, goManifest);
+  // 哲野的配方从仓库里的 apps/zheye/recipes 读：改了提示词，下一次试跑就生效（ZHEYE-0021）
+  kernel.registerApp(createZheyeApp({ recipesDir: join(appDir("zheye"), "recipes") }), zheyeManifest);
   kernel.start();
 
   // pnpm ai:check：在临时数据副本上用真实接口检查平台 AI / 搜索 / 抓取，不打开窗口，结束即退出
@@ -618,6 +743,19 @@ app.whenReady().then(async () => {
     if (typeof url !== "string" || !/^https?:\/\//i.test(url)) return false;
     await shell.openExternal(url);
     return true;
+  });
+
+  // 用系统默认程序打开子应用自己目录下的一个文本文件（例如哲野试验台的「在编辑器里打开」，D-0077）
+  ipcMain.handle("host:openAppFile", async (event, path: unknown) => {
+    const caller = callerOf(event.senderFrame);
+    if (!caller || caller === SHELL_CALLER || typeof path !== "string") return { ok: false, error: "无法识别调用者" };
+    const base = appDir(caller);
+    const file = normalize(join(base, path));
+    if (!file.startsWith(normalize(base) + sep)) return { ok: false, error: "只能打开本应用目录下的文件" };
+    if (!OPENABLE_EXTENSIONS.has(extname(file).toLowerCase())) return { ok: false, error: "只能打开 .md / .json / .txt 文件" };
+    if (!existsSync(file)) return { ok: false, error: "文件不存在" };
+    const failure = await shell.openPath(file);
+    return failure ? { ok: false, error: failure } : { ok: true };
   });
 
   registerAppProtocol(uiDirs);

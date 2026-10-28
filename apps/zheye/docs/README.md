@@ -1,7 +1,44 @@
 # 哲野（zheye）技术文档
 
-> 应用 id：`zheye`；显示名「哲野」。**未实现**，本文是技术设计草案。
-> 作者的预期见 [`../user-spec/README.md`](../user-spec/README.md)，决策见 [`../user-spec/decisions/`](../user-spec/decisions/README.md)。早期决策 ZHEYE-0001～0008 不一定可靠，讲解设计正在重新讨论；本文是早期草案，实现前重写。
+> 应用 id：`zheye`；显示名「哲野」。目前只实现了**试验台**（§0）；§1 起是早期的技术设计草案，正式功能实现前重写。
+> 作者的预期见 [`../user-spec/README.md`](../user-spec/README.md)，决策见 [`../user-spec/decisions/`](../user-spec/decisions/README.md)。早期决策 ZHEYE-0001～0008 不一定可靠。
+
+## 0. 试验台（已实现，ZHEYE-0020、ZHEYE-0021）
+
+作者设计、调试三类讲解的工作流与提示词用。哲野的界面目前就是试验台。
+
+**配方**：`apps/zheye/recipes/`（写法见 `recipes/README.md`）。外壳注册哲野时把这个目录交给后端：`createZheyeApp({ recipesDir })`；每次试跑开始时从磁盘读，存下快照。
+
+**流程**（`backend/src/trial.ts`）：按 `flow.json` 的步骤依次执行，每一步一次 `runToolLoop`（流式，思考强度 / 模型取自配方）：
+
+- 系统提示词 = `system` 里的文件 + 这一步的 `prompt`（`renderPrompt`：去注释、展开 `{{引入 …}}`、替换变量）；
+- 用户消息 = 讲解对象 + 当前全部草稿（`composeUserMessage`）；
+- 工具 = `web_search` / `web_fetch`（平台工具）+ `read_doc` / `edit_doc` / `write_doc`（`backend/src/drafts.ts`，ZHEYE-0019；`repeatable`，草稿在内存里）；
+- 每一轮结束（`onRound`）、每次草稿修改都经事务 API `zheye.trialAppend` 存一条轨迹并推送 `{ type: "trial_event" }`；结束时 `zheye.trialFinish`。
+
+**API**
+
+| 函数 | 类型 | 说明 |
+|---|---|---|
+| `zheye.getRecipe` | 只读 | 读取一类讲解的当前配方（流程 + 全部文件），出错时返回原因 |
+| `zheye.trialStart` | 异步 | 开始一次试跑，跑完才返回；一开始推送 `{ type: "trial_created", runId }` |
+| `zheye.trialStop` | 异步 | 停止进行中的试跑（不是发起它的页面也能停；要等这一次模型输出结束） |
+| `zheye.trialList` / `zheye.trialGet` | 只读 | 试跑记录；一次试跑的详情（配方快照 + 轨迹，`afterSeq` 取增量） |
+| `zheye.trialCreate` / `trialAppend` / `trialFinish` | 事务（内部） | 试跑过程中由后端调用 |
+
+**数据**
+
+```
+zheye__trial_run    id, subject, type, flow, recipe_hash, recipe(JSON 快照), status, error,
+                    docs(JSON), usage(JSON), cost_yuan, web_calls, started_at, finished_at
+zheye__trial_event  run_id, seq, stage, kind(stage_start | round | doc | stage_end), data(JSON), at
+```
+
+状态 `running` 但不在这次运行的进程里 → 读出时显示 `interrupted`。
+
+**界面**（`ui/`）：左边新试跑与试跑记录；「流程与提示词」页画出步骤与每一步渲染后的提示词、用到的文件（「在编辑器里打开」经 `outside.openAppFile`，D-0077）；试跑页是步骤条 + 轨迹（提示词、每一轮的思维链 / 工具调用，实时输出）+ 草稿面板（每份草稿的每一版：渲染 / 原文 / 与上一版对比）；可以把两次试跑的文章与配方差异并排对比。Markdown 渲染复制自对话，另外把 `[文字](#概念:名称)` 这类标记渲染成可点的标记（ZHEYE-0017，点了暂时只提示）。
+
+**冒烟**：`pnpm smoke` 检查流程页、写一次演示试跑看试跑页；`MYOUTSIDE_SMOKE_ZHEYE_LIVE=1` 时再经界面真跑一次（真实调用 DeepSeek）。
 
 ## 1. 核心概念
 

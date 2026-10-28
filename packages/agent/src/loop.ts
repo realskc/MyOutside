@@ -95,6 +95,10 @@ export async function runToolLoop(ctx: AgentContext, options: ToolLoopOptions): 
     history.push(message);
     added.push(message);
   };
+  const endRound = async (round: Round) => {
+    emit({ type: "round_end", round: round.index });
+    await options.onRound?.(round);
+  };
   const result = (stopReason: ToolLoopResult["stopReason"], error?: { code: string; message: string }): ToolLoopResult => {
     const last = rounds.at(-1);
     return {
@@ -169,12 +173,12 @@ export async function runToolLoop(ctx: AgentContext, options: ToolLoopOptions): 
 
     // 流式中途被取消：平台 AI 返回已经收到的部分，作为最后一轮保留
     if (response.finishReason === "aborted") {
-      emit({ type: "round_end", round: index });
+      await endRound(round);
       return result("aborted");
     }
 
     if (response.toolCalls.length === 0) {
-      emit({ type: "round_end", round: index });
+      await endRound(round);
       return result(offerTools || options.tools.length === 0 ? "done" : "max_rounds");
     }
 
@@ -197,6 +201,7 @@ export async function runToolLoop(ctx: AgentContext, options: ToolLoopOptions): 
     for (const [position, call] of response.toolCalls.entries()) {
       if (ctx.signal.aborted) {
         cancelFrom(position);
+        await endRound(round);
         return result("aborted");
       }
       const tool = toolsByName.get(call.function.name);
@@ -226,7 +231,7 @@ export async function runToolLoop(ctx: AgentContext, options: ToolLoopOptions): 
       if (tool && record.result === "") {
         record.summary = tool.summarize?.(args) ?? tool.name;
         const key = `${tool.name}:${JSON.stringify(args)}`;
-        if (seen.has(key)) {
+        if (!tool.repeatable && seen.has(key)) {
           record.result = "重复调用：前面已经用相同的参数调用过这个工具，请直接使用之前的结果。";
         } else {
           seen.add(key);
@@ -243,6 +248,7 @@ export async function runToolLoop(ctx: AgentContext, options: ToolLoopOptions): 
               push({ role: "tool", tool_call_id: call.id, content: CANCELLED });
               emit({ type: "tool_result", round: index, callId: call.id, tool: tool.name, ok: false, summary: record.summary });
               cancelFrom(position + 1);
+              await endRound(round);
               return result("aborted");
             }
             record.result = `工具执行失败：${error.message}`;
@@ -252,7 +258,7 @@ export async function runToolLoop(ctx: AgentContext, options: ToolLoopOptions): 
       }
       push({ role: "tool", tool_call_id: call.id, content: record.result });
     }
-    emit({ type: "round_end", round: index });
+    await endRound(round);
   }
   // 理论上不会到这里：最后一轮不提供工具
   return result("max_rounds");
