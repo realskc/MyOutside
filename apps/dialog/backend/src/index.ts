@@ -14,6 +14,7 @@ import {
   SendMessageInput,
   SetReasoningEffortInput,
   SetSystemPromptInput,
+  SetSearchNoticeInput,
   SetWebSearchInput,
   SwitchBranchInput,
 } from "@myoutside/contracts";
@@ -149,6 +150,12 @@ export const dialogApp: AppModule = {
       id: "0004_error",
       up: (ctx) => {
         ctx.addColumn("message", "error TEXT"); // 生成被错误中断时的原因，内容是已生成的部分
+      },
+    },
+    {
+      id: "0005_search_notice",
+      up: (ctx) => {
+        ctx.addColumn("message", "search_notice TEXT"); // 用户消息：联网搜索开关在这里变了（off / on），发给模型时跟一条 system 说明（DIALOG-0019）
       },
     },
   ],
@@ -367,6 +374,14 @@ export const dialogApp: AppModule = {
       ctx.db.update("message", { active_child_id: id }, { id: parent.id });
       ctx.db.update("conversation", { updated_at: now }, { id: conversation.id });
       return { messageId: id };
+    }),
+
+    /** 记下这条用户消息发出时联网搜索开关的变化（生成回复前由后端调用，DIALOG-0019） */
+    setSearchNotice: defineTx(SetSearchNoticeInput, (ctx, input) => {
+      const message = getMessageOrThrow(ctx.db, input.messageId);
+      if (message.role !== "user") throw new KernelError("VALIDATION", "只有用户消息能记联网搜索的变化");
+      ctx.db.update("message", { search_notice: input.notice }, { id: message.id });
+      return { ok: true as const };
     }),
 
     setWebSearch: defineTx(SetWebSearchInput, (ctx, input) => {

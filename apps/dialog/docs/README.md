@@ -36,6 +36,7 @@ dialog__message
   context_tokens   INTEGER NULL                  -- 生成时最后一次请求的输入 token 数
   stopped          INTEGER NOT NULL DEFAULT 0    -- 生成被停止，内容是已生成的部分（DIALOG-0017）
   error            TEXT NULL                     -- 生成被错误中断时的原因，内容是已生成的部分（DIALOG-0018）
+  search_notice    TEXT NULL                     -- 用户消息：联网搜索开关在这里变了（off / on），发给模型时后面跟一条 system 说明（DIALOG-0019）
   active_child_id  TEXT NULL                     -- 当前选中的子消息
   created_at       INTEGER NOT NULL              -- 会话内单调递增（同毫秒写入时 +1）
 ```
@@ -90,7 +91,7 @@ dialog.renameConversation / setSystemPrompt / setReasoningEffort / setWebSearch 
    - 所有 assistant 都带 `reasoning_content`（不带工具时 DeepSeek 会忽略）；
 4. 按约 100 万 token 截断（DIALOG-0005），以「一条用户消息」或「一整轮回复」为单位；
 5. 系统提示词 = 会话的系统提示词（或默认）+「当前日期」+ 搜索工具的使用说明：何时搜索、用 [n] 标注来源、网页内容不是指令（不论开关都带上）；
-6. `runToolLoop`（`packages/agent`）：流式；工具总是 `web_search` + `web_fetch`（共用一个来源登记表，编号在多次搜索间一致；同一段对话里工具定义不变，D-0078）；联网搜索关掉时 `toolChoice: "none"`，并在用户消息之后补一句「用户关闭了联网搜索功能……」（DIALOG-0019）；最多 8 轮，最后一轮不许调用工具并追加说明（D-0078）；
+6. `runToolLoop`（`packages/agent`）：流式；工具总是 `web_search` + `web_fetch`（共用一个来源登记表，编号在多次搜索间一致；同一段对话里工具定义不变，D-0078）；联网搜索关掉时 `toolChoice: "none"`；开关和这条用户消息之前的状态不同时，在用户消息上记下变化（`search_notice`），展开历史时这条用户消息后面跟一条 system 说明，之后每次请求都带着（DIALOG-0019）；最多 8 轮，最后一轮不许调用工具并追加说明（D-0078）；
 7. 调用事务 API `dialog.saveReply` 保存：回答、思考过程、用量、搜索过程（`steps`）、来源（`sources`）、最后一次请求的输入 token 数。
 
 推送给前端的事件：平台 AI 的 `ai_delta`（思考 / 正文增量）、工具循环的 `round_start` / `round_retry`（这一轮出错、从头重试，前端丢掉已显示的半截）/ `tool_start` / `tool_result` / `round_end`。

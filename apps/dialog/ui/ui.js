@@ -49,6 +49,9 @@
       noReply: "这条消息还没有回复（上次生成被中断）。",
       stopped: "已停止生成。",
       stoppedTag: "已停止",
+      searchOffTag: "关闭了联网搜索",
+      searchOnTag: "打开了联网搜索",
+      searchNoticeTitle: "发这条消息时联网搜索开关变了；之后发给模型的内容里，这条消息后面都会跟一条说明",
       stoppedTitle: "生成被停止，这是停止前已生成的部分",
       interruptedTag: "已中断",
       interruptedTitle: (reason) => `生成出错中断，这是中断前已生成的部分。原因：${reason}`,
@@ -106,6 +109,9 @@
       noReply: "This message has no reply yet (the last generation was interrupted).",
       stopped: "Generation stopped.",
       stoppedTag: "Stopped",
+      searchOffTag: "Web search turned off",
+      searchOnTag: "Web search turned on",
+      searchNoticeTitle: "The web search switch changed with this message; every later request includes a note right after it",
       stoppedTitle: "Generation was stopped; this is what had been generated",
       interruptedTag: "Interrupted",
       interruptedTitle: (reason) => `Generation failed midway; this is what had been generated. Reason: ${reason}`,
@@ -466,6 +472,13 @@
       tag.className = "stopped-tag" + (message.error ? " interrupted" : "");
       tag.textContent = message.error ? t("interruptedTag") : t("stoppedTag");
       tag.title = message.error ? t("interruptedTitle", message.error) : t("stoppedTitle");
+      head.appendChild(tag);
+    }
+    if (message && message.searchNotice) {
+      const tag = document.createElement("span");
+      tag.className = "stopped-tag search-notice";
+      tag.textContent = message.searchNotice === "off" ? t("searchOffTag") : t("searchOnTag");
+      tag.title = t("searchNoticeTitle");
       head.appendChild(tag);
     }
     if (message && message.siblingCount > 1) head.appendChild(buildBranchSwitcher(message));

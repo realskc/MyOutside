@@ -15,8 +15,23 @@ const SEARCH_INSTRUCTIONS =
 
 /** 发送给 AI 的历史上下文预算（估算 token 数；存储不受限，仅请求截断，DIALOG-0005） */
 export const CONTEXT_TOKEN_BUDGET = 1_000_000;
-/** 联网搜索关掉时追加在用户消息之后的说明（DIALOG-0019，作者的措辞） */
-export const SEARCH_OFF_NOTE = "【用户关闭了联网搜索功能，请不要调用 web_search、web_fetch，直接回答。】";
+/**
+ * 联网搜索开关变了时，跟在那条用户消息之后的 system 说明（DIALOG-0019）：存进会话（用户消息的 search_notice），
+ * 之后的每一次请求都带着，模型一直知道开关的状态。关闭的措辞是作者的。
+ */
+export const SEARCH_NOTES = {
+  off: "【用户关闭了联网搜索功能，请不要调用 web_search、web_fetch，直接回答。】",
+  on: "【用户重新打开了联网搜索功能，需要时可以调用 web_search、web_fetch。】",
+} as const;
+
+/** 到这条用户消息之前为止，联网搜索的状态（会话开始时是打开的；沿路径看最后一次变化） */
+export function searchStateBefore(chain: MessageRow[]): "on" | "off" {
+  for (let i = chain.length - 1; i >= 0; i -= 1) {
+    const notice = chain[i]!.search_notice;
+    if (notice === "off" || notice === "on") return notice;
+  }
+  return "on";
+}
 /** 一次回复最多几轮（每轮：调用一次模型并执行它要求的工具） */
 const MAX_ROUNDS = 8;
 
@@ -45,14 +60,20 @@ export function chainTo(messages: MessageRow[], nodeId: string): MessageRow[] {
 
 /**
  * 把消息链展开成发给模型的历史：
- * - 用户消息 → 一条 user 消息；
+ * - 用户消息 → 一条 user 消息；这条消息记了联网搜索的变化时，后面跟一条 system 说明（DIALOG-0019）；
  * - 回复 → 带工具步骤时：每一轮 assistant（含 reasoning_content、tool_calls）+ 工具结果，再加最终回答；
  *   请求总是带着工具定义（DIALOG-0019），所以历史也总是完整的，不随联网搜索开关变化；
  * - assistant 一律带上 reasoning_content：请求带工具时 DeepSeek 要求回传。
  */
 export function expandTurns(chain: MessageRow[]): HistoryTurn[] {
   return chain.map((row): HistoryTurn => {
-    if (row.role === "user") return { role: "user", messages: [{ role: "user", content: row.content }] };
+    if (row.role === "user") {
+      const notice = row.search_notice === "off" || row.search_notice === "on" ? row.search_notice : null;
+      return {
+        role: "user",
+        messages: [{ role: "user", content: row.content }, ...(notice ? [{ role: "system" as const, content: SEARCH_NOTES[notice] }] : [])],
+      };
+    }
     const messages: AiMessage[] = [];
     const steps = parseSteps(row.steps) ?? [];
     for (const step of steps) {
@@ -104,8 +125,9 @@ const PASS_THROUGH_CODES = new Set<KernelErrorCode>(["PRECONDITION", "UPSTREAM",
 /**
  * 为一条用户消息生成回复并保存（在普通的异步函数里调用，D-0063）：
  * 1. 沿父指针取出这条用户消息之前的历史，展开、截断；
- * 2. 搜索 / 抓取工具总是交给模型（同一段对话里工具定义不变，D-0078）；联网搜索关掉时 tool_choice = none，
- *    并在用户消息之后追加一句说明（DIALOG-0019）；跑工具循环（流式，增量经推送通道发给前端）；
+ * 2. 搜索 / 抓取工具总是交给模型（同一段对话里工具定义不变，D-0078）；联网搜索关掉时 tool_choice = none；
+ *    开关和这条用户消息之前的状态不一样时，在这条用户消息上记下变化（之后跟一条 system 说明，DIALOG-0019）；
+ *    跑工具循环（流式，增量经推送通道发给前端）；
  * 3. 调用事务 API `dialog.saveReply` 把回复挂在这条用户消息下（明确的父节点，生成期间切换分支也不会挂错地方）。
  * 被停止或出错中断时保存已生成的部分（标记 stopped / error；一个字都没输出则不保存，用户消息保留，可以重试）。
  */
@@ -120,17 +142,20 @@ export async function generateReply(ctx: AsyncContext, conversationId: string, p
     if (!parent || parent.role !== "user") throw new KernelError("PRECONDITION", "只能为会话里的用户消息生成回复");
 
     const webSearch = conversation.web_search !== 0;
+    const chain = chainTo(all, parentId);
+    const before = searchStateBefore(chain.slice(0, -1));
+    const notice = (webSearch ? "on" : "off") === before ? null : webSearch ? "on" : "off";
+    if ((parent.search_notice ?? null) !== notice) {
+      await ctx.call("dialog.setSearchNotice", { messageId: parent.id, notice });
+      parent.search_notice = notice;
+    }
     const systemPrompt = buildSystemPrompt(conversation);
-    const history = trimTurns(expandTurns(chainTo(all, parentId)), CONTEXT_TOKEN_BUDGET);
+    const history = trimTurns(expandTurns(chain), CONTEXT_TOKEN_BUDGET);
     const sources = createSourceRegistry();
     const tools = [webSearchTool({ sources, question: parent.content }), webFetchTool({ sources })];
 
     const result = await runToolLoop(ctx, {
-      messages: [
-        { role: "system", content: systemPrompt },
-        ...history,
-        ...(webSearch ? [] : [{ role: "user" as const, content: SEARCH_OFF_NOTE }]),
-      ],
+      messages: [{ role: "system", content: systemPrompt }, ...history],
       tools,
       ...(webSearch ? {} : { toolChoice: "none" as const }),
       reasoningEffort: conversation.reasoning_effort as ReasoningEffort,

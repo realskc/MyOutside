@@ -67,6 +67,24 @@ export async function runAiCheck(kernel: Kernel): Promise<boolean> {
     return `第二轮输入 ${r2.usage.promptTokens}，命中缓存 ${hit}；回答「${r2.content.slice(0, 60)}」`;
   });
 
+  await step("对话中途的 system 消息（思考模式 + 工具 + tool_choice = none，DIALOG-0019）", async () => {
+    const tools = [
+      { type: "function", function: { name: "web_search", description: "在网上搜索", parameters: { type: "object", properties: { query: { type: "string" } }, required: ["query"] } } },
+    ];
+    const r = await call("platform.ai.chat", {
+      messages: [
+        { role: "system", content: "你是一个助手。" },
+        { role: "user", content: "DeepSeek 最近发布了什么？" },
+        { role: "system", content: "【用户关闭了联网搜索功能，请不要调用 web_search、web_fetch，直接回答。】" },
+      ],
+      tools,
+      toolChoice: "none",
+      reasoningEffort: "low",
+    });
+    if (r.toolCalls.length > 0) throw new Error("仍然调用了工具");
+    return `回答「${r.content.replace(/\s+/g, " ").slice(0, 60)}」`;
+  });
+
   await step("网页搜索", async () => {
     const r = await call("platform.web.search", { query: "DeepSeek 搜索 API 发布", count: 3, oriQuestion: "DeepSeek 最近发布了什么" });
     if (r.results.length === 0) throw new Error("没有结果");

@@ -69,6 +69,11 @@ export const MessageSchema = z.object({
   stopped: z.boolean(),
   /** 生成被错误中断（例如断网、重试都失败）时的原因；内容是中断前已生成的部分 */
   error: z.string().nullable(),
+  /**
+   * 仅用户消息：发这条消息时联网搜索开关变了——off 关闭 / on 重新打开（DIALOG-0019）。
+   * 发给模型时，这条消息后面跟一条 role = system 的说明
+   */
+  searchNotice: z.enum(["off", "on"]).nullable(),
   activeChildId: z.string().nullable(),
   createdAt: z.number().int(),
 });
@@ -165,6 +170,12 @@ export const SaveReplyInput = z.object({
 });
 export type SaveReplyInput = z.infer<typeof SaveReplyInput>;
 
+export const SetSearchNoticeInput = z.object({
+  messageId: z.string(),
+  notice: z.enum(["off", "on"]).nullable(),
+});
+export type SetSearchNoticeInput = z.infer<typeof SetSearchNoticeInput>;
+
 export const SetWebSearchInput = z.object({
   conversationId: z.string(),
   enabled: z.boolean(),
@@ -242,6 +253,7 @@ export interface DialogApi {
   "dialog.editAndSend": { input: EditAndSendInput; output: GenerateOutput };
   "dialog.saveReply": { input: SaveReplyInput; output: { messageId: string } };
   "dialog.setWebSearch": { input: SetWebSearchInput; output: OkOutput };
+  "dialog.setSearchNotice": { input: SetSearchNoticeInput; output: OkOutput };
   "dialog.createConversation": { input: CreateConversationInput; output: CreateConversationOutput };
   "dialog.appendMessage": { input: AppendMessageInput; output: AppendMessageOutput };
   "dialog.editUserMessage": { input: EditUserMessageInput; output: EditUserMessageOutput };
