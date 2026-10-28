@@ -2,6 +2,7 @@ import { createKernel, type Kernel } from "@myoutside/kernel";
 import { createNodeSqliteAdapter } from "@myoutside/kernel-node";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { dialogApp } from "../backend/src/index.js";
+import { SEARCH_OFF_NOTE } from "../backend/src/generate.js";
 import dialogManifest from "../manifest.json";
 import { estimateTokens, trimHistory } from "../backend/src/history.js";
 
@@ -323,7 +324,10 @@ describe("dialog backend", () => {
     const body = model.requests[0]!;
     expect(body.stream).toBe(true);
     expect(body.reasoning_effort).toBe("low");
-    expect(body.tools).toBeUndefined();
+    // 关掉联网搜索：工具定义照常带上，但不许调用，并在用户消息之后补一句说明（DIALOG-0019）
+    expect(body.tools.map((t: any) => t.function.name)).toEqual(["web_search", "web_fetch"]);
+    expect(body.tool_choice).toBe("none");
+    expect(body.messages.at(-1)).toEqual({ role: "user", content: SEARCH_OFF_NOTE });
     expect(body.messages[0].role).toBe("system");
     expect(body.messages[0].content).toMatch(/当前日期：\d{4}-\d{2}-\d{2}/);
     expect(events).toContainEqual({ type: "ai_delta", content: "你好！" });
@@ -392,7 +396,7 @@ describe("dialog backend", () => {
     expect(path.messages.map((m: any) => m.role)).toEqual(["user", "assistant", "user", "assistant"]);
   });
 
-  it("关闭联网搜索：不提供工具；历史里只保留之前回复的最终回答（不放工具调用）", async () => {
+  it("中途关闭联网搜索：工具定义、系统提示词、历史（含之前的搜索过程）都不变，只是不许调用并补一句说明", async () => {
     const kernel = await setupWithKey();
     const conversationId = await createConversation(kernel);
     const model = fakeDeepSeek(
@@ -407,9 +411,14 @@ describe("dialog backend", () => {
     await call(kernel, "dialog.send", { conversationId, content: "查一下" });
     await call(kernel, "dialog.setWebSearch", { conversationId, enabled: false });
     await call(kernel, "dialog.send", { conversationId, content: "继续" });
+    const first = model.requests[0]!;
     const last = model.requests[2]!;
-    expect(last.tools).toBeUndefined();
-    expect(last.messages.map((m: any) => m.role)).toEqual(["system", "user", "assistant", "user"]);
+    expect(last.tools).toEqual(first.tools);
+    expect(first.tool_choice).toBeUndefined();
+    expect(last.tool_choice).toBe("none");
+    expect(last.messages[0]).toEqual(first.messages[0]);
+    expect(last.messages.map((m: any) => m.role)).toEqual(["system", "user", "assistant", "tool", "assistant", "user", "user"]);
+    expect(last.messages.at(-1).content).toBe(SEARCH_OFF_NOTE);
     const list = await call<Array<{ webSearch: boolean }>>(kernel, "dialog.listConversations", {});
     expect(list[0]!.webSearch).toBe(false);
   });
@@ -523,6 +532,7 @@ describe("dialog backend", () => {
       ["user", "讲个故事"],
       ["assistant", "从前有座山，"],
       ["user", "继续"],
+      ["user", SEARCH_OFF_NOTE],
     ]);
   });
 

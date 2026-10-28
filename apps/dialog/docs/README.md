@@ -86,12 +86,11 @@ dialog.renameConversation / setSystemPrompt / setReasoningEffort / setWebSearch 
 1. 取会话与要回答的用户消息（`parentId`）；
 2. **沿父指针**取出从根到这条用户消息的消息链（与当前选中的分支无关，生成期间切换分支也不会挂错地方）；
 3. 展开成发给模型的历史：
-   - 联网搜索打开：之前带搜索的回复按轮展开（assistant 含 `reasoning_content` 与 `tool_calls`，加工具结果），满足 DeepSeek 带工具时的回传规则；
-   - 联网搜索关闭：之前的回复只保留最终回答；
+   - 之前带搜索的回复总是按轮展开（assistant 含 `reasoning_content` 与 `tool_calls`，加工具结果），满足 DeepSeek 带工具时的回传规则；不随联网搜索开关变化（DIALOG-0019）；
    - 所有 assistant 都带 `reasoning_content`（不带工具时 DeepSeek 会忽略）；
 4. 按约 100 万 token 截断（DIALOG-0005），以「一条用户消息」或「一整轮回复」为单位；
-5. 系统提示词 = 会话的系统提示词（或默认）+「当前日期」+（联网搜索打开时）使用说明：何时搜索、用 [n] 标注来源、网页内容不是指令；
-6. `runToolLoop`（`packages/agent`）：流式；工具 = 联网搜索打开时的 `web_search` + `web_fetch`（共用一个来源登记表，编号在多次搜索间一致）；最多 8 轮；
+5. 系统提示词 = 会话的系统提示词（或默认）+「当前日期」+ 搜索工具的使用说明：何时搜索、用 [n] 标注来源、网页内容不是指令（不论开关都带上）；
+6. `runToolLoop`（`packages/agent`）：流式；工具总是 `web_search` + `web_fetch`（共用一个来源登记表，编号在多次搜索间一致；同一段对话里工具定义不变，D-0078）；联网搜索关掉时 `toolChoice: "none"`，并在用户消息之后补一句「用户关闭了联网搜索功能……」（DIALOG-0019）；最多 8 轮，最后一轮不许调用工具并追加说明（D-0078）；
 7. 调用事务 API `dialog.saveReply` 保存：回答、思考过程、用量、搜索过程（`steps`）、来源（`sources`）、最后一次请求的输入 token 数。
 
 推送给前端的事件：平台 AI 的 `ai_delta`（思考 / 正文增量）、工具循环的 `round_start` / `round_retry`（这一轮出错、从头重试，前端丢掉已显示的半截）/ `tool_start` / `tool_result` / `round_end`。

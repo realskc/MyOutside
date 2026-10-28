@@ -76,6 +76,11 @@ export interface ToolLoopOptions {
   maxRounds?: number;
   /** 最后一轮追加给模型的说明（默认：轮数用完，请说明做到了哪里、还有什么没做完） */
   finalRoundNote?: string;
+  /**
+   * 这一次整个循环能不能调用工具（默认 auto）。none：工具定义照常带上（D-0078），但每一轮都不许调用，
+   * 例如对话关掉了联网搜索（DIALOG-0019）；说明由调用方放进 messages
+   */
+  toolChoice?: "auto" | "none";
   /** 可重试的上游错误最多重试几次（默认 2） */
   retries?: number;
   /** 每一轮结束（工具都执行完）时调用，例如把这一轮及时保存下来；会等它完成再进入下一轮 */

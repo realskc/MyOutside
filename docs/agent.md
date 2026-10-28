@@ -93,6 +93,7 @@ runToolLoop(ctx, {
   messages, tools, reasoningEffort?, model?, stream?,
   maxRounds?,   // 默认 8；最后一轮工具定义不变、tool_choice = none，并追加 finalRoundNote（D-0078）
   finalRoundNote?, // 最后一轮追加给模型的说明
+  toolChoice?,  // "none"：整个循环都不许调用工具（工具定义照常带上），例如对话关掉了联网搜索（DIALOG-0019）
   retries?,     // 可重试的上游错误最多重试几次，默认 2
   onRound?,     // 每一轮结束（工具都执行完）时调用，会等它完成；例如把这一轮及时存下（哲野试验台）
 }) → { stopReason: "done" | "max_rounds" | "aborted" | "error", content, reasoning, rounds, messages, usage, model, error? }

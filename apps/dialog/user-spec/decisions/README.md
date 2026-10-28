@@ -22,7 +22,7 @@
 | [DIALOG-0006](DIALOG-0006-usage-display.md) | 用量显示：每条回复的明细 + 会话累计 | 已取代（→ DIALOG-0014） |
 | [DIALOG-0007](DIALOG-0007-dialog-ui-details.md) | 对话界面细节 | 部分被取代（→ DIALOG-0015） |
 | [DIALOG-0008](DIALOG-0008-dialog-search-v1-with-progress.md) | 对话搜索第一版就做进度推送 | 有效 |
-| [DIALOG-0009](DIALOG-0009-web-search-toggle.md) | 对话的「联网搜索」开关：默认打开，打开时由模型决定搜不搜 | 有效 |
+| [DIALOG-0009](DIALOG-0009-web-search-toggle.md) | 对话的「联网搜索」开关：默认打开，打开时由模型决定搜不搜 | 部分被取代（→ DIALOG-0019） |
 | [DIALOG-0010](DIALOG-0010-search-results-presentation.md) | 搜索结果的呈现：正文标注引用、下方列出来源（默认折叠）、搜索过程折叠 | 有效 |
 | [DIALOG-0011](DIALOG-0011-streaming-output.md) | 对话回复逐字流式输出 | 有效 |
 | [DIALOG-0012](DIALOG-0012-regenerate-reply.md) | 支持重新生成助手回复（在回复这一层分叉） | 有效 |
@@ -32,3 +32,4 @@
 | [DIALOG-0016](DIALOG-0016-dialog-generation-implementation.md) | 对话回复的生成与保存方式 | 部分被取代（→ DIALOG-0017） |
 | [DIALOG-0017](DIALOG-0017-keep-partial-reply-on-stop.md) | 停止生成或正常关闭时，保存已生成的部分 | 有效 |
 | [DIALOG-0018](DIALOG-0018-keep-partial-reply-on-error.md) | 生成出错中断（例如断网）时，保存已生成的部分 | 有效 |
+| [DIALOG-0019](DIALOG-0019-search-off-keeps-tools.md) | 关掉联网搜索时工具定义照常带上：tool_choice = none，并补一句说明 | 有效 |

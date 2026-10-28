@@ -8,7 +8,7 @@ const CANCELLED = "已被用户取消";
 /** 轮数用完时追加给模型的说明（D-0078） */
 export const DEFAULT_FINAL_ROUND_NOTE =
   "【已到最多轮数：这一次不能再调用工具了。请直接回复：说明已经做到了哪里、还有什么没做完。】";
-const NOT_EXECUTED = "没有执行：已到最多轮数";
+const NOT_EXECUTED = "没有执行：这一次不许调用工具";
 
 interface ErrorLike {
   code?: string;
@@ -137,7 +137,7 @@ export async function runToolLoop(ctx: AgentContext, options: ToolLoopOptions): 
         response = (await ctx.call("platform.ai.chat", {
           messages: history,
           ...(hasTools ? { tools: options.tools.map(toolSpec) } : {}),
-          ...(finalRound ? { toolChoice: "none" } : {}),
+          ...(finalRound || options.toolChoice === "none" ? { toolChoice: "none" } : {}),
           ...(options.reasoningEffort ? { reasoningEffort: options.reasoningEffort } : {}),
           ...(options.model ? { model: options.model } : {}),
           ...(options.stream ? { stream: true } : {}),
@@ -197,13 +197,13 @@ export async function runToolLoop(ctx: AgentContext, options: ToolLoopOptions): 
     }
 
     // 不许调用时仍然调用了（理论上不会）：不执行，补上结果保证消息合法，结束
-    if (finalRound) {
+    if (finalRound || options.toolChoice === "none") {
       for (const call of response.toolCalls) {
         round.toolCalls.push({ id: call.id, name: call.function.name, arguments: call.function.arguments, ok: false, summary: call.function.name, result: NOT_EXECUTED });
         push({ role: "tool", tool_call_id: call.id, content: NOT_EXECUTED });
       }
       await endRound(round);
-      return result("max_rounds");
+      return result(finalRound ? "max_rounds" : "done");
     }
 
     // —— 执行工具（顺序执行）——

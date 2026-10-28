@@ -7,7 +7,7 @@ import { parseSteps, type ConversationRow, type MessageRow } from "./mapping.js"
 export const DEFAULT_SYSTEM_PROMPT =
   "你是一个乐于助人的 AI 助手。回答简洁、准确；除非用户要求，使用与用户相同的语言回答。";
 
-/** 联网搜索打开时追加的说明（DIALOG-0010：正文用 [n] 标注来源） */
+/** 搜索工具的说明（DIALOG-0010：正文用 [n] 标注来源）；不论开关都在系统提示词里，开关不改变对话的前缀（DIALOG-0019） */
 const SEARCH_INSTRUCTIONS =
   "你可以使用 web_search 搜索网页、用 web_fetch 阅读网页正文。需要最新信息、需要核实事实、或对答案没有把握时再使用；常识性问题直接回答。" +
   "引用搜索结果时，在相应句子后用方括号标注来源编号，例如 [1] 或 [2][3]；编号以工具结果里给出的为准，不要编造来源。" +
@@ -15,6 +15,8 @@ const SEARCH_INSTRUCTIONS =
 
 /** 发送给 AI 的历史上下文预算（估算 token 数；存储不受限，仅请求截断，DIALOG-0005） */
 export const CONTEXT_TOKEN_BUDGET = 1_000_000;
+/** 联网搜索关掉时追加在用户消息之后的说明（DIALOG-0019，作者的措辞） */
+export const SEARCH_OFF_NOTE = "【用户关闭了联网搜索功能，请不要调用 web_search、web_fetch，直接回答。】";
 /** 一次回复最多几轮（每轮：调用一次模型并执行它要求的工具） */
 const MAX_ROUNDS = 8;
 
@@ -44,15 +46,15 @@ export function chainTo(messages: MessageRow[], nodeId: string): MessageRow[] {
 /**
  * 把消息链展开成发给模型的历史：
  * - 用户消息 → 一条 user 消息；
- * - 回复 → 若带工具步骤且本次提供工具：每一轮 assistant（含 reasoning_content、tool_calls）+ 工具结果，再加最终回答；
- *   本次不提供工具时只保留最终回答（不带工具定义的请求里不放工具调用）；
- * - assistant 一律带上 reasoning_content：请求带工具时 DeepSeek 要求回传，不带工具时会被忽略。
+ * - 回复 → 带工具步骤时：每一轮 assistant（含 reasoning_content、tool_calls）+ 工具结果，再加最终回答；
+ *   请求总是带着工具定义（DIALOG-0019），所以历史也总是完整的，不随联网搜索开关变化；
+ * - assistant 一律带上 reasoning_content：请求带工具时 DeepSeek 要求回传。
  */
-export function expandTurns(chain: MessageRow[], includeToolRounds: boolean): HistoryTurn[] {
+export function expandTurns(chain: MessageRow[]): HistoryTurn[] {
   return chain.map((row): HistoryTurn => {
     if (row.role === "user") return { role: "user", messages: [{ role: "user", content: row.content }] };
     const messages: AiMessage[] = [];
-    const steps = includeToolRounds ? (parseSteps(row.steps) ?? []) : [];
+    const steps = parseSteps(row.steps) ?? [];
     for (const step of steps) {
       messages.push({
         role: "assistant",
@@ -80,10 +82,8 @@ function today(now: Date): string {
   return `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}`;
 }
 
-export function buildSystemPrompt(conversation: ConversationRow, webSearch: boolean, now = new Date()): string {
-  const parts = [conversation.system_prompt ?? DEFAULT_SYSTEM_PROMPT, `当前日期：${today(now)}。`];
-  if (webSearch) parts.push(SEARCH_INSTRUCTIONS);
-  return parts.join("\n\n");
+export function buildSystemPrompt(conversation: ConversationRow, now = new Date()): string {
+  return [conversation.system_prompt ?? DEFAULT_SYSTEM_PROMPT, `当前日期：${today(now)}。`, SEARCH_INSTRUCTIONS].join("\n\n");
 }
 
 /** 估算当前上下文长度：最近一条带实际用量的回复的输入 token 数 + 其后内容的估算；没有就整体估算（DIALOG-0014） */
@@ -104,7 +104,8 @@ const PASS_THROUGH_CODES = new Set<KernelErrorCode>(["PRECONDITION", "UPSTREAM",
 /**
  * 为一条用户消息生成回复并保存（在普通的异步函数里调用，D-0063）：
  * 1. 沿父指针取出这条用户消息之前的历史，展开、截断；
- * 2. 联网搜索打开时，把搜索 / 抓取工具交给模型，跑工具循环（流式，增量经推送通道发给前端）；
+ * 2. 搜索 / 抓取工具总是交给模型（同一段对话里工具定义不变，D-0078）；联网搜索关掉时 tool_choice = none，
+ *    并在用户消息之后追加一句说明（DIALOG-0019）；跑工具循环（流式，增量经推送通道发给前端）；
  * 3. 调用事务 API `dialog.saveReply` 把回复挂在这条用户消息下（明确的父节点，生成期间切换分支也不会挂错地方）。
  * 被停止或出错中断时保存已生成的部分（标记 stopped / error；一个字都没输出则不保存，用户消息保留，可以重试）。
  */
@@ -119,14 +120,19 @@ export async function generateReply(ctx: AsyncContext, conversationId: string, p
     if (!parent || parent.role !== "user") throw new KernelError("PRECONDITION", "只能为会话里的用户消息生成回复");
 
     const webSearch = conversation.web_search !== 0;
-    const systemPrompt = buildSystemPrompt(conversation, webSearch);
-    const history = trimTurns(expandTurns(chainTo(all, parentId), webSearch), CONTEXT_TOKEN_BUDGET);
+    const systemPrompt = buildSystemPrompt(conversation);
+    const history = trimTurns(expandTurns(chainTo(all, parentId)), CONTEXT_TOKEN_BUDGET);
     const sources = createSourceRegistry();
-    const tools = webSearch ? [webSearchTool({ sources, question: parent.content }), webFetchTool({ sources })] : [];
+    const tools = [webSearchTool({ sources, question: parent.content }), webFetchTool({ sources })];
 
     const result = await runToolLoop(ctx, {
-      messages: [{ role: "system", content: systemPrompt }, ...history],
+      messages: [
+        { role: "system", content: systemPrompt },
+        ...history,
+        ...(webSearch ? [] : [{ role: "user" as const, content: SEARCH_OFF_NOTE }]),
+      ],
       tools,
+      ...(webSearch ? {} : { toolChoice: "none" as const }),
       reasoningEffort: conversation.reasoning_effort as ReasoningEffort,
       stream: true,
       maxRounds: MAX_ROUNDS,

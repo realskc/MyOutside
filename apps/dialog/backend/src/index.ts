@@ -311,7 +311,7 @@ export const dialogApp: AppModule = {
           siblingIds: siblings.map((m) => m.id),
         };
       });
-      const systemPrompt = buildSystemPrompt(conversation, conversation.web_search !== 0);
+      const systemPrompt = buildSystemPrompt(conversation);
       return {
         messages,
         hasMore: path.length > limit,
