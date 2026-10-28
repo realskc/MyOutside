@@ -33,3 +33,4 @@ ZHEYE-0001～0008 是早期决策（由 git 历史复原），不一定可靠，
 | [ZHEYE-0015](ZHEYE-0015-entry.md) | 入口：投递材料与直接提出，讲成哪一类 | 有效（未实现） |
 | [ZHEYE-0016](ZHEYE-0016-prerequisite-levels.md) | 前置：P0 / P1 / P2 三个等级，三个选项，超时默认正文带过 | 有效（未实现） |
 | [ZHEYE-0017](ZHEYE-0017-links-between-articles.md) | 三类之间的联系：直觉即断言的一节，概念与实体是两篇，相关的东西可以点 | 有效（未实现） |
+| [ZHEYE-0018](ZHEYE-0018-writing-pipeline.md) | 写作流程：先走一遍线性流程，大纲不要求结构化，任何一步都能推倒重来 | 有效（未实现；讨论中） |
