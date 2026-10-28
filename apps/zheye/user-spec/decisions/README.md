@@ -22,7 +22,7 @@ ZHEYE-0001～0008 是早期决策（由 git 历史复原），不一定可靠，
 | [ZHEYE-0004](ZHEYE-0004-zheye-article-templates.md) | 哲野的三类文章模板 | 已废弃（讲解设计重新讨论中） |
 | [ZHEYE-0005](ZHEYE-0005-zheye-rubric.md) | 哲野的质量标准（rubric） | 已被取代（→ ZHEYE-0013） |
 | [ZHEYE-0006](ZHEYE-0006-zheye-no-profiling.md) | 哲野不做口味档案、不做应用内反馈；不要求高保真 | 有效 |
-| [ZHEYE-0007](ZHEYE-0007-zheye-recipes-in-repo.md) | 哲野的配方以人可读文件随仓库版本化 | 有效（未实现） |
+| [ZHEYE-0007](ZHEYE-0007-zheye-recipes-in-repo.md) | 哲野的配方以人可读文件随仓库版本化 | 部分被取代（→ ZHEYE-0020） |
 | [ZHEYE-0008](ZHEYE-0008-zheye-v1-scope.md) | 哲野 v1 的范围 | 有效（未实现） |
 | [ZHEYE-0009](ZHEYE-0009-resume-on-startup.md) | MyOutside 启动时自动接着生成，不必打开哲野 | 有效（未实现） |
 | [ZHEYE-0010](ZHEYE-0010-flash-max.md) | 哲野用 deepseek-flash，思考强度最高 | 有效（未实现） |
@@ -34,3 +34,5 @@ ZHEYE-0001～0008 是早期决策（由 git 历史复原），不一定可靠，
 | [ZHEYE-0016](ZHEYE-0016-prerequisite-levels.md) | 前置：P0 / P1 / P2 三个等级，三个选项，超时默认正文带过 | 有效（未实现） |
 | [ZHEYE-0017](ZHEYE-0017-links-between-articles.md) | 三类之间的联系：直觉即断言的一节，概念与实体是两篇，相关的东西可以点 | 有效（未实现） |
 | [ZHEYE-0018](ZHEYE-0018-writing-pipeline.md) | 写作流程：先走一遍线性流程，大纲不要求结构化，任何一步都能推倒重来 | 有效（未实现；讨论中） |
+| [ZHEYE-0019](ZHEYE-0019-editing-tools.md) | 写作用的编辑工具：读取、查找替换、整篇重写 | 有效（未实现） |
+| [ZHEYE-0020](ZHEYE-0020-trial-bench.md) | 试验台：哲野里的一个页面，提示词在仓库文件里，每次试跑都存下 | 有效（未实现） |

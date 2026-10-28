@@ -94,7 +94,7 @@
 - 作者设想的流程（实现见 [ZHEYE-0018](decisions/ZHEYE-0018-writing-pipeline.md)）：搜集资料 →（拟定大纲 → 分析前置 → 编写文章 → 修改大纲）反复 →（检查文章 → 修改前置、添加前置链接 → 检查文章）反复；**现阶段先不反复，走一遍线性流程**，看效果再说；每一步都能联网搜索。
 - 大纲有自然语言的要求（三类各不相同），但不要求 LLM 交出纯结构化的大纲。
 
-**试验台**：作者设计、调试工作流与提示词用的工具，要能——
+**试验台**（实现见 [ZHEYE-0020](decisions/ZHEYE-0020-trial-bench.md)）：作者设计、调试工作流与提示词用的工具，要能——
 
 1. 看到当前的 agent 流程（例如画成一张图）和每个环节的提示词；方便的话可以直接在这里改提示词（不方便就去文件里改）；
 2. 看到一次生成文章的完整轨迹：思维链、工具调用等，最好能实时看到文章的样子。
@@ -109,7 +109,7 @@
 - 三类文章模板：[ZHEYE-0004](decisions/ZHEYE-0004-zheye-article-templates.md)（已废弃）
 - 质量标准：[ZHEYE-0005](decisions/ZHEYE-0005-zheye-rubric.md)（已被 ZHEYE-0013 取代）
 - 不做画像与应用内反馈；不要求高保真：[ZHEYE-0006](decisions/ZHEYE-0006-zheye-no-profiling.md)
-- 配方的管理方式：[ZHEYE-0007](decisions/ZHEYE-0007-zheye-recipes-in-repo.md)
+- 配方的管理方式：[ZHEYE-0007](decisions/ZHEYE-0007-zheye-recipes-in-repo.md)（部分被 ZHEYE-0020 取代）
 - v1 的范围：[ZHEYE-0008](decisions/ZHEYE-0008-zheye-v1-scope.md)
 - 启动时自动接着生成：[ZHEYE-0009](decisions/ZHEYE-0009-resume-on-startup.md)
 - 模型与思考强度：[ZHEYE-0010](decisions/ZHEYE-0010-flash-max.md)
@@ -121,6 +121,8 @@
 - 前置的等级、询问与记录：[ZHEYE-0016](decisions/ZHEYE-0016-prerequisite-levels.md)
 - 三类之间的联系：[ZHEYE-0017](decisions/ZHEYE-0017-links-between-articles.md)
 - 写作流程：[ZHEYE-0018](decisions/ZHEYE-0018-writing-pipeline.md)
+- 编辑工具：[ZHEYE-0019](decisions/ZHEYE-0019-editing-tools.md)
+- 试验台：[ZHEYE-0020](decisions/ZHEYE-0020-trial-bench.md)
 
 ## 未定
 
