@@ -8,7 +8,7 @@
 
 ## 决策
 
-- 哲野写讲解时可以联网搜索、抓取网页，主动搜集资料；用平台的 `platform.web.search` / `platform.web.fetch`；
+- 哲野写讲解时可以联网搜索、抓取网页，主动搜集资料；用平台的 `platform.web.search` / `platform.web.fetch`；写作流程的每一步都能搜（ZHEYE-0018）；
 - 是否把搜集到的资料也存下来：未定（作者在考虑）。
 
 ## 什么时候应该重新考虑
