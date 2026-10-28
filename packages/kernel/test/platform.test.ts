@@ -87,6 +87,22 @@ describe("platform AI / web", () => {
     expect(out.usage.cacheHitTokens).toBe(16);
   });
 
+  it("toolChoice：带工具时透传为 tool_choice；不带工具时不发（D-0078）", async () => {
+    const { kernel } = await setup();
+    const bodies: Array<Record<string, unknown>> = [];
+    vi.stubGlobal("fetch", async (_url: string, init: { body: string }) => {
+      bodies.push(JSON.parse(init.body));
+      return jsonResponse({ model: "deepseek-flash", choices: [{ message: { content: "好" }, finish_reason: "stop" }], usage: { prompt_tokens: 1, completion_tokens: 1, total_tokens: 2 } });
+    });
+    const tools = [{ type: "function", function: { name: "f", parameters: { type: "object", properties: {} } } }];
+    await kernel.handle({ call: "platform.ai.chat", payload: { messages: [{ role: "user", content: "x" }], tools, toolChoice: "none" } });
+    await kernel.handle({ call: "platform.ai.chat", payload: { messages: [{ role: "user", content: "x" }], toolChoice: "none" } });
+    const required = await kernel.handle({ call: "platform.ai.chat", payload: { messages: [{ role: "user", content: "x" }], tools, toolChoice: "required" } });
+    expect(bodies[0]).toMatchObject({ tools, tool_choice: "none" });
+    expect(bodies[1]!.tool_choice).toBeUndefined();
+    expect(required.ok).toBe(false);
+  });
+
   it("流式：思考与正文的增量经 emit 推送；工具调用参数分片拼装；usage 取最后一块", async () => {
     const { kernel } = await setup();
     let body: Record<string, unknown> = {};

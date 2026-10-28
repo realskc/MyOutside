@@ -55,6 +55,8 @@ export interface Round {
   toolCalls: ToolCallRecord[];
   usage: AiUsage | null;
   model: string;
+  /** 这一轮之前由循环追加给模型的说明（例如轮数用完时的提示，D-0078） */
+  note?: string;
 }
 
 export type StopReason = "done" | "max_rounds" | "aborted" | "error";
@@ -67,8 +69,13 @@ export interface ToolLoopOptions {
   model?: string;
   /** 流式：模型输出的增量经 ctx.emit 推送（平台 AI 的 ai_delta 事件） */
   stream?: boolean;
-  /** 最多几轮（默认 8）；达到时最后一轮不再提供工具，让模型直接回答 */
+  /**
+   * 最多几轮（默认 8）。最后一轮工具定义照常带上（不在对话中改动工具定义，D-0078），
+   * 但设 tool_choice = none 不许调用，并追加 finalRoundNote，让模型直接回复
+   */
   maxRounds?: number;
+  /** 最后一轮追加给模型的说明（默认：轮数用完，请说明做到了哪里、还有什么没做完） */
+  finalRoundNote?: string;
   /** 可重试的上游错误最多重试几次（默认 2） */
   retries?: number;
   /** 每一轮结束（工具都执行完）时调用，例如把这一轮及时保存下来；会等它完成再进入下一轮 */

@@ -119,6 +119,7 @@ export async function runTrial(
           })),
           usage: round.usage,
           model: round.model,
+          note: round.note ?? null,
           costYuan: cost.costYuan,
           webCalls: cost.webCalls,
         });

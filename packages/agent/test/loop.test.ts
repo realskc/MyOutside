@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { createSourceRegistry, runToolLoop, webSearchTool, type AgentContext, type AgentTool } from "../src/index.js";
+import { createSourceRegistry, DEFAULT_FINAL_ROUND_NOTE, runToolLoop, webSearchTool, type AgentContext, type AgentTool } from "../src/index.js";
 
 interface FakeReply {
   content?: string;
@@ -158,15 +158,29 @@ describe("runToolLoop", () => {
     expect(seen).toEqual(['1:{"echoed":"x"}', "2:"]);
   });
 
-  it("达到最大轮数：最后一轮不再提供工具，让模型直接回答", async () => {
+  it("达到最大轮数：工具定义不变，最后一轮 tool_choice = none 并追加说明，让模型直接回复", async () => {
     const { ctx, requests } = fakeContext([
       { toolCalls: [{ id: "1", name: "echo", arguments: '{"text":"a"}' }] },
-      { content: "根据已有信息回答" },
+      { content: "做到了第一步，还差第二步" },
     ]);
     const r = await runToolLoop(ctx, { messages: base, tools: [echoTool], maxRounds: 2 });
     expect(r.stopReason).toBe("max_rounds");
-    expect(r.content).toBe("根据已有信息回答");
-    expect(requests[1].tools).toBeUndefined();
+    expect(r.content).toBe("做到了第一步，还差第二步");
+    expect(requests[1].tools).toEqual(requests[0].tools);
+    expect(requests[0].toolChoice).toBeUndefined();
+    expect(requests[1].toolChoice).toBe("none");
+    expect(requests[1].messages.at(-1)).toEqual({ role: "user", content: DEFAULT_FINAL_ROUND_NOTE });
+    expect(r.rounds[1]!.note).toBe(DEFAULT_FINAL_ROUND_NOTE);
+  });
+
+  it("最后一轮仍然调用了工具：不执行，补上结果，结束为 max_rounds", async () => {
+    let executed = 0;
+    const counting: AgentTool = { ...echoTool, execute: async () => ++executed };
+    const { ctx } = fakeContext([{ toolCalls: [{ id: "1", name: "echo", arguments: "{}" }] }]);
+    const r = await runToolLoop(ctx, { messages: base, tools: [counting], maxRounds: 1, finalRoundNote: "停" });
+    expect(r.stopReason).toBe("max_rounds");
+    expect(executed).toBe(0);
+    expect(r.messages.at(-1)).toMatchObject({ role: "tool", tool_call_id: "1" });
   });
 
   it("可重试的上游错误：退避后重试成功；不可重试的错误：结束为 error", async () => {

@@ -5,6 +5,10 @@ const DEFAULT_MAX_ROUNDS = 8;
 const DEFAULT_RETRIES = 2;
 const DEFAULT_MAX_CHARS = 8000;
 const CANCELLED = "已被用户取消";
+/** 轮数用完时追加给模型的说明（D-0078） */
+export const DEFAULT_FINAL_ROUND_NOTE =
+  "【已到最多轮数：这一次不能再调用工具了。请直接回复：说明已经做到了哪里、还有什么没做完。】";
+const NOT_EXECUTED = "没有执行：已到最多轮数";
 
 interface ErrorLike {
   code?: string;
@@ -113,8 +117,15 @@ export async function runToolLoop(ctx: AgentContext, options: ToolLoopOptions): 
     };
   };
 
+  const hasTools = options.tools.length > 0;
   for (let index = 1; index <= maxRounds; index += 1) {
-    const offerTools = options.tools.length > 0 && index < maxRounds;
+    // 工具定义每一轮都一样（改动会让缓存失效、让模型困惑）；最后一轮只是不许调用（D-0078）
+    const finalRound = hasTools && index === maxRounds;
+    let note: string | undefined;
+    if (finalRound) {
+      note = options.finalRoundNote ?? DEFAULT_FINAL_ROUND_NOTE;
+      push({ role: "user", content: note });
+    }
     emit({ type: "round_start", round: index });
 
     // —— 调用模型（可重试的错误按指数退避重试）——
@@ -125,7 +136,8 @@ export async function runToolLoop(ctx: AgentContext, options: ToolLoopOptions): 
       try {
         response = (await ctx.call("platform.ai.chat", {
           messages: history,
-          ...(offerTools ? { tools: options.tools.map(toolSpec) } : {}),
+          ...(hasTools ? { tools: options.tools.map(toolSpec) } : {}),
+          ...(finalRound ? { toolChoice: "none" } : {}),
           ...(options.reasoningEffort ? { reasoningEffort: options.reasoningEffort } : {}),
           ...(options.model ? { model: options.model } : {}),
           ...(options.stream ? { stream: true } : {}),
@@ -144,6 +156,7 @@ export async function runToolLoop(ctx: AgentContext, options: ToolLoopOptions): 
               toolCalls: [],
               usage: null,
               model,
+              ...(note ? { note } : {}),
             });
           }
           return result("error", { code: error.code, message: error.message });
@@ -167,6 +180,7 @@ export async function runToolLoop(ctx: AgentContext, options: ToolLoopOptions): 
       toolCalls: [],
       usage: response.usage,
       model: response.model,
+      ...(note ? { note } : {}),
     };
     rounds.push(round);
     push(response.message);
@@ -179,7 +193,17 @@ export async function runToolLoop(ctx: AgentContext, options: ToolLoopOptions): 
 
     if (response.toolCalls.length === 0) {
       await endRound(round);
-      return result(offerTools || options.tools.length === 0 ? "done" : "max_rounds");
+      return result(finalRound ? "max_rounds" : "done");
+    }
+
+    // 不许调用时仍然调用了（理论上不会）：不执行，补上结果保证消息合法，结束
+    if (finalRound) {
+      for (const call of response.toolCalls) {
+        round.toolCalls.push({ id: call.id, name: call.function.name, arguments: call.function.arguments, ok: false, summary: call.function.name, result: NOT_EXECUTED });
+        push({ role: "tool", tool_call_id: call.id, content: NOT_EXECUTED });
+      }
+      await endRound(round);
+      return result("max_rounds");
     }
 
     // —— 执行工具（顺序执行）——

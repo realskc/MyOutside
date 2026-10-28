@@ -44,6 +44,29 @@ export async function runAiCheck(kernel: Kernel): Promise<boolean> {
     return `第一轮调用 ${r1.toolCalls.map((c: any) => c.function.name).join("、")}，第二轮回答「${r2.content}」`;
   });
 
+  await step("轮数用完：工具定义不变、tool_choice = none（思考模式），缓存照常命中（D-0078）", async () => {
+    const tools = [
+      { type: "function", function: { name: "get_date", description: "获取今天的日期", parameters: { type: "object", properties: {} } } },
+    ];
+    // 系统提示词放长一些（几千 token），缓存才看得出来
+    const system = `你是一个助手。下面是一段不需要理会的背景资料：\n${"间隔重复是一种学习方法，复习的间隔随着记忆变牢而拉长。".repeat(120)}`;
+    const messages: any[] = [
+      { role: "system", content: system },
+      { role: "user", content: "今天是几号？请调用工具获取后回答。" },
+    ];
+    const r1 = await call("platform.ai.chat", { messages, tools, reasoningEffort: "low" });
+    if (r1.toolCalls.length === 0) throw new Error(`第一轮没有调用工具：${r1.content}`);
+    messages.push(r1.message);
+    for (const toolCall of r1.toolCalls) messages.push({ role: "tool", tool_call_id: toolCall.id, content: new Date().toISOString().slice(0, 10) });
+    messages.push({ role: "user", content: "【已到最多轮数：这一次不能再调用工具了。请直接回复。】" });
+    const r2 = await call("platform.ai.chat", { messages, tools, toolChoice: "none", reasoningEffort: "low" });
+    if (r2.toolCalls.length > 0) throw new Error("tool_choice = none 时仍然调用了工具");
+    if (/DSML/.test(r2.content)) throw new Error(`回复里出现了工具调用的格式：${r2.content.slice(0, 80)}`);
+    const hit = r2.usage.cacheHitTokens ?? 0;
+    if (hit < r1.usage.promptTokens / 2) throw new Error(`缓存几乎没有命中：输入 ${r2.usage.promptTokens}，命中 ${hit}`);
+    return `第二轮输入 ${r2.usage.promptTokens}，命中缓存 ${hit}；回答「${r2.content.slice(0, 60)}」`;
+  });
+
   await step("网页搜索", async () => {
     const r = await call("platform.web.search", { query: "DeepSeek 搜索 API 发布", count: 3, oriQuestion: "DeepSeek 最近发布了什么" });
     if (r.results.length === 0) throw new Error("没有结果");

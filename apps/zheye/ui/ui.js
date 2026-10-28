@@ -749,6 +749,7 @@
       ` · ${yuan(round.costYuan)}`,
     );
     const box = el("div", { class: "round" }, head);
+    if (round.note) box.append(el("div", { class: "round-note" }, `程序追加给模型：${round.note}`));
     if (round.reasoning) {
       box.append(details(`思维链（${round.reasoning.length} 字）`, () => pre(round.reasoning, "pre-reasoning")));
     }

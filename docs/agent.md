@@ -59,11 +59,11 @@ ctx.signal                                // 取消信号，沿嵌套调用向�
 
 详见 `docs/architecture.md` §6.1。要点：
 
-- 透传 `messages`（含 `assistant.reasoning_content` 回传与工具消息）、`tools`、`reasoningEffort`（`none` 即关闭思考）；
+- 透传 `messages`（含 `assistant.reasoning_content` 回传与工具消息）、`tools`、`toolChoice`（只有 `auto` / `none`，D-0078）、`reasoningEffort`（`none` 即关闭思考）；
 - 输出 `{ content, reasoning, toolCalls, model, usage, finishReason, message }`，`message` 可直接追加进历史；
 - 流式：增量经推送通道发出 `{ type: "ai_delta", content?, reasoning? }`；中途被取消时返回已收到的部分（`finishReason = "aborted"`）；中途出错时照常报错，已收到的部分放在 `details.partial`；
 - 结构化错误：`UPSTREAM` 带 `retryable`；未配置或无效密钥 → `PRECONDITION`；
-- DeepSeek 规则：请求带 `tools` 时，历史中每一轮的 `reasoning_content` 都必须回传；不使用 `tool_choice` 强制调用（D-0059）；对话前缀续写（Beta）不能与工具同时使用（DIALOG-0018 里记录了调研结果）；
+- DeepSeek 规则：请求带 `tools` 时，历史中每一轮的 `reasoning_content` 都必须回传；不使用 `tool_choice` 强制调用（D-0059），`none` 可用；同一段对话里不改动工具定义（D-0078）；对话前缀续写（Beta）不能与工具同时使用（DIALOG-0018 里记录了调研结果）；
 - 每次成功调用按调用者记一条用量，并按官方价格与调用时段估算花费（D-0074）。
 
 ## 4. 平台工具：搜索与抓取（D-0050）
@@ -91,7 +91,8 @@ interface AgentTool {
 
 runToolLoop(ctx, {
   messages, tools, reasoningEffort?, model?, stream?,
-  maxRounds?,   // 默认 8；最后一轮不提供工具，让模型直接回答
+  maxRounds?,   // 默认 8；最后一轮工具定义不变、tool_choice = none，并追加 finalRoundNote（D-0078）
+  finalRoundNote?, // 最后一轮追加给模型的说明
   retries?,     // 可重试的上游错误最多重试几次，默认 2
   onRound?,     // 每一轮结束（工具都执行完）时调用，会等它完成；例如把这一轮及时存下（哲野试验台）
 }) → { stopReason: "done" | "max_rounds" | "aborted" | "error", content, reasoning, rounds, messages, usage, model, error? }
@@ -111,7 +112,7 @@ runToolLoop(ctx, {
 | 重试都失败 / 不可重试的错误 | 以 `error` 结束；最后一次输出到一半的部分作为最后一轮保留在 `rounds` 里（DIALOG-0018） |
 | 工具不存在、参数不是合法 JSON、执行失败 | 作为工具结果告诉模型，让它自己修正，循环继续 |
 | 同一工具以相同参数重复调用 | 不再执行，告诉模型「请直接使用之前的结果」；标了 `repeatable` 的工具照常执行 |
-| 达到最大轮数 | 最后一轮不提供工具，让模型根据已有信息回答（`max_rounds`） |
+| 达到最大轮数 | 最后一轮工具定义照常带上，但 `tool_choice = none` 不许调用，并追加一条说明（「轮数用完，说明做到了哪里、还有什么没做完」），模型直接回复（`max_rounds`）；仍然调用了工具就不执行（D-0078） |
 | 模型输出到一半被取消 | 已输出的部分作为最后一轮保留，以 `aborted` 结束（DIALOG-0017） |
 | 执行工具时被取消 | 本轮剩下的工具调用补上「已被用户取消」的结果，保证新增的消息仍然合法，以 `aborted` 结束 |
 

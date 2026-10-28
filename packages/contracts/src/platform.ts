@@ -58,6 +58,8 @@ export const AiChatInput = z.object({
   temperature: z.number().optional(),
   /** 思考强度；不传 = 服务默认（high） */
   reasoningEffort: ReasoningEffort.optional(),
+  /** 这一次能不能调用工具：none = 工具定义照常带上、但这一次不许调用（D-0078） */
+  toolChoice: z.enum(["auto", "none"]).optional(),
   /** 流式：增量经推送通道发出（事件 { type: "ai_delta", content?, reasoning? }），最终仍返回完整结果 */
   stream: z.boolean().optional(),
 });

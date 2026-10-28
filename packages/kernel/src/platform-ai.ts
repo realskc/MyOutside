@@ -49,6 +49,11 @@ export const AiChatInputSchema = z.object({
   temperature: z.number().optional(),
   /** 思考强度（none 关闭思考；不传 = 服务默认 high） */
   reasoningEffort: z.enum(["none", "low", "high", "max"]).optional(),
+  /**
+   * 这一次能不能调用工具（D-0078）：none = 工具定义照常带上、但这一次不许调用（例如轮数用完时）。
+   * 不提供 required / 指定工具：思考模式下不支持（D-0059）。
+   */
+  toolChoice: z.enum(["auto", "none"]).optional(),
   /** 流式：增量经推送通道发出（事件 ai_delta），最终仍返回完整结果 */
   stream: z.boolean().optional(),
 });
@@ -130,6 +135,7 @@ export function createPlatformAiDefinition(
         model,
         messages,
         ...(input.tools ? { tools: input.tools } : {}),
+        ...(input.tools && input.toolChoice ? { tool_choice: input.toolChoice } : {}),
         ...(input.temperature !== undefined ? { temperature: input.temperature } : {}),
         ...(input.reasoningEffort ? { reasoning_effort: input.reasoningEffort } : {}),
         ...(input.stream ? { stream: true, stream_options: { include_usage: true } } : {}),
