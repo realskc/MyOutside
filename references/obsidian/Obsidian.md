@@ -2,7 +2,7 @@
 
 - 官网：https://obsidian.md
 - 资料最近核对：2026-11-05
-- 想法：[想法.md](想法.md)
+- 我们的想法：[我们的想法.md](我们的想法.md)
 
 ## 是什么
 
@@ -13,7 +13,7 @@
 ## 人们用它做什么
 
 - CEO 的说法：很多人用它记录想法、写日记；很多用户是学生，用它追踪学习进度、整理研究笔记；也有作家、写书的人，甚至 RPG 爱好者。（The Verge Decoder 播客，[2025-08-18](https://www.theverge.com/decoder-podcast-with-nilay-patel/760522/obsidian-ceo-steph-ango-kepano-productivity-software-notes-app)）
-- 2026 年 4 月起流行的一种用法：Andrej Karpathy 的「LLM 知识库」（LLM Wiki）。把原始资料（文章、论文、代码库、图片等）放进 `raw/` 文件夹，让 LLM 把它们逐步「编译」成一个 wiki：一堆互相链接的 `.md` 文件，有资料摘要、概念文章和反向链接；提问的回答也写回 wiki；定期让 LLM 做「体检」（找矛盾、补缺、找新的联系）。wiki 几乎全由 LLM 写和维护，他自己很少直接改，Obsidian 只用来浏览。原话：「Obsidian is the IDE; the LLM is the programmer; the wiki is the codebase.」（[推文，2026-04-02](https://x.com/karpathy/status/2039805659525644595)；详见 [LLM Wiki](../karpathy-llm-wiki/LLM%20Wiki.md)）
+- 2026 年 4 月起流行的一种用法：Andrej Karpathy 的「LLM 知识库」（LLM Wiki）。把原始资料（文章、论文、代码库、图片等）放进 `raw/` 文件夹，让 LLM 把它们逐步「编译」成一个 wiki：一堆互相链接的 `.md` 文件，有资料摘要、概念文章和反向链接；提问的回答也写回 wiki；定期让 LLM 做「体检」（找矛盾、补缺、找新的联系）。wiki 几乎全由 LLM 写和维护，他自己很少直接改，Obsidian 只用来浏览。原话：「Obsidian is the IDE; the LLM is the programmer; the wiki is the codebase.」（[推文，2026-04-02](https://x.com/karpathy/status/2039805659525644595)；详见 [LLM Wiki.md](LLM%20Wiki.md)）
 
 ## 开放程度
 

@@ -2,6 +2,7 @@
 
 - 原文：[gist「LLM Wiki」](https://gist.github.com/karpathy/442a6bf555914893e9891c11519de94f)；最早的推文「LLM Knowledge Bases」（[2026-04-02](https://x.com/karpathy/status/2039805659525644595)）
 - 资料最近核对：2026-11-05
+- 和 Obsidian 的关系：Karpathy 用 Obsidian 浏览这个 wiki（见 [Obsidian.md](Obsidian.md)「人们用它做什么」）
 
 ## 是什么
 
