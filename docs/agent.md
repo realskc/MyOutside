@@ -1,6 +1,6 @@
 # agent 框架（共享库）
 
-> 技术文档：当前实现与已定的设计。概念（工作流、LLM 步骤、工具循环、轮）见 `user-spec/concepts/agent.md`。
+> 技术文档：当前实现与已定的设计。概念（agent、工作流、LLM 步骤、工具循环、轮）见 `user-spec/concepts/agent.md`：agent 指像小黄人一样的智能体，工作流叫 workflow；「agent 框架」是构建工作流与 agent 的共享框架。本文较早写成的部分里，「agent 运行」「agent 状态」等说法里的 agent 指工作流。
 > 作者的预期：`user-spec/platform.md`「平台 AI」（agent 框架必须共享、硬约束在框架层面）、`user-spec/principles.md`「约束：软约束与硬约束都要」。
 > 自研、不引入开源框架：D-0048。
 
