@@ -486,20 +486,34 @@
       mute.className = "stem-toggle" + (params.muted ? " on" : "");
       mute.textContent = "M";
       mute.title = "mute";
-      mute.addEventListener("click", () => {
-        params.muted = !params.muted;
-        mute.classList.toggle("on", params.muted);
-        applyStemParams();
-      });
+      mute.setAttribute("aria-pressed", String(params.muted));
 
       const solo = document.createElement("button");
       solo.type = "button";
       solo.className = "stem-toggle solo" + (params.solo ? " on" : "");
       solo.textContent = "S";
       solo.title = "solo";
+      solo.setAttribute("aria-pressed", String(params.solo));
+
+      const syncToggles = () => {
+        mute.classList.toggle("on", params.muted);
+        solo.classList.toggle("on", params.solo);
+        mute.setAttribute("aria-pressed", String(params.muted));
+        solo.setAttribute("aria-pressed", String(params.solo));
+      };
+
+      // 同一轨的静音与独奏互斥：开启一个会关闭另一个。
+      mute.addEventListener("click", () => {
+        params.muted = !params.muted;
+        if (params.muted) params.solo = false;
+        syncToggles();
+        applyStemParams();
+      });
+
       solo.addEventListener("click", () => {
         params.solo = !params.solo;
-        solo.classList.toggle("on", params.solo);
+        if (params.solo) params.muted = false;
+        syncToggles();
         applyStemParams();
       });
 
@@ -631,10 +645,47 @@
     loopBtn.classList.toggle("active", loop.enabled);
   }
 
-  playBtn.addEventListener("click", () => {
+  function togglePlayback() {
+    if (!master) return;
     if (playing) pauseAll();
     else void playAll();
-  });
+  }
+
+  playBtn.addEventListener("click", togglePlayback);
+
+  // 空格：暂停 / 继续（文字输入框聚焦时让给输入；range / select / button 上仍然控制播放）。
+  window.addEventListener(
+    "keydown",
+    (event) => {
+      if (event.code !== "Space" || event.repeat || event.defaultPrevented) return;
+      if (event.ctrlKey || event.metaKey || event.altKey || event.isComposing) return;
+      const target = event.target;
+      if (target instanceof HTMLElement) {
+        if (target.isContentEditable || target.tagName === "TEXTAREA") return;
+        // 纯蓝没有文字输入框；range / select / button 上按空格仍然控制播放。
+        if (target.tagName === "INPUT") {
+          const type = target.getAttribute("type") ?? "text";
+          if (!["range", "checkbox", "radio", "button", "submit"].includes(type)) return;
+        }
+      }
+      if (!master) return;
+      event.preventDefault();
+      togglePlayback();
+    },
+    true,
+  );
+
+  // 防止聚焦的按钮在 keyup 时把空格又当成一次点击。
+  window.addEventListener(
+    "keyup",
+    (event) => {
+      if (event.code !== "Space" || !master) return;
+      if (event.target instanceof HTMLElement && event.target.tagName === "BUTTON") {
+        event.preventDefault();
+      }
+    },
+    true,
+  );
 
   seekEl.addEventListener("input", () => {
     draggingSeek = true;

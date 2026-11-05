@@ -167,6 +167,8 @@ async function loadApps() {
         closeSettings();
         panel.src = appUrl(app.id);
         setActive(button);
+        // 切换应用后把键盘焦点交给面板，空格等快捷键直接作用于子应用
+        panel.addEventListener("load", () => panel.focus(), { once: true });
       });
       appsEl.appendChild(button);
     }
