@@ -1,11 +1,11 @@
 # 哲野决策（ZHEYE）
 
-这里记录**哲野应用专属**的决策；全局/跨应用的决策仍在 [`user-spec/decisions/`](../../../../user-spec/decisions/)。应用 spec 见 [`../README.md`](../README.md)，技术文档见 [`../../docs/README.md`](../../docs/README.md)。
+这里记录**哲野应用专属**的决策；全局/跨应用的决策仍在 [`user-spec/decisions/`](../../../../user-spec/decisions/README.md)。应用 spec 见 [`../README.md`](../README.md)，技术文档见 [`../../docs/README.md`](../../docs/README.md)。
 
 ## 约定
 
 - 一条决策一个文件：`ZHEYE-NNNN-简短英文标识.md`，编号四位、递增、永不复用。
-- 引用写法：`ZHEYE-0001`；同一目录内用相对链接。引用全局决策时写 `D-NNNN` 并链接到 [`user-spec/decisions/`](../../../../user-spec/decisions/)。
+- 引用写法：`ZHEYE-0001`；同一目录内用相对链接。引用全局决策时写 `D-NNNN` 并链接到 [`user-spec/decisions/`](../../../../user-spec/decisions/README.md)。
 - 状态：`有效` / `已取代（→ ZHEYE-xxxx）` / `已废弃`。决策文件不删除。
 - 决策者：`作者` / `讨论` / `agent`。
 - 模板、代价、重新考虑条件沿用 [`user-spec/decisions/README.md`](../../../../user-spec/decisions/README.md)。

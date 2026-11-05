@@ -5,3 +5,6 @@ out/
 /data/
 *.log
 .DS_Store
+
+# Obsidian：设置提交进仓库（两台电脑共用），只忽略记录界面状态（开了哪些标签页）的文件
+.obsidian/workspace*.json
