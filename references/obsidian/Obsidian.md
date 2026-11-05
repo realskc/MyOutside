@@ -2,7 +2,7 @@
 
 - 官网：https://obsidian.md
 - 资料最近核对：2026-11-05
-- 我们的想法：[我们的想法.md](我们的想法.md)
+- 我们的想法：[thoughts.md](thoughts.md)
 
 ## 是什么
 

@@ -5,7 +5,7 @@
 每样东西一个子目录（例如 `obsidian/`），里面分两种文件：
 
 - **资料**：文件名就是它的名字（例如 `Obsidian.md`）；
-- **我们的想法**：统一叫 `我们的想法.md`。还没有想法时可以没有这个文件。
+- **我们的想法**：统一叫 `thoughts.md`。还没有想法时可以没有这个文件。
 
 和它密切相关的东西（例如围绕它的一种用法）可以放进同一个子目录，资料同样以自己的名字命名。
 
@@ -27,4 +27,4 @@
 
 | 目录 | 资料 | 我们的想法 |
 |---|---|---|
-| `obsidian/` | [Obsidian](obsidian/Obsidian.md)：本地优先的 Markdown 笔记软件；[LLM Wiki](obsidian/LLM%20Wiki.md)：Karpathy 提出的、让 LLM 编译并维护个人知识库的做法，用 Obsidian 浏览 | [有](obsidian/我们的想法.md) |
+| `obsidian/` | [Obsidian](obsidian/Obsidian.md)：本地优先的 Markdown 笔记软件；[LLM Wiki](obsidian/LLM%20Wiki.md)：Karpathy 提出的、让 LLM 编译并维护个人知识库的做法，用 Obsidian 浏览 | [有](obsidian/thoughts.md) |
