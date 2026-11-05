@@ -17,7 +17,8 @@
 ## 愉悦
 
 - 哲野要带来的是**学到真东西的愉悦**——顿悟、理顺、看清结构——同时不累。
-- **不做**：投其所好、性格或口味画像、强行加笑话或个人关联。
+- **不做**：刻意迎合（投其所好）、强行加笑话或个人关联。
+- 不刻意迎合，不代表不能记录用户的特点（见 [ZHEYE-0022](decisions/ZHEYE-0022-record-traits-without-catering.md)）。
 
 ## 角色
 
@@ -84,7 +85,7 @@
 - **文章之间连起来**：文章里提到的、与被讲解对象有关系的概念、断言、实体可以点；有文章的跳过去，没有的问是否生成（实现见 [ZHEYE-0017](decisions/ZHEYE-0017-links-between-articles.md)）。
 
 - **写过的文章长期保存，以后直接复用**：以后学别的东西时，需要的前置如果曾经写过，就直接用那一篇，不再重写（实现见 [ZHEYE-0011](decisions/ZHEYE-0011-reuse-prerequisite-articles.md)）。
-- **哲野记住作者对前置的了解情况**（长期记忆 / 知识库）：作者选过「已了解」或「单独讲解」的，以后不再问；选「正文带过」的不记（实现见 [ZHEYE-0012](decisions/ZHEYE-0012-remember-known-concepts.md)、[ZHEYE-0016](decisions/ZHEYE-0016-prerequisite-levels.md)）。这是关于作者知识状态的任务数据，与「愉悦」里否掉的口味画像是两回事。了解程度会随时间变化的问题，先做出一版再解决。
+- **哲野记住作者对前置的了解情况**（长期记忆 / 知识库）：作者选过「已了解」或「单独讲解」的，以后不再问；选「正文带过」的不记（实现见 [ZHEYE-0012](decisions/ZHEYE-0012-remember-known-concepts.md)、[ZHEYE-0016](decisions/ZHEYE-0016-prerequisite-levels.md)）。这是关于作者知识状态的任务数据。了解程度会随时间变化的问题，先做出一版再解决。
 
 ## 工作流与提示词由作者把关
 
@@ -108,7 +109,7 @@
 - 生成方式：[ZHEYE-0003](decisions/ZHEYE-0003-zheye-generation.md)
 - 三类文章模板：[ZHEYE-0004](decisions/ZHEYE-0004-zheye-article-templates.md)（已废弃）
 - 质量标准：[ZHEYE-0005](decisions/ZHEYE-0005-zheye-rubric.md)（已被 ZHEYE-0013 取代）
-- 不做画像与应用内反馈；不要求高保真：[ZHEYE-0006](decisions/ZHEYE-0006-zheye-no-profiling.md)
+- 不做应用内反馈；不要求高保真：[ZHEYE-0006](decisions/ZHEYE-0006-zheye-no-profiling.md)（「不做画像」的部分被 ZHEYE-0022 取代）
 - 配方的管理方式：[ZHEYE-0007](decisions/ZHEYE-0007-zheye-recipes-in-repo.md)（部分被 ZHEYE-0020 取代）
 - v1 的范围：[ZHEYE-0008](decisions/ZHEYE-0008-zheye-v1-scope.md)
 - 启动时自动接着生成：[ZHEYE-0009](decisions/ZHEYE-0009-resume-on-startup.md)
@@ -123,6 +124,7 @@
 - 写作流程：[ZHEYE-0018](decisions/ZHEYE-0018-writing-pipeline.md)
 - 编辑工具：[ZHEYE-0019](decisions/ZHEYE-0019-editing-tools.md)
 - 试验台：[ZHEYE-0020](decisions/ZHEYE-0020-trial-bench.md)、实现 [ZHEYE-0021](decisions/ZHEYE-0021-trial-bench-implementation.md)
+- 可以记录用户的特点，不做的是刻意迎合：[ZHEYE-0022](decisions/ZHEYE-0022-record-traits-without-catering.md)
 
 ## 未定
 

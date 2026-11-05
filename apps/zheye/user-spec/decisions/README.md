@@ -21,7 +21,7 @@ ZHEYE-0001～0008 是早期决策（由 git 历史复原），不一定可靠，
 | [ZHEYE-0003](ZHEYE-0003-zheye-generation.md) | 哲野的生成：自动开始，全局串行，按依赖顺序，生成后固定 | 有效（未实现） |
 | [ZHEYE-0004](ZHEYE-0004-zheye-article-templates.md) | 哲野的三类文章模板 | 已废弃（讲解设计重新讨论中） |
 | [ZHEYE-0005](ZHEYE-0005-zheye-rubric.md) | 哲野的质量标准（rubric） | 已被取代（→ ZHEYE-0013） |
-| [ZHEYE-0006](ZHEYE-0006-zheye-no-profiling.md) | 哲野不做口味档案、不做应用内反馈；不要求高保真 | 有效 |
+| [ZHEYE-0006](ZHEYE-0006-zheye-no-profiling.md) | 哲野不做口味档案、不做应用内反馈；不要求高保真 | 部分被取代（→ ZHEYE-0022） |
 | [ZHEYE-0007](ZHEYE-0007-zheye-recipes-in-repo.md) | 哲野的配方以人可读文件随仓库版本化 | 部分被取代（→ ZHEYE-0020） |
 | [ZHEYE-0008](ZHEYE-0008-zheye-v1-scope.md) | 哲野 v1 的范围 | 有效（未实现） |
 | [ZHEYE-0009](ZHEYE-0009-resume-on-startup.md) | MyOutside 启动时自动接着生成，不必打开哲野 | 有效（未实现） |
@@ -37,3 +37,4 @@ ZHEYE-0001～0008 是早期决策（由 git 历史复原），不一定可靠，
 | [ZHEYE-0019](ZHEYE-0019-editing-tools.md) | 写作用的编辑工具：读取、查找替换、整篇重写 | 有效（未实现） |
 | [ZHEYE-0020](ZHEYE-0020-trial-bench.md) | 试验台：哲野里的一个页面，提示词在仓库文件里，每次试跑都存下 | 有效（未实现） |
 | [ZHEYE-0021](ZHEYE-0021-trial-bench-implementation.md) | 试验台的实现：配方文件的写法、每步一次工具循环、轨迹边跑边存 | 有效 |
+| [ZHEYE-0022](ZHEYE-0022-record-traits-without-catering.md) | 可以记录用户的特点；不做的是刻意迎合 | 有效 |
