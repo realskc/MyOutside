@@ -79,7 +79,7 @@ agent 发现 spec 与需求或现状冲突时，正确的反应不是覆盖，�
 | `vision.md` | 愿景与哲学：离实现还远的宏观想法（不是需求） |
 | `principles.md` | 贯穿全局的原则 |
 | `platform.md` | 平台层的预期 |
-| `future/` | 尚未实现的方向：`builder.md`、`user-spec.md`（user spec 作为产品能力的构想） |
+| `future/` | 尚未实现的方向：`builder.md`、`user-spec.md`（user spec 作为产品能力的构想）、`unified-capabilities.md`（统一能力：入口、事件记录、界面、记忆） |
 | `workflow.md` | 对开发方式的预期 |
 | `concepts/` | 概念：给项目里的东西起明确的名字 |
 | `decisions/` | 全局/跨应用决策（`D-NNNN`） |
