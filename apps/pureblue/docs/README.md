@@ -7,6 +7,7 @@
 - **后端**：`backend/src/index.ts` 的 `createPureblueApp({ dataDir, engineDir? })`（宿主在启动时用数据目录构造并注册）；`demucs.ts` 负责引擎探测与分离进程。
 - **界面**：`ui/` 静态 HTML / CSS / JS（零构建）。
 - **引擎**：`scripts/setup-engine.ps1` 安装到 `<userData>/apps/pureblue/engine`（Python 3.12 venv + Demucs + CUDA PyTorch；见 [PB-0003](../user-spec/decisions/PB-0003-engine-setup-script.md)）。
+- **MIDI 引擎（可选）**：`scripts/setup-midi-engine.ps1` 安装到 `<userData>/apps/pureblue/midi-engine`（独立 Python 3.10 venv + Basic Pitch + ONNX Runtime；见 [PB-0007](../user-spec/decisions/PB-0007-basic-pitch-midi.md)）；`scripts/transcribe_midi.py` 负责单条 stem 转 MIDI。
 - **媒体**：宿主 `media://<appId>/<相对路径>` 协议读取 `<userData>/apps/<appId>/`（见 [PB-0004](../user-spec/decisions/PB-0004-app-files-and-media-protocol.md)）。
 
 ## 2. 数据
@@ -45,7 +46,23 @@ pureblue__stem(id, track_id, job_id, kind, file, size, created_at)
 - 失败：任务标记 `failed` 并保留最后一段错误；页面刷新后靠列表 / 详情轮询恢复显示。
 - 遗留任务：应用关闭 / 崩溃后留在 `running` 的任务，超过 1 小时在读取时显示为失败；重新分离或删除时会正式标记为失败（避免永久卡住）。
 
-## 5. 界面
+### 模型与体积
+
+- Demucs `htdemucs_6s`：27,414,996 个参数；HuggingFace 缓存里的权重是 F16，文件 52.34MB；加载为 fp32 后约 104.6MB。
+- `engine` 目录的 4.20GB 基本不是模型，而是 CUDA 版 PyTorch：`site-packages/torch` 4.08GB，其中 `torch/lib` 3.99GB（`torch_cuda.dll`、cuBLAS、cuDNN、cuSPARSE 等 CUDA DLL）。
+- Basic Pitch：ONNX 模型 230,444 字节（0.22MB），约 3.6 万个 ONNX 初始化器元素（float32 约 3.57 万个）；独立 MIDI 引擎约 423MB，主要是 ONNX Runtime、scipy、llvmlite、librosa 等依赖。
+
+## 5. MIDI 转写（验证）
+
+- 引擎：Spotify Basic Pitch `0.4.0`，独立 Python 3.10 venv + ONNX Runtime；不安装 TensorFlow，也不与 Demucs 的 Python 3.12 环境混用；
+- 安装：`powershell -ExecutionPolicy Bypass -File apps/pureblue/scripts/setup-midi-engine.ps1`；
+- 转写：`apps/pureblue/scripts/transcribe_midi.py <stem 音频> <输出.mid>`，可选 `--instrument-name`、`--program`、`--min-frequency`、`--max-frequency`、阈值参数；
+- 输入只接受**一个音频文件**；未来也只做单条 stem，不转整首歌、不做多轨合并；鼓轨没有音高，不转；
+- 脚本 stdout 输出 JSON 摘要（音符数、音高范围、时长、输出路径），供后续后端接入；
+- 验证：本机 3 分 02 秒的 piano stem → 1,131 个音符，bass stem → 615 个音符；冷启动约 20 秒（模型加载），预热后约 5 秒；输出在 `tracks/<id>/midi-validation/`（尚未写入数据库、尚未接入界面）；
+- Basic Pitch 以 Apache-2.0 发布；若随应用分发，需要保留 LICENSE / NOTICE。
+
+## 6. 界面
 
 - 左侧曲目列表（时长、任务状态、轨数）；右侧分离面板与播放器；
 - 引擎缺失时显示安装命令与「重新检查」；
@@ -53,9 +70,10 @@ pureblue__stem(id, track_id, job_id, kind, file, size, created_at)
 - 播放 / 暂停按钮用图标切换（播放三角 / 暂停条），播放中按钮颜色加深；进度条、速度 50%–100%（保持音高）、循环与 AB 段、清除；空格键暂停 / 继续（文字输入框聚焦时除外）；
 - 播放用多个 `<audio>` 元素同步，主轨 `timeupdate` 定期校正其它轨；无波形（v1）。
 
-## 6. 已知限制
+## 7. 已知限制
 
+- MIDI 转写目前只有命令行验证，没有界面 / API；只支持单轨，未做 MIDI 播放或多轨合并。
 - 取消只对当前页面发起的任务有效；刷新后正在运行的任务无法从界面取消（会继续并靠轮询显示）。
 - 没有导出、变调、两轨快捷预设、波形；这些见应用 user spec 的「未定 / 非目标」。
 - `media://` 没有跨应用权限：目前任意子应用理论上能猜到并读取其它应用的 media 路径；builder / 不可信应用出现前必须收紧（PB-0004）。
-- 引擎安装脚本只有 Windows 版本；macOS / Linux 需要另行安装（PB-0003）。
+- 两个引擎安装脚本都只有 Windows 版本；macOS / Linux 需要另行安装（PB-0003、PB-0007）。

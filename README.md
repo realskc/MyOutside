@@ -29,6 +29,7 @@ pnpm.cmd dev        # 启动桌面端（Electron 窗口）
 pnpm.cmd dev:lan    # 开发用 LAN 预览：额外在 3000 端口提供 Web 界面（默认关闭）
 pnpm.cmd smoke      # 冒烟测试：后台自检内核 / 桥 / 子应用 iframe 后自动退出（MYOUTSIDE_SMOKE_SHOW=1 显示窗口）
 powershell -ExecutionPolicy Bypass -File apps/pureblue/scripts/setup-engine.ps1  # 纯蓝引擎（一次性，需 uv；下载 Python/PyTorch/模型）
+powershell -ExecutionPolicy Bypass -File apps/pureblue/scripts/setup-midi-engine.ps1  # 纯蓝 MIDI 引擎（可选；Python 3.10 + Basic Pitch + ONNX，单轨转写）
 ```
 
 `dev:lan` 是临时开发工具，不是正式多端方案（见 [D-0072](user-spec/decisions/0072-dev-lan-preview.md)）：手机和电脑连同一热点后，打开终端打印的 `http://<电脑IP>:3000/shell/`。普通 `dev` 不监听端口；用 `MYOUTSIDE_LAN_PORT` 可改端口。没有鉴权，只用于可信热点。
