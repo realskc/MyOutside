@@ -9,6 +9,8 @@
 1. `user-spec/` — **作者的预期**（项目的源头）：产品是什么、为谁、什么重要、什么不要；以及 `decisions/`——每个实现选择为什么这样做、什么时候可以推翻。已迁移应用（目前是 `apps/go`）的预期与决策在 `apps/go/user-spec/`。从 `user-spec/README.md` 读起。
 2. `docs/` — **技术文档**：当前实现与技术设计（架构与协议、各子应用、未来方向），设计依据引用决策；应用专属技术文档在 `apps/<app>/docs/`。从 `docs/README.md` 读起。
 
+另有 `references/`：其他产品与项目的资料，以及作者对它们的想法（规则见 `references/README.md`）。
+
 参与开发的 agent 先读 `AGENTS.md`。
 
 ## 开发
