@@ -49,6 +49,20 @@
   - 每个插件版本都会被自动扫描（安全漏洞、代码质量、恶意软件），结果在插件页上显示为安全评分卡；热门、精选和被举报的插件还有人工审核。社区插件不会自动更新。
   - 开发者政策（[Developer policies](https://docs.obsidian.md/Developer+policies)）：不许混淆代码、不许客户端遥测、不许自己安装或更新依赖；联网、访问库以外的文件、需要付费或账号等，必须在说明里写清楚。
 
+## 社区
+
+- 官方入口（[Community](https://obsidian.md/community)）：
+  - [论坛](https://forum.obsidian.md)：功能请求、报告问题、关于知识管理的深入讨论。「[Share & showcase](https://forum.obsidian.md/c/share-showcase/9)」版块专门分享用法，分「Workflows & Templates」（工作流与模板）、「Themes & CSS snippets」、「Plugins」三个子版块；
+  - [中文论坛](https://forum-zh.obsidian.md)；
+  - Discord：求助、提问、认识其他用户、看别人的配置；
+  - 社交媒体：X（@obsdmd）、Bluesky、Threads、Mastodon、YouTube、GitHub。
+- 论坛「Workflows & Templates」里能看到的用法举例（2026 年）：圣经学习套件（约 10 万次浏览）、出租房产管理、生理周期记录、个人 CRM、大学课程笔记、写剧本、用地图视图规划旅行、玩 Steam 游戏时自动记笔记；也有很多帖子讲把 Claude Code 等 AI agent 用在库里。
+- 周报：
+  - Obsidian Roundup（版主 Eleanor Konik，2021-04 至 2023-06，已停更）；
+  - [This Week in Obsidian](https://thisweekinobsidian.substack.com)（社区成员写的英文周报，2025 年底开始，每周二）；
+  - [PKMer 的 Obsidian 社区周报](https://pkmer.cn/Pkmer-Docs/10-obsidian/obsidian%E7%A4%BE%E5%8C%BA%E5%91%A8%E6%8A%A5/obsidian%E7%A4%BE%E5%8C%BA%E5%91%A8%E6%8A%A5)（中文，最近一期 2026-09-30）。
+- [Obsidian Hub](https://publish.obsidian.md/hub)：社区维护的资料库（本身就是一个用 Obsidian Publish 发布的库）。
+
 ## 收费
 
 见[定价](https://obsidian.md/pricing)：
