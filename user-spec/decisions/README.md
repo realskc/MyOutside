@@ -141,6 +141,7 @@
 | [D-0077](0077-open-app-file.md) | 子应用可以请外壳用系统默认程序打开自己目录下的文本文件 | 有效 |
 | [D-0078](0078-tools-unchanged-within-conversation.md) | 对话中不改动工具定义；轮数用完时用 tool_choice = none | 有效 |
 | [D-0079](0079-obsidian-for-docs.md) | 用 Obsidian 查看和编辑文档：打开整个仓库，链接保持标准 Markdown | 有效 |
+| [D-0080](0080-device-access.md) | 设备上的数据是普通文件夹；子应用访问设备要在清单里登记，经内核与设备之间的通道 | 有效（未实现） |
 
 ## 应用专属决策
 
