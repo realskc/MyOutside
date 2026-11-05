@@ -1,6 +1,7 @@
 import {
   app,
   BrowserWindow,
+  dialog,
   ipcMain,
   Menu,
   protocol,
@@ -8,8 +9,9 @@ import {
   type MenuItemConstructorOptions,
   type WebFrameMain,
 } from "electron";
-import { copyFileSync, existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { copyFileSync, createReadStream, existsSync, mkdirSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { extname, join, normalize, resolve, sep } from "node:path";
+import { Readable } from "node:stream";
 import { createKernel, SHELL_CALLER, type Kernel } from "@myoutside/kernel";
 import { createNodeSqliteAdapter } from "@myoutside/kernel-node";
 import { vocabApp } from "@myoutside/vocab";
@@ -18,6 +20,8 @@ import { dialogApp } from "@myoutside/dialog";
 import dialogManifest from "@myoutside/dialog/manifest.json";
 import { goApp } from "@myoutside/go";
 import goManifest from "@myoutside/go/manifest.json";
+import { createPureblueApp } from "@myoutside/pureblue";
+import pureblueManifest from "@myoutside/pureblue/manifest.json";
 import { startLanServer } from "./lan-server";
 
 // 数据目录使用正式名称：%APPDATA%/MyOutside
@@ -30,6 +34,10 @@ if (process.env.MYOUTSIDE_SMOKE === "1") {
 
 protocol.registerSchemesAsPrivileged([
   { scheme: "app", privileges: { standard: true, secure: true, supportFetchAPI: true, corsEnabled: true } },
+  {
+    scheme: "media",
+    privileges: { standard: true, secure: true, supportFetchAPI: true, corsEnabled: true, stream: true },
+  },
 ]);
 
 function mimeFor(file: string): string {
@@ -85,6 +93,76 @@ function registerAppProtocol(uiDirs: Record<string, string>): void {
     } catch {
       return new Response("Not Found", { status: 404 });
     }
+  });
+}
+
+const MEDIA_MIME: Record<string, string> = {
+  ".mp3": "audio/mpeg",
+  ".wav": "audio/wav",
+  ".flac": "audio/flac",
+  ".m4a": "audio/mp4",
+  ".ogg": "audio/ogg",
+  ".aac": "audio/aac",
+};
+
+/** 应用私有文件（媒体）：media://<appId>/<相对路径> → <dataDir>/apps/<appId>/<相对路径> */
+function registerMediaProtocol(dataDir: string, appIds: Set<string>): void {
+  const appsRoot = resolve(dataDir, "apps");
+  protocol.handle("media", async (request) => {
+    const url = new URL(request.url);
+    const appId = url.hostname;
+    if (!appIds.has(appId)) return new Response("Not Found", { status: 404 });
+    const relativePath = decodeURIComponent(url.pathname).replace(/^\/+/, "");
+    const appRoot = normalize(join(appsRoot, appId));
+    const file = normalize(join(appRoot, relativePath));
+    if (!file.startsWith(appRoot + sep)) return new Response("Forbidden", { status: 403 });
+
+    let fileStat;
+    try {
+      fileStat = statSync(file);
+    } catch {
+      return new Response("Not Found", { status: 404 });
+    }
+    if (!fileStat.isFile()) return new Response("Not Found", { status: 404 });
+    const mime = MEDIA_MIME[extname(file).toLowerCase()] ?? "application/octet-stream";
+
+    const range = request.headers.get("range");
+    if (range) {
+      const match = /^bytes=(\d*)-(\d*)$/.exec(range.trim());
+      if (match) {
+        let start = match[1] ? Number(match[1]) : NaN;
+        let end = match[2] ? Number(match[2]) : NaN;
+        if (Number.isNaN(start)) {
+          const suffix = Number.isNaN(end) ? 0 : end;
+          start = Math.max(0, fileStat.size - suffix);
+          end = fileStat.size - 1;
+        } else if (Number.isNaN(end) || end >= fileStat.size) {
+          end = fileStat.size - 1;
+        }
+        if (start <= end && start < fileStat.size) {
+          const stream = Readable.toWeb(createReadStream(file, { start, end }));
+          return new Response(stream as unknown as ReadableStream, {
+            status: 206,
+            headers: {
+              "content-type": mime,
+              "content-length": String(end - start + 1),
+              "content-range": `bytes ${start}-${end}/${fileStat.size}`,
+              "accept-ranges": "bytes",
+            },
+          });
+        }
+      }
+    }
+
+    const stream = Readable.toWeb(createReadStream(file));
+    return new Response(stream as unknown as ReadableStream, {
+      status: 200,
+      headers: {
+        "content-type": mime,
+        "content-length": String(fileStat.size),
+        "accept-ranges": "bytes",
+      },
+    });
   });
 }
 
@@ -236,6 +314,29 @@ async function captureWindow(win: BrowserWindow, attempts: number, delayMs: numb
     }
   }
   return Buffer.alloc(0);
+}
+
+/** 冒烟用：生成一小段合法 WAV（静音），验证 media:// 音频链路 */
+function makeSilentWav(seconds: number): Buffer {
+  const sampleRate = 44100;
+  const channels = 2;
+  const bits = 16;
+  const dataSize = sampleRate * channels * (bits / 8) * seconds;
+  const buffer = Buffer.alloc(44 + dataSize);
+  buffer.write("RIFF", 0);
+  buffer.writeUInt32LE(36 + dataSize, 4);
+  buffer.write("WAVE", 8);
+  buffer.write("fmt ", 12);
+  buffer.writeUInt32LE(16, 16);
+  buffer.writeUInt16LE(1, 20);
+  buffer.writeUInt16LE(channels, 22);
+  buffer.writeUInt32LE(sampleRate, 24);
+  buffer.writeUInt32LE(sampleRate * channels * (bits / 8), 28);
+  buffer.writeUInt16LE(channels * (bits / 8), 32);
+  buffer.writeUInt16LE(bits, 34);
+  buffer.write("data", 36);
+  buffer.writeUInt32LE(dataSize, 40);
+  return buffer;
 }
 
 async function runSmoke(win: BrowserWindow): Promise<void> {
@@ -429,6 +530,74 @@ async function runSmoke(win: BrowserWindow): Promise<void> {
     writeFileSync(goShotPath, goPng);
     console.log("[smoke] go screenshot:", goShotPath, `(${goPng.length} bytes)`);
 
+    // 纯蓝：验证 app://pureblue 能加载、曲目列表 / 引擎状态 / media:// 音频链路
+    const smokeAppDir = join(app.getPath("temp"), "myoutside-smoke-data", "apps", "pureblue");
+    const smokeWavPath = join(smokeAppDir, "smoke.wav");
+    mkdirSync(smokeAppDir, { recursive: true });
+    writeFileSync(smokeWavPath, makeSilentWav(1));
+    await win.loadURL("app://pureblue/index.html");
+    for (let i = 0; i < 24; i += 1) {
+      const ready = (await win.webContents.executeJavaScript(
+        'document.readyState === "complete" && typeof window.outside === "object" && !!document.getElementById("btn-import")',
+      )) as boolean;
+      if (ready) break;
+      await new Promise((resolve) => setTimeout(resolve, 250));
+    }
+    const pureblueCheck = await win.webContents.executeJavaScript(
+      `(async () => {
+        const list = await window.outside.call("pureblue.listTracks", {});
+        const engine = await window.outside.call("pureblue.getEngineStatus", {});
+        const audio = await new Promise((resolve) => {
+          const element = new Audio("media://pureblue/smoke.wav");
+          let done = false;
+          const finish = (result) => { if (!done) { done = true; resolve(result); } };
+          element.addEventListener("canplaythrough", () => finish({ ok: true, duration: element.duration }));
+          element.addEventListener("error", () => finish({ ok: false, code: element.error ? element.error.code : null }));
+          setTimeout(() => finish({ ok: false, timeout: true }), 3000);
+          element.load();
+        });
+        return {
+          listOk: list.ok,
+          count: list.ok ? list.result.length : null,
+          engineOk: engine.ok,
+          engineReady: engine.ok ? engine.result.ready : null,
+          hasImport: !!document.getElementById("btn-import"),
+          chip: (document.getElementById("engine-chip") || {}).textContent || "",
+          audio,
+        };
+      })()`,
+    );
+    console.log("[smoke] pureblue:", JSON.stringify(pureblueCheck));
+    const pureblueShotPath = join(app.getPath("temp"), "myoutside-pureblue.png");
+    const purebluePng = await captureWindow(win, 8, 400);
+    writeFileSync(pureblueShotPath, purebluePng);
+    console.log("[smoke] pureblue screenshot:", pureblueShotPath, `(${purebluePng.length} bytes)`);
+
+    // 纯蓝：真实导入一段静音 WAV（临时数据），验证导入 + 详情界面
+    const pureblueImport = await win.webContents.executeJavaScript(
+      `(async () => {
+        const r = await window.outside.call("pureblue.importTrack", { path: ${JSON.stringify(smokeWavPath)} });
+        return { ok: r.ok, id: r.ok ? r.result.id : null, error: r.ok ? null : r.error };
+      })()`,
+    );
+    console.log("[smoke] pureblue import:", JSON.stringify(pureblueImport));
+    await win.reload();
+    for (let i = 0; i < 24; i += 1) {
+      const ready = (await win.webContents.executeJavaScript(
+        'document.readyState === "complete" && !!document.getElementById("track-title") && document.getElementById("track-title").textContent !== ""',
+      )) as boolean;
+      if (ready) break;
+      await new Promise((resolve) => setTimeout(resolve, 250));
+    }
+    const pureblueTrackPng = await captureWindow(win, 8, 400);
+    const pureblueTrackShotPath = join(app.getPath("temp"), "myoutside-pureblue-track.png");
+    writeFileSync(pureblueTrackShotPath, pureblueTrackPng);
+    console.log(
+      "[smoke] pureblue track screenshot:",
+      pureblueTrackShotPath,
+      `(${pureblueTrackPng.length} bytes)`,
+    );
+
   } catch (error) {
     console.error("[smoke] 失败：", error);
   } finally {
@@ -464,8 +633,10 @@ app.whenReady().then(async () => {
   kernel.registerApp(vocabApp, vocabManifest);
   kernel.registerApp(dialogApp, dialogManifest);
   kernel.registerApp(goApp, goManifest);
+  kernel.registerApp(createPureblueApp({ dataDir: join(dataDir, "apps", "pureblue") }), pureblueManifest);
   kernel.start();
   const appIds = new Set(kernel.listApps().map((item) => item.id));
+  registerMediaProtocol(dataDir, appIds);
 
   /** 调用者 = 发起 IPC 的页面所属的子应用（app://<id>/）；外壳 = 平台自身 */
   const callerOf = (frame: WebFrameMain | null): string | null => {
@@ -554,6 +725,18 @@ app.whenReady().then(async () => {
     if (typeof url !== "string" || !/^https?:\/\//i.test(url)) return false;
     await shell.openExternal(url);
     return true;
+  });
+
+  // 子应用请求选择本地音频文件；只允许已注册的子应用页面调用
+  ipcMain.handle("host:pickAudioFile", async (event) => {
+    const caller = callerOf(event.senderFrame);
+    if (!caller || caller === SHELL_CALLER) return null;
+    const result = await dialog.showOpenDialog({
+      title: "选择音频",
+      properties: ["openFile"],
+      filters: [{ name: "Audio", extensions: ["mp3", "wav", "flac", "m4a", "ogg", "aac"] }],
+    });
+    return result.canceled ? null : (result.filePaths[0] ?? null);
   });
 
   registerAppProtocol(uiDirs);

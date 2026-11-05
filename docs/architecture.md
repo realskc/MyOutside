@@ -32,6 +32,7 @@ SQLite 单文件（<userData>/myoutside.db）
 | `packages/kernel-node` | Node 存储适配器（`node:sqlite` 的 `DatabaseSync`） |
 | `apps/vocab`、`apps/dialog` | 子应用：`backend/`（AppModule）、`ui/`（静态界面，D-0011）、`test/` |
 | `apps/go` | 围棋子应用：`backend/`（9 路规则、联机、悔棋、棋谱）、`ui/`（Canvas 棋盘 + 聊天）、`user-spec/`、`docs/`；应用自包含，见 D-0073 |
+| `apps/pureblue` | 纯蓝：`backend/`（六轨分离任务、曲目、引擎探测）、`ui/`（内建慢放播放器）、`user-spec/`、`docs/`、`manifest.json`；应用自包含，见 D-0073 |
 | `apps/host` | Electron 程序：主进程、preload、外壳界面（`renderer/`） |
 
 ## 2. 子应用模块（AppModule）
@@ -225,13 +226,15 @@ get(table, where) / all(table, where?, { orderBy?, limit?, offset? }) / count(ta
 - 写入：先落盘临时文件 → 计算校验和 → 事务登记 → 原子改名；
 - 删除：事务内删元数据并写入 `files.pending_delete`，后台任务删物理文件；
 - 原则：**先库后文件，允许孤儿文件，禁止幽灵引用**（库里有记录、盘上无文件）；启动时清理待删队列与临时文件。
+- 目前纯蓝使用临时方案：应用文件放 `<userData>/apps/<appId>/`，通过 `media://` 提供（PB-0004）；文件仓库实现后再迁移。
 
 ## 10. Electron 程序（apps/host）
 
 - 主进程（`src/main/index.ts`）：创建内核与存储、按清单注册子应用、识别调用者、IPC（`kernel:call`、`kernel:cancel`、`host:openExternal`）、推送事件（`kernel:event`）、`app://` 协议、菜单、冒烟模式；
 - 界面（D-0018）：外壳页面 `app://shell/index.html`，一个 iframe 作为面板，切换时改 `src`；`app://<id>/` 映射到各应用 `ui/` 目录，带路径穿越检查；
-- preload（`src/preload/index.ts`）：`window.outside = { call(name, payload, { runId }), newRunId, onEvent(runId, listener), cancel(runId), openExternal }`；
+- preload（`src/preload/index.ts`）：`window.outside = { call(name, payload, { runId }), newRunId, onEvent(runId, listener), cancel(runId), openExternal, pickAudioFile }`；
 - 外链：`host.openExternal` 只接受 http/https，用系统浏览器打开；
+- 应用文件：`media://<appId>/<相对路径>` 映射到 `<dataDir>/apps/<appId>/`（支持 Range 请求、路径穿越检查，PB-0004）；`host:pickAudioFile` 为子应用打开本地音频选择框（PB-0004）；
 - 菜单：文件 / 编辑 / 视图；「编辑」菜单让 macOS 上的剪贴板快捷键生效；中英文跟随 `ui.language`；
 - 单实例锁（D-0016）；数据目录：`app.getPath("userData")`（应用名 MyOutside）；
 - 冒烟模式（`pnpm smoke`，`MYOUTSIDE_SMOKE=1`）：复制真实数据库到临时目录，自检外壳与各子应用、做演示写入、截图后退出（D-0046）；

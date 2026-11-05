@@ -30,6 +30,8 @@ const outside = {
   cancel: (runId: string) => ipcRenderer.invoke("kernel:cancel", runId),
   /** 用系统浏览器打开外链（仅 http/https） */
   openExternal: (url: string) => ipcRenderer.invoke("host:openExternal", url),
+  /** 选择本地音频文件（返回绝对路径；取消返回 null） */
+  pickAudioFile: () => ipcRenderer.invoke("host:pickAudioFile"),
 };
 
 contextBridge.exposeInMainWorld("outside", outside);

@@ -1,0 +1,93 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>纯蓝</title>
+    <link rel="stylesheet" href="ui.css" />
+  </head>
+  <body>
+    <header class="topbar">
+      <div class="brand">
+        <h1 data-i18n="appTitle">纯蓝</h1>
+        <span class="hex">0x66CCFF</span>
+      </div>
+      <div class="topbar-right">
+        <span id="engine-chip" class="chip"></span>
+        <button id="btn-import" class="primary" data-i18n="import">导入音频</button>
+      </div>
+    </header>
+
+    <main class="layout">
+      <aside class="sidebar">
+        <div id="track-list" class="track-list"></div>
+      </aside>
+
+      <section class="workspace">
+        <div id="empty" class="empty">
+          <div class="empty-icon">♪</div>
+          <p data-i18n="emptyHint">导入一首歌，分离成六轨，然后慢放练习。</p>
+        </div>
+
+        <div id="detail" class="detail hidden">
+          <div class="detail-head">
+            <div class="detail-title">
+              <h2 id="track-title"></h2>
+              <div id="track-meta" class="meta"></div>
+            </div>
+            <button id="btn-delete" class="text-danger" data-i18n="delete">删除</button>
+          </div>
+
+          <div class="panel separate-panel">
+            <div class="panel-row">
+              <button id="btn-separate" class="primary" data-i18n="separate">分离六轨</button>
+              <button id="btn-cancel" class="ghost hidden" data-i18n="cancel">取消</button>
+              <span id="job-status" class="muted"></span>
+            </div>
+            <div id="progress-wrap" class="progress-wrap hidden">
+              <div id="progress-bar" class="progress-bar"></div>
+            </div>
+            <div id="job-message" class="job-message"></div>
+            <div id="engine-help" class="engine-help hidden">
+              <div data-i18n="engineMissing">未检测到分离引擎。请先运行：</div>
+              <code>powershell -ExecutionPolicy Bypass -File apps/pureblue/scripts/setup-engine.ps1</code>
+              <div class="engine-help-actions">
+                <button id="btn-recheck" class="link-btn" data-i18n="recheck">重新检查</button>
+              </div>
+            </div>
+          </div>
+
+          <div id="player" class="player hidden">
+            <div class="transport">
+              <button id="btn-play" class="play" data-i18n="play">播放</button>
+              <span id="time" class="time">0:00 / 0:00</span>
+              <input id="seek" class="seek" type="range" min="0" max="1000" value="0" />
+              <label class="speed">
+                <span data-i18n="speed">速度</span>
+                <select id="speed">
+                  <option value="0.5">50%</option>
+                  <option value="0.6">60%</option>
+                  <option value="0.7">70%</option>
+                  <option value="0.75">75%</option>
+                  <option value="0.8">80%</option>
+                  <option value="0.9">90%</option>
+                  <option value="1" selected>100%</option>
+                </select>
+              </label>
+              <button id="btn-loop" class="ghost" data-i18n="loop">循环</button>
+              <button id="btn-a" class="ghost">A</button>
+              <button id="btn-b" class="ghost">B</button>
+              <span id="loop-label" class="loop-label"></span>
+              <button id="btn-clear-loop" class="link-btn" data-i18n="clearLoop">清除</button>
+            </div>
+            <div id="mixer" class="mixer"></div>
+          </div>
+        </div>
+      </section>
+    </main>
+
+    <div id="toast" class="toast hidden"></div>
+    <div id="audio-holder" class="audio-holder"></div>
+    <script src="ui.js"></script>
+  </body>
+</html>

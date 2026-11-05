@@ -1,0 +1,124 @@
+import { existsSync, mkdtempSync, statSync, writeFileSync, mkdirSync, rmSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import { createKernel, type Kernel } from "@myoutside/kernel";
+import { createNodeSqliteAdapter } from "@myoutside/kernel-node";
+import { afterEach, describe, expect, it } from "vitest";
+import { createPureblueApp } from "../backend/src/index.js";
+
+const cleanup: string[] = [];
+
+function setup(): { kernel: Kernel; dataDir: string } {
+  const dataDir = mkdtempSync(join(tmpdir(), "pureblue-test-"));
+  cleanup.push(dataDir);
+  const storage = createNodeSqliteAdapter({ path: ":memory:" });
+  const kernel = createKernel({ storage });
+  kernel.registerApp(createPureblueApp({ dataDir }));
+  kernel.start();
+  return { kernel, dataDir };
+}
+
+async function call<T>(kernel: Kernel, name: string, payload?: unknown): Promise<T> {
+  const res = await kernel.handle({ call: name, payload });
+  if (!res.ok) throw new Error(`${res.error.code}: ${res.error.message}`);
+  return res.result as T;
+}
+
+async function raw(kernel: Kernel, name: string, payload?: unknown) {
+  return kernel.handle({ call: name, payload });
+}
+
+afterEach(() => {
+  while (cleanup.length > 0) {
+    const dir = cleanup.pop();
+    if (dir) rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+describe("pureblue backend", () => {
+  it("引擎未安装时状态为 not ready", async () => {
+    const { kernel } = setup();
+    const status = await call<{ ready: boolean; pythonPath: string | null; setupCommand: string }>(
+      kernel,
+      "pureblue.getEngineStatus",
+      {},
+    );
+    expect(status.ready).toBe(false);
+    expect(status.pythonPath).toBeNull();
+    expect(status.setupCommand).toContain("setup-engine.ps1");
+  });
+
+  it("曲目 CRUD：写入 / 列表 / 详情 / 删除", async () => {
+    const { kernel, dataDir } = setup();
+    const trackDir = join(dataDir, "tracks", "t1");
+    mkdirSync(trackDir, { recursive: true });
+    writeFileSync(join(trackDir, "source.wav"), "fake");
+
+    await call(kernel, "pureblue.insertTrack", {
+      id: "t1",
+      title: "测试曲目",
+      file: "tracks/t1/source.wav",
+      ext: "wav",
+      size: 4,
+      duration: 12.5,
+    });
+
+    const tracks = await call<Array<{ id: string; title: string; stemCount: number }>>(
+      kernel,
+      "pureblue.listTracks",
+      {},
+    );
+    expect(tracks).toHaveLength(1);
+    expect(tracks[0]).toMatchObject({ id: "t1", title: "测试曲目", stemCount: 0 });
+
+    const detail = await call<{ id: string; duration: number; stems: unknown[]; job: null }>(
+      kernel,
+      "pureblue.getTrack",
+      { trackId: "t1" },
+    );
+    expect(detail.id).toBe("t1");
+    expect(detail.duration).toBe(12.5);
+    expect(detail.stems).toEqual([]);
+    expect(detail.job).toBeNull();
+
+    await call(kernel, "pureblue.deleteTrackTx", { trackId: "t1" });
+    expect(await call<unknown[]>(kernel, "pureblue.listTracks", {})).toHaveLength(0);
+  });
+
+  it("importTrack 复制文件到应用目录并写入曲目", async () => {
+    const { kernel, dataDir } = setup();
+    const source = join(dataDir, "incoming.wav");
+    writeFileSync(source, "fake audio");
+
+    const track = await call<{ id: string; title: string; file: string }>(kernel, "pureblue.importTrack", {
+      path: source,
+      title: "导入测试",
+    });
+    expect(track.title).toBe("导入测试");
+    expect(track.file.startsWith("tracks/")).toBe(true);
+    expect(existsSync(join(dataDir, track.file))).toBe(true);
+    expect(statSync(join(dataDir, track.file)).size).toBe(10);
+
+    const imported = await call<{ file: string }>(kernel, "pureblue.getTrack", { trackId: track.id });
+    expect(imported.file).toBe(track.file);
+  });
+
+  it("不支持的文件格式被拒绝", async () => {
+    const { kernel, dataDir } = setup();
+    const source = join(dataDir, "notes.txt");
+    writeFileSync(source, "hi");
+    const result = await raw(kernel, "pureblue.importTrack", { path: source });
+    expect(result.ok).toBe(false);
+    if (!result.ok) expect(result.error.code).toBe("VALIDATION");
+  });
+
+  it("引擎缺失时拒绝分离", async () => {
+    const { kernel, dataDir } = setup();
+    const source = join(dataDir, "song.mp3");
+    writeFileSync(source, "fake");
+    const track = await call<{ id: string }>(kernel, "pureblue.importTrack", { path: source });
+    const result = await raw(kernel, "pureblue.startSeparation", { trackId: track.id });
+    expect(result.ok).toBe(false);
+    if (!result.ok) expect(result.error.code).toBe("PRECONDITION");
+  });
+});

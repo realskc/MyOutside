@@ -12,6 +12,7 @@
 | [`../apps/vocab/docs/README.md`](../apps/vocab/docs/README.md) | 学英语：数据模型、API、添加 / 查词流程、界面 |
 | [`../apps/dialog/docs/README.md`](../apps/dialog/docs/README.md) | 对话：消息树、API、生成流程、界面 |
 | [`../apps/go/docs/README.md`](../apps/go/docs/README.md) | 围棋：9 路特殊规则、双人联机、聊天、悔棋、棋谱、界面 |
+| [`../apps/pureblue/docs/README.md`](../apps/pureblue/docs/README.md) | 纯蓝：六轨分离、内建慢放播放器、引擎与文件布局 |
 | [`../apps/zheye/docs/README.md`](../apps/zheye/docs/README.md) | 哲野（未实现）：数据模型、状态机、API、流程 |
 | `future/one-off-functions.md` | 临时函数（未实现） |
 | `future/multi-device.md` | 多端（未实施） |

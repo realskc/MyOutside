@@ -16,7 +16,8 @@
     "@myoutside/kernel-node": "workspace:*",
     "@myoutside/vocab": "workspace:*",
     "@myoutside/dialog": "workspace:*",
-    "@myoutside/go": "workspace:*"
+    "@myoutside/go": "workspace:*",
+    "@myoutside/pureblue": "workspace:*"
   },
   "devDependencies": {
     "@types/node": "^24.0.0",

@@ -1,0 +1,9 @@
+{
+  "id": "pureblue",
+  "name": "纯蓝",
+  "protocolVersion": 1,
+  "ui": "ui/index.html",
+  "backend": "backend/src/index.ts",
+  "owns": ["track", "job", "stem"],
+  "uses": ["platform.settings.get"]
+}
