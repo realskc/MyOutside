@@ -30,3 +30,4 @@
 | `obsidian/` | [Obsidian](obsidian/Obsidian.md)：本地优先的 Markdown 笔记软件；[LLM Wiki](obsidian/LLM%20Wiki.md)：Karpathy 提出的、让 LLM 编译并维护个人知识库的做法，用 Obsidian 浏览 | [有](obsidian/thoughts.md) |
 | `bilibili/` | [Bilibili](bilibili/Bilibili.md)：历史记录接口（非官方） | 无 |
 | `wechat/` | [WeChat ClawBot](wechat/WeChat%20ClawBot.md)：个人微信号的官方机器人接入（iLink） | 无 |
+| `lobehub/` | [LobeHub](lobehub/LobeHub.md)：以 agent 为工作单位的 agent 团队平台（前身 LobeChat） | 无 |
