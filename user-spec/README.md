@@ -76,6 +76,7 @@ agent 发现 spec 与需求或现状冲突时，正确的反应不是覆盖，�
 | 文档 | 内容 |
 |---|---|
 | `product.md` | 产品是什么、为谁、使命、阶段路线 |
+| `vision.md` | 愿景与哲学：离实现还远的宏观想法（不是需求） |
 | `principles.md` | 贯穿全局的原则 |
 | `platform.md` | 平台层的预期 |
 | `future/` | 尚未实现的方向：`builder.md`、`user-spec.md`（user spec 作为产品能力的构想） |
