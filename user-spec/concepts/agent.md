@@ -10,7 +10,7 @@
 ## agent
 
 - 定义：像小黄人一样的智能体（见 `../vision.md`「智能像灵气」：智能是灵气，agent 是小黄人）。
-- 作者暂且按它绑定的记忆分三类：session（绑定某个短时记忆）、claw（绑定某个中时记忆）、assistant（绑定某个长时记忆，或一个用户 / 公司），见 `../future/agent-design.md`。
+- 作者暂且按它绑定的记忆分三类：session（绑定某个短期记忆）、claw（绑定某个中期记忆）、assistant（绑定某个长期记忆，或一个用户 / 公司），见 `../future/agent-design.md`。
 - 例子：编码 agent；将来的 builder（见 `../future/builder.md`）；OpenClaw 就是一个 claw。
 - 不是：工作流。例如学英语添加卡片时的判重是一个工作流，不是 agent。
 
