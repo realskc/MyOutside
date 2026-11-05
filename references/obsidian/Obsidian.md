@@ -22,6 +22,33 @@
 - 官方命令行（1.12 起）几乎能做界面上能做的所有事，但它遥控的是正在运行的 Obsidian：程序没开，第一条命令会先把它打开（[Obsidian CLI](https://obsidian.md/help/cli)）。不开界面也能运行的官方组件只有 Obsidian Headless，只负责同步，需要订阅 Sync。
 - CEO Steph Ango 发布了一套 agent skills，教 AI agent 使用 Obsidian 命令行和它的文件格式（Markdown、Bases、JSON Canvas）（[obsidian-skills](https://github.com/kepano/obsidian-skills)）。
 
+## 插件
+
+- 两种：
+  - **核心插件**：官方自带，只能开关，例如日记、模板、Canvas 白板、Bases、关系图谱、反向链接、同步、发布、网页浏览器（完整列表见库里的 `.obsidian/core-plugins.json`）；
+  - **社区插件**：第三方用 JavaScript 写的，官方目录里有 9960 个（2026-11-05 统计，见上文「开放程度」）。
+- 下载量最多的社区插件（[community-plugin-stats.json](https://github.com/obsidianmd/obsidian-releases)，2026-11-05 统计）：
+
+  | 插件 | 下载量 | 做什么 |
+  |---|---|---|
+  | Excalidraw | 891 万 | 手绘风格的白板和画图 |
+  | Templater | 610 万 | 带脚本的动态模板 |
+  | Dataview | 526 万 | 把笔记当数据库查询，生成表格和列表 |
+  | Tasks | 457 万 | 跨笔记的任务管理：截止日期、重复任务 |
+  | Git | 340 万 | 用 git 自动备份和同步库 |
+  | Advanced Tables | 334 万 | 更好用的 Markdown 表格编辑 |
+  | Calendar | 325 万 | 用日历浏览日记 |
+  | Copilot | 325 万 | 在库里运行 Claude Code、Codex、OpenCode 等 AI agent |
+  | Style Settings | 283 万 | 调整主题和插件的样式变量 |
+  | Kanban | 281 万 | 用 Markdown 存的看板 |
+  | Claudian | 262 万 | 把 Claude Code、Codex 等本地 agent 嵌进库里 |
+
+- 安全（[Plugin security](https://obsidian.md/help/plugin-security)）：
+  - 默认是「限制模式」，不运行任何第三方代码；要装社区插件得先关掉它。
+  - 插件继承 Obsidian 的全部权限，官方说技术上做不到按权限限制：插件能读写电脑上的文件、联网、安装其他程序。
+  - 每个插件版本都会被自动扫描（安全漏洞、代码质量、恶意软件），结果在插件页上显示为安全评分卡；热门、精选和被举报的插件还有人工审核。社区插件不会自动更新。
+  - 开发者政策（[Developer policies](https://docs.obsidian.md/Developer+policies)）：不许混淆代码、不许客户端遥测、不许自己安装或更新依赖；联网、访问库以外的文件、需要付费或账号等，必须在说明里写清楚。
+
 ## 收费
 
 见[定价](https://obsidian.md/pricing)：
