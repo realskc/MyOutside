@@ -7,7 +7,7 @@
 - **后端**：`backend/src/index.ts` 的 `createPureblueApp({ dataDir, engineDir? })`（宿主在启动时用数据目录构造并注册）；`demucs.ts` 负责引擎探测与分离进程。
 - **界面**：`ui/` 静态 HTML / CSS / JS（零构建）。
 - **引擎**：`scripts/setup-engine.ps1` 安装到 `<userData>/apps/pureblue/engine`（Python 3.12 venv + Demucs + CUDA PyTorch；见 [PB-0003](../user-spec/decisions/PB-0003-engine-setup-script.md)）。
-- **MIDI 引擎（可选）**：`scripts/setup-midi-engine.ps1` 安装到 `<userData>/apps/pureblue/midi-engine`（独立 Python 3.10 venv + Basic Pitch + ONNX Runtime；见 [PB-0007](../user-spec/decisions/PB-0007-basic-pitch-midi.md)）；`scripts/transcribe_midi.py` 负责单条 stem 转 MIDI。
+- **MIDI 引擎（可选）**：`scripts/setup-midi-engine.ps1` 安装到 `<userData>/apps/pureblue/midi-engine`（独立 Python 3.10 venv + Basic Pitch + ONNX Runtime；见 [PB-0007](../user-spec/decisions/PB-0007-basic-pitch-midi.md)）；`scripts/transcribe_midi.py` 负责单音频（单条 stem 或选定 stem 混合）转 MIDI。
 - **媒体**：宿主 `media://<appId>/<相对路径>` 协议读取 `<userData>/apps/<appId>/`（见 [PB-0004](../user-spec/decisions/PB-0004-app-files-and-media-protocol.md)）。
 
 ## 2. 数据
@@ -56,10 +56,10 @@ pureblue__stem(id, track_id, job_id, kind, file, size, created_at)
 
 - 引擎：Spotify Basic Pitch `0.4.0`，独立 Python 3.10 venv + ONNX Runtime；不安装 TensorFlow，也不与 Demucs 的 Python 3.12 环境混用；
 - 安装：`powershell -ExecutionPolicy Bypass -File apps/pureblue/scripts/setup-midi-engine.ps1`；
-- 转写：`apps/pureblue/scripts/transcribe_midi.py <stem 音频> <输出.mid>`，可选 `--instrument-name`、`--program`、`--min-frequency`、`--max-frequency`、阈值参数；
-- 输入只接受**一个音频文件**；未来也只做单条 stem，不转整首歌、不做多轨合并；鼓轨没有音高，不转；
+- 转写：`apps/pureblue/scripts/transcribe_midi.py <音频> <输出.mid>`，可选 `--instrument-name`、`--program`、`--min-frequency`、`--max-frequency`、阈值参数；
+- 输入只接受**一个音频文件**；可以是单条 stem，也可以是选定的几条 stem 混合；不转整首歌；输出一个单轨 MIDI；鼓轨没有音高，不转；
 - 脚本 stdout 输出 JSON 摘要（音符数、音高范围、时长、输出路径），供后续后端接入；
-- 验证：本机 3 分 02 秒的 piano stem → 1,131 个音符，bass stem → 615 个音符；冷启动约 20 秒（模型加载），预热后约 5 秒；输出在 `tracks/<id>/midi-validation/`（尚未写入数据库、尚未接入界面）；
+- 验证：本机 3 分 02 秒的 piano stem → 1,131 个音符，guitar stem → 880 个音符；piano + guitar 混成一条音频后 → 1,525 个音符、10,334 字节；冷启动约 20 秒（模型加载），预热后约 5 秒；输出在 `tracks/<id>/midi-validation/`（尚未写入数据库、尚未接入界面）；
 - Basic Pitch 以 Apache-2.0 发布；若随应用分发，需要保留 LICENSE / NOTICE。
 
 ## 6. 界面
@@ -72,7 +72,7 @@ pureblue__stem(id, track_id, job_id, kind, file, size, created_at)
 
 ## 7. 已知限制
 
-- MIDI 转写目前只有命令行验证，没有界面 / API；只支持单轨，未做 MIDI 播放或多轨合并。
+- MIDI 转写目前只有命令行验证，没有界面 / API；输出单轨 MIDI，未做 MIDI 播放或多轨合并。
 - 取消只对当前页面发起的任务有效；刷新后正在运行的任务无法从界面取消（会继续并靠轮询显示）。
 - 没有导出、变调、两轨快捷预设、波形；这些见应用 user spec 的「未定 / 非目标」。
 - `media://` 没有跨应用权限：目前任意子应用理论上能猜到并读取其它应用的 media 路径；builder / 不可信应用出现前必须收紧（PB-0004）。

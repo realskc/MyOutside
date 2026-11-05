@@ -16,7 +16,7 @@ powershell -ExecutionPolicy Bypass -File apps/pureblue/scripts/setup-engine.ps1
 
 脚本会创建 Python 3.12 venv，安装 Demucs + CUDA 版 PyTorch，并预下载 `htdemucs_6s` 六轨模型（首次下载约数 GB）。
 
-### MIDI 转写（可选，单轨）
+### MIDI 转写（可选，单音频）
 
 需要把某条 stem 转成 MIDI 时，再运行一次：
 
@@ -24,7 +24,7 @@ powershell -ExecutionPolicy Bypass -File apps/pureblue/scripts/setup-engine.ps1
 powershell -ExecutionPolicy Bypass -File apps/pureblue/scripts/setup-midi-engine.ps1
 ```
 
-脚本会创建**独立**的 Python 3.10 venv，安装 Basic Pitch + ONNX Runtime，不安装 TensorFlow，也不影响上面的 Demucs 引擎。只支持单条 stem，不转整首歌。
+脚本会创建**独立**的 Python 3.10 venv，安装 Basic Pitch + ONNX Runtime，不安装 TensorFlow，也不影响上面的 Demucs 引擎。可以转单条 stem，也可以把选定的几条 stem 混成一条音频再转；不转整首歌。
 
 应用文件（曲目、六轨结果、引擎、MIDI 引擎）位于 `%APPDATA%/MyOutside/apps/pureblue/`。
 
@@ -32,6 +32,6 @@ powershell -ExecutionPolicy Bypass -File apps/pureblue/scripts/setup-midi-engine
 
 - 数据库迁移与 API：`backend/src/index.ts`
 - 引擎调用与进度：`backend/src/demucs.ts`
-- MIDI 单轨转写：`scripts/transcribe_midi.py`（需要 `setup-midi-engine.ps1` 安装的独立引擎）
+- MIDI 单音频转写：`scripts/transcribe_midi.py`（需要 `setup-midi-engine.ps1` 安装的独立引擎；输入可以是单条 stem 或选定 stem 的混合）
 - 界面：`ui/`（零构建静态页面）
 - 测试：`pnpm.cmd --filter @myoutside/pureblue test`
