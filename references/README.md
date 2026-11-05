@@ -31,3 +31,4 @@
 | `bilibili/` | [Bilibili](bilibili/Bilibili.md)：历史记录接口（非官方） | 无 |
 | `wechat/` | [WeChat ClawBot](wechat/WeChat%20ClawBot.md)：个人微信号的官方机器人接入（iLink） | 无 |
 | `lobehub/` | [LobeHub](lobehub/LobeHub.md)：以 agent 为工作单位的 agent 团队平台（前身 LobeChat） | 无 |
+| `openclaw/` | [OpenClaw](openclaw/OpenClaw.md)：开源的个人 agent；一个 agent = 工作区文件 + 凭据 + 会话，记忆是工作区里的 Markdown | 无 |
