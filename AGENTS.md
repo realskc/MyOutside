@@ -6,7 +6,9 @@
 
 ## 动手之前：先读 user spec
 
-`user-spec/` 记录作者对 MyOutside 的预期，是整个项目的源头；各子应用的作者预期放在 `apps/<app>/user-spec/`；`docs/` 与 `apps/<app>/docs/` 下是技术文档（派生物）。
+`user-spec/` 记录作者对 MyOutside 的预期，是整个项目的源头；各子应用的作者预期放在 `apps/<app>/user-spec/`；`docs/` 与 `apps/<app>/docs/` 下是技术文档（派生物）。`references/` 记录其他产品与项目：资料 agent 可以自行补充，想法（`thoughts.md`）只记作者说的或作者明确认可的（见 `references/README.md`）。
+
+作者用 Obsidian 查看和编辑文档（整个仓库就是一个库）：文档里的链接一律用标准 Markdown 相对链接，指向文件而不是文件夹，不用 `[[双链]]`（见 [D-0079](user-spec/decisions/0079-obsidian-for-docs.md)）。
 
 1. 先读 `user-spec/README.md`，了解两层内容（spec 文档 / 决策）与变更规则；
 2. 改动之前，读与改动相关的 spec 文档与决策：

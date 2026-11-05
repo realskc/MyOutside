@@ -16,7 +16,7 @@
 ## 用量
 
 - **需要知道当前对话的上下文长度**（用了多少 token）。
-- 开销目前不太高，暂时不太关心；但子应用增多、分发给其他人以后，一定要有按子应用的、更严格的 token 用量管控与显示（见 `platform.md`「平台 AI」）。
+- 开销目前不太高，暂时不太关心；但子应用增多、分发给其他人以后，一定要有按子应用的、更严格的 token 用量管控与显示（见 `platform.md`「平台 AI」；用量与花费的显示已有，见 [D-0074](../../../user-spec/decisions/0074-usage-and-cost-display.md)）。
 - 显示方式见 [DIALOG-0014](decisions/DIALOG-0014-show-current-context-length.md)。
 
 ## 与其他应用的连接

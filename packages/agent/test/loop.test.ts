@@ -1,10 +1,12 @@
 import { describe, expect, it } from "vitest";
-import { createSourceRegistry, runToolLoop, webSearchTool, type AgentContext, type AgentTool } from "../src/index.js";
+import { createSourceRegistry, DEFAULT_FINAL_ROUND_NOTE, runToolLoop, webSearchTool, type AgentContext, type AgentTool } from "../src/index.js";
 
 interface FakeReply {
   content?: string;
   reasoning?: string;
   toolCalls?: Array<{ id: string; name: string; arguments: string }>;
+  /** 模拟流式中途被取消：平台 AI 返回已收到的部分 */
+  aborted?: boolean;
 }
 
 /** 按脚本回复的假模型 + 可配置的其他 API；记录每次请求 */
@@ -36,7 +38,7 @@ function fakeContext(
           toolCalls,
           model: "deepseek-flash",
           usage: { promptTokens: 10, completionTokens: 5, totalTokens: 15 },
-          finishReason: toolCalls.length ? "tool_calls" : "stop",
+          finishReason: reply.aborted ? "aborted" : toolCalls.length ? "tool_calls" : "stop",
           message: {
             role: "assistant",
             content: toolCalls.length && !reply.content ? null : reply.content ?? "",
@@ -129,15 +131,56 @@ describe("runToolLoop", () => {
     expect(r.rounds[1]!.toolCalls[0]!.result).toContain("重复调用");
   });
 
-  it("达到最大轮数：最后一轮不再提供工具，让模型直接回答", async () => {
+  it("repeatable 的工具：同样参数也照常执行（例如读取一份正在修改的稿子）", async () => {
+    let executed = 0;
+    const reader: AgentTool = { ...echoTool, repeatable: true, execute: async () => ++executed };
+    const { ctx } = fakeContext([
+      { toolCalls: [{ id: "1", name: "echo", arguments: "{}" }] },
+      { toolCalls: [{ id: "2", name: "echo", arguments: "{}" }] },
+      { content: "好" },
+    ]);
+    const r = await runToolLoop(ctx, { messages: base, tools: [reader] });
+    expect(executed).toBe(2);
+    expect(r.rounds[1]!.toolCalls[0]!.result).toBe("2");
+  });
+
+  it("onRound：每一轮结束（工具执行完）时调用，并等它完成", async () => {
+    const seen: string[] = [];
+    const { ctx } = fakeContext([{ toolCalls: [{ id: "1", name: "echo", arguments: '{"text":"x"}' }] }, { content: "好" }]);
+    await runToolLoop(ctx, {
+      messages: base,
+      tools: [echoTool],
+      onRound: async (round) => {
+        await new Promise((resolve) => setTimeout(resolve, 5));
+        seen.push(`${round.index}:${round.toolCalls.map((call) => call.result).join(",")}`);
+      },
+    });
+    expect(seen).toEqual(['1:{"echoed":"x"}', "2:"]);
+  });
+
+  it("达到最大轮数：工具定义不变，最后一轮 tool_choice = none 并追加说明，让模型直接回复", async () => {
     const { ctx, requests } = fakeContext([
       { toolCalls: [{ id: "1", name: "echo", arguments: '{"text":"a"}' }] },
-      { content: "根据已有信息回答" },
+      { content: "做到了第一步，还差第二步" },
     ]);
     const r = await runToolLoop(ctx, { messages: base, tools: [echoTool], maxRounds: 2 });
     expect(r.stopReason).toBe("max_rounds");
-    expect(r.content).toBe("根据已有信息回答");
-    expect(requests[1].tools).toBeUndefined();
+    expect(r.content).toBe("做到了第一步，还差第二步");
+    expect(requests[1].tools).toEqual(requests[0].tools);
+    expect(requests[0].toolChoice).toBeUndefined();
+    expect(requests[1].toolChoice).toBe("none");
+    expect(requests[1].messages.at(-1)).toEqual({ role: "user", content: DEFAULT_FINAL_ROUND_NOTE });
+    expect(r.rounds[1]!.note).toBe(DEFAULT_FINAL_ROUND_NOTE);
+  });
+
+  it("最后一轮仍然调用了工具：不执行，补上结果，结束为 max_rounds", async () => {
+    let executed = 0;
+    const counting: AgentTool = { ...echoTool, execute: async () => ++executed };
+    const { ctx } = fakeContext([{ toolCalls: [{ id: "1", name: "echo", arguments: "{}" }] }]);
+    const r = await runToolLoop(ctx, { messages: base, tools: [counting], maxRounds: 1, finalRoundNote: "停" });
+    expect(r.stopReason).toBe("max_rounds");
+    expect(executed).toBe(0);
+    expect(r.messages.at(-1)).toMatchObject({ role: "tool", tool_call_id: "1" });
   });
 
   it("可重试的上游错误：退避后重试成功；不可重试的错误：结束为 error", async () => {
@@ -210,4 +253,28 @@ describe("runToolLoop", () => {
       [3, "https://c.com"],
     ]);
   });
+  it("模型输出到一半被取消：已输出的部分作为最后一轮保留，以 aborted 结束", async () => {
+    const { ctx } = fakeContext([
+      { content: "我先查一下。", toolCalls: [{ id: "1", name: "echo", arguments: '{"text":"a"}' }] },
+      { content: "查到的结果是", reasoning: "整理", aborted: true },
+    ]);
+    const r = await runToolLoop(ctx, { messages: base, tools: [echoTool] });
+    expect(r.stopReason).toBe("aborted");
+    expect(r.rounds).toHaveLength(2);
+    expect(r.content).toBe("查到的结果是");
+    expect(r.reasoning).toBe("整理");
+  });
+  it("输出到一半出错：重试前推送 round_retry；重试都失败时，最后收到的半截作为最后一轮保留", async () => {
+    const broken = { code: "UPSTREAM", message: "读取流式响应失败", details: { retryable: true, partial: { content: "写到一半", reasoning: "想" } } };
+    const { ctx, events } = fakeContext([
+      { content: "我先查一下。", toolCalls: [{ id: "1", name: "echo", arguments: '{"text":"a"}' }] },
+      { error: broken },
+      { error: broken },
+    ]);
+    const r = await runToolLoop(ctx, { messages: base, tools: [echoTool], retries: 1 });
+    expect(r.stopReason).toBe("error");
+    expect(events.filter((e) => e.type === "round_retry")).toEqual([{ type: "round_retry", round: 2, attempt: 1 }]);
+    expect(r.rounds).toHaveLength(2);
+    expect(r.rounds[1]).toMatchObject({ content: "写到一半", reasoning: "想", toolCalls: [] });
+  }, 10000);
 });

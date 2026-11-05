@@ -1,4 +1,4 @@
-# VOCAB-0010 音标统一使用美式 IPA（General American）
+# VOCAB-0011 音标统一使用美式 IPA（General American）
 
 - 状态：有效
 - 日期：2026-10-26

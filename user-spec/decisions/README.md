@@ -77,10 +77,10 @@
 | [D-0013](0013-cloud-kernel-for-multi-device.md) | 多端方案：云端内核 | 有效（未实施） |
 | [D-0014](0014-deepseek-as-ai-provider.md) | 平台 AI 使用 DeepSeek | 有效 |
 | [D-0015](0015-bilingual-ui.md) | 界面中英双语 | 有效 |
-| [D-0016](0016-single-instance-and-launcher.md) | 单实例运行；Windows 双击快捷方式静默启动 | 有效 |
-| [D-0017](0017-per-app-hot-reload.md) | 开发时按子应用热重载（reloadApp） | 有效（未实现） |
+| [D-0016](0016-single-instance-and-launcher.md) | 单实例运行；Windows 双击快捷方式、macOS 终端命令启动 | 有效 |
+| [D-0017](0017-per-app-hot-reload.md) | 开发时按子应用热重载（reloadApp） | 有效（未实现；推迟到做 builder 时） |
 | [D-0018](0018-iframe-panel-and-app-protocol.md) | 子应用面板：一个 iframe + app:// 自定义协议 | 有效 |
-| [D-0019](0019-api-key-in-platform-settings.md) | AI 密钥存在平台设置里（明文） | 有效（临时方案） |
+| [D-0019](0019-api-key-in-platform-settings.md) | AI 密钥存在平台设置里（明文） | 部分被取代（→ D-0075） |
 | [D-0020](0020-mobile-via-web-ui.md) | 移动端用同一套 Web 界面承载，不做原生 App | 有效（未实施） |
 | [D-0021](0021-card-is-term-plus-sense.md) | 卡片数据模型：一张卡片 = 单词 + 本质意项 | 弃用（→ VOCAB-0001） |
 | [D-0022](0022-dedup-on-add.md) | 添加卡片时的查重：机械检查拼写 + AI 判断是否同义，不自动合并 | 弃用（→ VOCAB-0002） |
@@ -110,7 +110,7 @@
 | [D-0046](0046-smoke-on-temp-data-copy.md) | 冒烟测试在真实数据的临时副本上运行 | 有效 |
 | [D-0047](0047-current-stage-non-goals.md) | 现阶段不做的事 | 有效 |
 | [D-0048](0048-self-built-agent-library.md) | agent 框架自研，不引入开源 agent 框架 | 有效 |
-| [D-0049](0049-agent-layering.md) | agent 能力分四部分：执行层承载循环，循环调用模型层与工具层 | 有效 |
+| [D-0049](0049-agent-layering.md) | agent 能力分四部分：执行层承载循环，循环调用模型层与工具层 | 部分被取代（→ D-0061、D-0062、D-0063） |
 | [D-0050](0050-web-tools-as-platform-api.md) | 搜索与抓取做成平台 API | 有效 |
 | [D-0051](0051-event-centric-agent-runs.md) | agent 运行以事件为中心；流式输出与进度显示共用推送通道 | 有效 |
 | [D-0052](0052-agent-execution-modes.md) | agent 的两种运行模式：调用内运行先行，后台任务后置 | 已取代（→ D-0061、D-0062、D-0063） |
@@ -135,6 +135,13 @@
 | [D-0071](0071-dialog-generation-implementation.md) | 对话回复的生成与保存方式 | 弃用（→ DIALOG-0016） |
 | [D-0072](0072-dev-lan-preview.md) | 开发用 LAN 预览：Electron 主进程内加可选 HTTP 宿主 | 有效 |
 | [D-0073](0073-app-local-decisions.md) | 应用自包含：spec/docs/decisions 在 apps/<app>/ 内按层组织 | 有效 |
+| [D-0074](0074-usage-and-cost-display.md) | 用量与花费：按子应用统计，按官方价格与调用时段估算 | 有效 |
+| [D-0075](0075-credentials-encrypted-with-keychain.md) | 凭据用系统钥匙串加密保存 | 有效 |
+| [D-0076](0076-app-background-work-on-startup.md) | 子应用可以在 MyOutside 启动时开始后台工作 | 有效（未实现） |
+| [D-0077](0077-open-app-file.md) | 子应用可以请外壳用系统默认程序打开自己目录下的文本文件 | 有效 |
+| [D-0078](0078-tools-unchanged-within-conversation.md) | 对话中不改动工具定义；轮数用完时用 tool_choice = none | 有效 |
+| [D-0079](0079-obsidian-for-docs.md) | 用 Obsidian 查看和编辑文档：打开整个仓库，链接保持标准 Markdown | 有效 |
+| [D-0080](0080-device-access.md) | 设备上的数据是普通文件夹；子应用访问设备要在清单里登记，经内核与设备之间的通道 | 有效（未实现） |
 
 ## 应用专属决策
 

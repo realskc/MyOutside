@@ -1,6 +1,6 @@
 # DIALOG-0009 对话的「联网搜索」开关：默认打开，打开时由模型决定搜不搜
 
-- 状态：有效（未实现）
+- 状态：部分被取代（「关闭：不给这些工具」→ [DIALOG-0019](DIALOG-0019-search-off-keeps-tools.md)）
 - 日期：2026-10-21
 - 决策者：讨论（作者同意）
 - 服务于：
@@ -22,4 +22,4 @@
 
 ## 相关文档
 
-- `docs/agent.md` §11
+- `docs/agent.md` §1；`apps/dialog/docs/README.md` §4

@@ -29,6 +29,15 @@ export interface DbAdapter {
   close(): void;
 }
 
+/**
+ * 凭据加解密（D-0075）：由运行环境提供（Electron 用 safeStorage，密钥由系统钥匙串保管）。
+ * 内核不依赖具体实现；没有提供时凭据以明文保存。
+ */
+export interface SecretCodec {
+  encrypt(plain: string): string;
+  decrypt(cipher: string): string;
+}
+
 /** 以应用为作用域的数据访问助手（表名自动加 `appId__` 前缀） */
 export interface AppDb {
   insert(table: string, row: Record<string, SqlValue>): void;

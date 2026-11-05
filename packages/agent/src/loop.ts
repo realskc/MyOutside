@@ -5,19 +5,32 @@ const DEFAULT_MAX_ROUNDS = 8;
 const DEFAULT_RETRIES = 2;
 const DEFAULT_MAX_CHARS = 8000;
 const CANCELLED = "已被用户取消";
+/** 轮数用完时追加给模型的说明（D-0078） */
+export const DEFAULT_FINAL_ROUND_NOTE =
+  "【已到最多轮数：这一次不能再调用工具了。请直接回复：说明已经做到了哪里、还有什么没做完。】";
+const NOT_EXECUTED = "没有执行：这一次不许调用工具";
 
 interface ErrorLike {
   code?: string;
   message?: string;
-  details?: { retryable?: boolean };
+  details?: { retryable?: boolean; partial?: { content?: string; reasoning?: string } };
 }
 
-function errorOf(cause: unknown): { code: string; message: string; retryable: boolean } {
+interface PartialOutput {
+  content: string;
+  reasoning: string;
+}
+
+function errorOf(cause: unknown): { code: string; message: string; retryable: boolean; partial: PartialOutput | null } {
   const e = (cause ?? {}) as ErrorLike;
+  const partial = e.details?.partial;
+  const content = typeof partial?.content === "string" ? partial.content : "";
+  const reasoning = typeof partial?.reasoning === "string" ? partial.reasoning : "";
   return {
     code: typeof e.code === "string" ? e.code : "INTERNAL",
     message: typeof e.message === "string" ? e.message : String(cause),
     retryable: e.details?.retryable === true,
+    partial: content !== "" || reasoning !== "" ? { content, reasoning } : null,
   };
 }
 
@@ -64,10 +77,12 @@ function toolSpec(tool: AgentTool): Record<string, unknown> {
  * 工具循环（D-0060）：反复调用模型；模型调用了工具就执行、把结果交回，再调用模型；
  * 直到某一轮模型不再调用工具。
  *
- * - 可重试的上游错误（429 / 5xx / 网络）按指数退避重试；
+ * - 可重试的上游错误（429 / 5xx / 网络）按指数退避重试，重试前推送 round_retry（这一轮从头重来）；
+ *   重试都失败时，最后一次输出到一半的部分作为最后一轮保留在 rounds 里，以 error 结束；
  * - 工具不存在、参数不是合法 JSON、执行失败、重复调用：都作为工具结果告诉模型，让它自己修正；
  * - 达到最大轮数时，最后一轮不再提供工具，让模型根据已有信息直接回答；
- * - 取消时：未执行的工具调用补上「已取消」的结果，保证新增的消息仍然合法，以 aborted 结束。
+ * - 取消时：未执行的工具调用补上「已取消」的结果，保证新增的消息仍然合法，以 aborted 结束；
+ *   模型输出到一半被取消时，已输出的部分作为最后一轮保留在 rounds 里。
  */
 export async function runToolLoop(ctx: AgentContext, options: ToolLoopOptions): Promise<ToolLoopResult> {
   const maxRounds = Math.max(1, options.maxRounds ?? DEFAULT_MAX_ROUNDS);
@@ -84,6 +99,10 @@ export async function runToolLoop(ctx: AgentContext, options: ToolLoopOptions): 
     history.push(message);
     added.push(message);
   };
+  const endRound = async (round: Round) => {
+    emit({ type: "round_end", round: round.index });
+    await options.onRound?.(round);
+  };
   const result = (stopReason: ToolLoopResult["stopReason"], error?: { code: string; message: string }): ToolLoopResult => {
     const last = rounds.at(-1);
     return {
@@ -98,17 +117,27 @@ export async function runToolLoop(ctx: AgentContext, options: ToolLoopOptions): 
     };
   };
 
+  const hasTools = options.tools.length > 0;
   for (let index = 1; index <= maxRounds; index += 1) {
-    const offerTools = options.tools.length > 0 && index < maxRounds;
+    // 工具定义每一轮都一样（改动会让缓存失效、让模型困惑）；最后一轮只是不许调用（D-0078）
+    const finalRound = hasTools && index === maxRounds;
+    let note: string | undefined;
+    if (finalRound) {
+      note = options.finalRoundNote ?? DEFAULT_FINAL_ROUND_NOTE;
+      push({ role: "user", content: note });
+    }
     emit({ type: "round_start", round: index });
 
     // —— 调用模型（可重试的错误按指数退避重试）——
     let response!: AiChatOutput;
+    /** 这一轮输出到一半出错时收到的部分（重试都失败时作为最后一轮保留） */
+    let partial: PartialOutput | null = null;
     for (let attempt = 0; ; attempt += 1) {
       try {
         response = (await ctx.call("platform.ai.chat", {
           messages: history,
-          ...(offerTools ? { tools: options.tools.map(toolSpec) } : {}),
+          ...(hasTools ? { tools: options.tools.map(toolSpec) } : {}),
+          ...(finalRound || options.toolChoice === "none" ? { toolChoice: "none" } : {}),
           ...(options.reasoningEffort ? { reasoningEffort: options.reasoningEffort } : {}),
           ...(options.model ? { model: options.model } : {}),
           ...(options.stream ? { stream: true } : {}),
@@ -117,7 +146,23 @@ export async function runToolLoop(ctx: AgentContext, options: ToolLoopOptions): 
       } catch (cause) {
         const error = errorOf(cause);
         if (ctx.signal.aborted || error.code === "ABORTED") return result("aborted");
-        if (!error.retryable || attempt >= retries) return result("error", { code: error.code, message: error.message });
+        if (error.partial) partial = error.partial;
+        if (!error.retryable || attempt >= retries) {
+          if (partial) {
+            rounds.push({
+              index,
+              reasoning: partial.reasoning === "" ? null : partial.reasoning,
+              content: partial.content,
+              toolCalls: [],
+              usage: null,
+              model,
+              ...(note ? { note } : {}),
+            });
+          }
+          return result("error", { code: error.code, message: error.message });
+        }
+        // 告诉界面这一轮从头重来（丢掉已显示的半截），再退避重试
+        emit({ type: "round_retry", round: index, attempt: attempt + 1 });
         try {
           await sleep(1000 * 2 ** attempt, ctx.signal);
         } catch {
@@ -135,13 +180,30 @@ export async function runToolLoop(ctx: AgentContext, options: ToolLoopOptions): 
       toolCalls: [],
       usage: response.usage,
       model: response.model,
+      ...(note ? { note } : {}),
     };
     rounds.push(round);
     push(response.message);
 
+    // 流式中途被取消：平台 AI 返回已经收到的部分，作为最后一轮保留
+    if (response.finishReason === "aborted") {
+      await endRound(round);
+      return result("aborted");
+    }
+
     if (response.toolCalls.length === 0) {
-      emit({ type: "round_end", round: index });
-      return result(offerTools || options.tools.length === 0 ? "done" : "max_rounds");
+      await endRound(round);
+      return result(finalRound ? "max_rounds" : "done");
+    }
+
+    // 不许调用时仍然调用了（理论上不会）：不执行，补上结果保证消息合法，结束
+    if (finalRound || options.toolChoice === "none") {
+      for (const call of response.toolCalls) {
+        round.toolCalls.push({ id: call.id, name: call.function.name, arguments: call.function.arguments, ok: false, summary: call.function.name, result: NOT_EXECUTED });
+        push({ role: "tool", tool_call_id: call.id, content: NOT_EXECUTED });
+      }
+      await endRound(round);
+      return result(finalRound ? "max_rounds" : "done");
     }
 
     // —— 执行工具（顺序执行）——
@@ -163,6 +225,7 @@ export async function runToolLoop(ctx: AgentContext, options: ToolLoopOptions): 
     for (const [position, call] of response.toolCalls.entries()) {
       if (ctx.signal.aborted) {
         cancelFrom(position);
+        await endRound(round);
         return result("aborted");
       }
       const tool = toolsByName.get(call.function.name);
@@ -192,7 +255,7 @@ export async function runToolLoop(ctx: AgentContext, options: ToolLoopOptions): 
       if (tool && record.result === "") {
         record.summary = tool.summarize?.(args) ?? tool.name;
         const key = `${tool.name}:${JSON.stringify(args)}`;
-        if (seen.has(key)) {
+        if (!tool.repeatable && seen.has(key)) {
           record.result = "重复调用：前面已经用相同的参数调用过这个工具，请直接使用之前的结果。";
         } else {
           seen.add(key);
@@ -209,6 +272,7 @@ export async function runToolLoop(ctx: AgentContext, options: ToolLoopOptions): 
               push({ role: "tool", tool_call_id: call.id, content: CANCELLED });
               emit({ type: "tool_result", round: index, callId: call.id, tool: tool.name, ok: false, summary: record.summary });
               cancelFrom(position + 1);
+              await endRound(round);
               return result("aborted");
             }
             record.result = `工具执行失败：${error.message}`;
@@ -218,7 +282,7 @@ export async function runToolLoop(ctx: AgentContext, options: ToolLoopOptions): 
       }
       push({ role: "tool", tool_call_id: call.id, content: record.result });
     }
-    emit({ type: "round_end", round: index });
+    await endRound(round);
   }
   // 理论上不会到这里：最后一轮不提供工具
   return result("max_rounds");

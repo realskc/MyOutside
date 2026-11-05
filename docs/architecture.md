@@ -70,7 +70,7 @@ interface AppModule {
 
 - 描述性字段：平台据此自动发现与装载应用（替代硬编码的导入、注册与 `uiDirs`）；协议版本不兼容时拒绝装载；
 - `owns`：登记表的归属（供临时函数作用域检查、删除应用时清理数据等使用）；应用访问数据的限制本身由 AppDb 的表名前缀在结构上保证（§5.1），不依赖 `owns`；
-- `uses`：内核按调用者检查跨应用调用（D-0053，`docs/agent.md` §7.2）；
+- `uses`：内核按调用者检查跨应用调用（D-0053，`docs/agent.md` §6.1）；
 - API 函数与迁移仍由后端代码（AppModule）提供。
 
 ## 3. 函数与调用（D-0006、D-0007、D-0063）
@@ -118,7 +118,7 @@ interface AppModule {
 | 其他子应用的 API | 必须是公开 API，且在清单 `uses` 里声明 |
 | （外壳调用子应用的 API） | 拒绝 |
 
-拒绝时错误码 `FORBIDDEN`。平台设置中的凭据（`ai.deepseek.apiKey`）任何调用者读到的都是 `{ value: null, isSet }`。
+拒绝时错误码 `FORBIDDEN`。平台设置中的凭据（`ai.deepseek.apiKey`）任何调用者读到的都是 `{ value: null, isSet }`；在数据库里只存密文 `{"$encrypted": ...}`，由 Electron 传入的 `SecretCodec`（`safeStorage`，macOS 钥匙串 / Windows DPAPI）加解密，启动时把明文改为密文（`packages/kernel/src/credentials.ts`，D-0075）。
 
 **远程调用**（`handle(request, { caller, remote: true })`，目前只有局域网预览，D-0072）：必须带调用者；不能调用只给外壳的平台 API（身份是对方报上来的，可以伪造）。局域网预览按 Referer 确定调用者（`/shell/` → 外壳，`/apps/<id>/` → 子应用）。
 
@@ -174,6 +174,7 @@ get(table, where) / all(table, where?, { orderBy?, limit?, offset? }) / count(ta
 | `platform.ai.chat` | 只读 | 子应用（需声明） | DeepSeek 对话（D-0014） |
 | `platform.web.search` | 只读 | 子应用（需声明） | DeepSeek 网页搜索（D-0050） |
 | `platform.web.fetch` | 只读 | 子应用（需声明） | DeepSeek 网页抓取，返回 Markdown 正文（D-0050） |
+| `platform.usage.summary` | 只读 | 只给外壳 | 用量与估算花费，按调用者汇总（D-0074） |
 
 实现：`packages/kernel/src/platform-ai.ts`、`platform-web.ts`、`deepseek.ts`（密钥读取、请求、错误整理、SSE 解析）。
 
@@ -194,22 +195,26 @@ get(table, where) / all(table, where?, { orderBy?, limit?, offset? }) / count(ta
 ### 6.3 错误与取消
 
 - 网络错误、408 / 429 / 5xx → `UPSTREAM`，`details.retryable = true`；其余 HTTP 错误 → `UPSTREAM`，`details.status`、`retryable = false`；401 → `PRECONDITION`（密钥无效）；未配置密钥 → `PRECONDITION`；
-- 调用被取消时中止发往 DeepSeek 的请求（流式请求断开后 DeepSeek 会停止生成），以 `ABORTED` 结束。
+- 调用被取消时中止发往 DeepSeek 的请求（流式请求断开后 DeepSeek 会停止生成）：非流式以 `ABORTED` 结束；**流式返回已收到的部分**，`finishReason = "aborted"`（未拼完的工具调用丢弃，拿不到用量），由调用方决定要不要保留（DIALOG-0017）；流式中途出错（例如断网）照常报错，已收到的部分放在 `details.partial = { content, reasoning }`（DIALOG-0018）。
+- 取消只是通知正在执行的函数「该停了」：内核不因取消而拒绝之后的写入，函数停下来后可以经本应用的事务 API 保存已有的进度。
 
 ### 6.4 用量计量
 
-每次成功调用按**调用者**记一条到 `platform_usage`（`caller`、`kind`：`ai.chat` / `web.search` / `web.fetch`、`model`、各类 token 数、时间），经写队列写入，不改变 DataVersion。为将来按子应用的用量显示与管控打基础。
+每次成功调用按**调用者**记一条到 `platform_usage`（`caller`、`kind`：`ai.chat` / `web.search` / `web.fetch`、`model`、各类 token 数、`cost_yuan`、时间），经写队列写入，不改变 DataVersion。`cost_yuan` 在写入时按当时的官方价格与调用时段（高峰全价、空闲半价）估算（`pricing.ts`，D-0074）。设置页「用量与花费」经 `platform.usage.summary` 按子应用显示。
 
 ## 7. AI 辅助的写操作（D-0008）
 
-先解析（只读 API，异步，可调平台 AI，不落库）→ 再提交（事务 API）；两步之间由前端编排。实例：`vocab.resolveCard → vocab.addCard`、`dialog.generateReply → dialog.appendMessage`。
+先解析（异步，可调平台 AI，不落库）→ 再提交（事务 API）。两步之间：
+
+- 需要用户中途决定的，由前端编排：`vocab.resolveCard`（只读 API）→ 用户选择 → `vocab.addCard` / `vocab.updateCard`；
+- 不需要用户参与的，由后端的普通的异步函数编排（D-0063）：`dialog.send` 等模型生成完，再调用事务 API `dialog.saveReply` 保存。
 
 ### 7.1 编写子应用时的指引：又慢、又需要原子性的操作
 
 原子的单位永远是**一个短事务**（一次事务 API 调用）。事务 API 不能等外部，否则会挡住所有其他写入；外部动作（调 AI、发请求）也无法回滚。需要「慢的外部操作 + 原子写入」时：
 
-- **先慢后快，提交时校验**：慢的外部操作先做（在只读 API 里，不在事务内）；最后用一个短事务提交，**提交时重新检查前提是否仍成立**（例如「这个词仍然没有卡片吗」），不成立就报错或让用户决定。当前 `vocab.addCard` 尚未做这一步校验。
-- **拆成多个短事务，失败时补偿**：长流程拆成一串各自原子的短事务；后续步骤失败或用户反悔时，撤销前面已完成的步骤。将来的后台任务可由内核自动撤销整次任务写过的数据（`docs/agent.md` §8.2）。
+- **先慢后快，提交时校验**：慢的外部操作先做（在只读 API 里，不在事务内）；最后用一个短事务提交，**提交时重新检查前提是否仍成立**（例如「这个词仍然没有卡片吗」），不成立就报错或让用户决定。实例：`vocab.addCard` 带上判断时看到的卡片 id（`knownCardIds`），这个词多出了卡片就 `CONFLICT`（VOCAB-0010）。
+- **拆成多个短事务，失败时补偿**：长流程拆成一串各自原子的短事务；后续步骤失败或用户反悔时，撤销前面已完成的步骤。撤销与中断后的恢复由子应用自己负责，平台不提供通用的重放 / 撤销机制（D-0062）。
 - 慢的部分如果本身不写数据（例如抓词时先让 AI 生成卡片草稿），直接「先生成、后一次事务写入」即可。
 
 这些属于编写子应用与 API 时的考虑；系统层只提供「事务 API 同步执行、只读 API 可以异步」这一基础（D-0007）。
@@ -237,7 +242,7 @@ get(table, where) / all(table, where?, { orderBy?, limit?, offset? }) / count(ta
 - 应用文件：`media://<appId>/<相对路径>` 映射到 `<dataDir>/apps/<appId>/`（支持 Range 请求、路径穿越检查，PB-0004）；`host:pickAudioFile` 为子应用打开本地音频选择框（PB-0004）；
 - 菜单：文件 / 编辑 / 视图；「编辑」菜单让 macOS 上的剪贴板快捷键生效；中英文跟随 `ui.language`；
 - 单实例锁（D-0016）；数据目录：`app.getPath("userData")`（应用名 MyOutside）；
-- 冒烟模式（`pnpm smoke`，`MYOUTSIDE_SMOKE=1`）：复制真实数据库到临时目录，自检外壳与各子应用、做演示写入、截图后退出（D-0046）；
+- 冒烟模式（`pnpm smoke`，`MYOUTSIDE_SMOKE=1`）：复制真实数据库到临时目录，自检外壳与各子应用、做演示写入、截图后退出；默认后台运行（窗口不显示、不抢焦点），`MYOUTSIDE_SMOKE_SHOW=1` 时显示；使用独立的临时配置目录、打包到独立的 `dist-smoke/`，可与正在运行的 MyOutside 同时运行、互不影响（D-0046）；
 - LAN 预览（`pnpm dev:lan`，D-0072）：主进程额外启动 HTTP 宿主，服务外壳与 `apps/<id>/ui`，并注入浏览器版 `window.outside`（`POST /__myoutside/call` → `kernel.handle`）；默认不启用，无鉴权，仅供可信热点上的临时多设备调试；不是正式多端方案（正式方向见 D-0013）；
 - 构建：`scripts/build.mjs`（esbuild 打包主进程与 preload）、`scripts/run.mjs`（启动 Electron）。
 

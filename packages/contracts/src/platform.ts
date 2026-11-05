@@ -58,6 +58,8 @@ export const AiChatInput = z.object({
   temperature: z.number().optional(),
   /** 思考强度；不传 = 服务默认（high） */
   reasoningEffort: ReasoningEffort.optional(),
+  /** 这一次能不能调用工具：none = 工具定义照常带上、但这一次不许调用（D-0078） */
+  toolChoice: z.enum(["auto", "none"]).optional(),
   /** 流式：增量经推送通道发出（事件 { type: "ai_delta", content?, reasoning? }），最终仍返回完整结果 */
   stream: z.boolean().optional(),
 });
@@ -87,6 +89,22 @@ export const AiChatOutput = z.object({
   message: AiMessageSchema,
 });
 export type AiChatOutput = z.infer<typeof AiChatOutput>;
+
+// —— 用量与花费 ——
+
+export interface UsageSummaryRow {
+  /** 子应用 id、"shell"（外壳）或 "platform"（平台内部，例如脚本） */
+  caller: string;
+  aiCalls: number;
+  promptTokens: number;
+  cacheHitTokens: number;
+  completionTokens: number;
+  reasoningTokens: number;
+  searches: number;
+  fetches: number;
+  /** 估算花费（元），按 DeepSeek 官方价格与调用时段计算 */
+  costYuan: number;
+}
 
 // —— 平台 web 服务（DeepSeek 搜索 / 抓取）——
 
@@ -131,4 +149,6 @@ export interface PlatformApi {
   "platform.ai.chat": { input: AiChatInput; output: AiChatOutput };
   "platform.web.search": { input: WebSearchInput; output: { results: WebSearchResult[] } };
   "platform.web.fetch": { input: WebFetchInput; output: WebFetchOutput };
+  /** 用量与估算花费，按调用者汇总；只给外壳 */
+  "platform.usage.summary": { input: { since?: number }; output: UsageSummaryRow[] };
 }

@@ -2,6 +2,7 @@ import { createKernel, type Kernel } from "@myoutside/kernel";
 import { createNodeSqliteAdapter } from "@myoutside/kernel-node";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { dialogApp } from "../backend/src/index.js";
+import { SEARCH_NOTES } from "../backend/src/generate.js";
 import dialogManifest from "../manifest.json";
 import { estimateTokens, trimHistory } from "../backend/src/history.js";
 
@@ -323,7 +324,13 @@ describe("dialog backend", () => {
     const body = model.requests[0]!;
     expect(body.stream).toBe(true);
     expect(body.reasoning_effort).toBe("low");
-    expect(body.tools).toBeUndefined();
+    // 关掉联网搜索：工具定义照常带上，但不许调用；用户消息后面跟一条 system 说明（DIALOG-0019）
+    expect(body.tools.map((t: any) => t.function.name)).toEqual(["web_search", "web_fetch"]);
+    expect(body.tool_choice).toBe("none");
+    expect(body.messages.slice(1)).toEqual([
+      { role: "user", content: "hi" },
+      { role: "system", content: SEARCH_NOTES.off },
+    ]);
     expect(body.messages[0].role).toBe("system");
     expect(body.messages[0].content).toMatch(/当前日期：\d{4}-\d{2}-\d{2}/);
     expect(events).toContainEqual({ type: "ai_delta", content: "你好！" });
@@ -392,7 +399,7 @@ describe("dialog backend", () => {
     expect(path.messages.map((m: any) => m.role)).toEqual(["user", "assistant", "user", "assistant"]);
   });
 
-  it("关闭联网搜索：不提供工具；历史里只保留之前回复的最终回答（不放工具调用）", async () => {
+  it("中途关闭 / 重新打开联网搜索：工具定义、系统提示词、历史都不变；变化记在用户消息上，之后的请求都带着这条 system 说明", async () => {
     const kernel = await setupWithKey();
     const conversationId = await createConversation(kernel);
     const model = fakeDeepSeek(
@@ -400,6 +407,8 @@ describe("dialog backend", () => {
         { content: "", toolCalls: [{ id: "c1", name: "web_search", arguments: '{"query":"x"}' }] },
         { content: "结果 [1]" },
         { content: "好的" },
+        { content: "还是不搜" },
+        { content: "可以搜了" },
       ],
       { "/v1/tools/search": () => ({ results: [{ title: "t", url: "https://e.com", summary: "s" }] }) },
     );
@@ -407,11 +416,30 @@ describe("dialog backend", () => {
     await call(kernel, "dialog.send", { conversationId, content: "查一下" });
     await call(kernel, "dialog.setWebSearch", { conversationId, enabled: false });
     await call(kernel, "dialog.send", { conversationId, content: "继续" });
-    const last = model.requests[2]!;
-    expect(last.tools).toBeUndefined();
-    expect(last.messages.map((m: any) => m.role)).toEqual(["system", "user", "assistant", "user"]);
+    await call(kernel, "dialog.send", { conversationId, content: "再继续" });
+    await call(kernel, "dialog.setWebSearch", { conversationId, enabled: true });
+    await call(kernel, "dialog.send", { conversationId, content: "现在搜吧" });
+    const first = model.requests[0]!;
+    const off = model.requests[2]!;
+    const stillOff = model.requests[3]!;
+    const on = model.requests[4]!;
+    expect(off.tools).toEqual(first.tools);
+    expect(off.messages[0]).toEqual(first.messages[0]);
+    expect(first.tool_choice).toBeUndefined();
+    expect(off.tool_choice).toBe("none");
+    expect(off.messages.map((m: any) => m.role)).toEqual(["system", "user", "assistant", "tool", "assistant", "user", "system"]);
+    expect(off.messages.at(-1).content).toBe(SEARCH_NOTES.off);
+    // 下一次请求：前面的内容（含那条 system 说明）原样保留，开关没再变就不再加说明
+    expect(stillOff.messages.slice(0, off.messages.length)).toEqual([...off.messages.slice(0, -1), off.messages.at(-1)]);
+    expect(stillOff.messages.slice(off.messages.length).map((m: any) => m.role)).toEqual(["assistant", "user"]);
+    expect(stillOff.tool_choice).toBe("none");
+    // 重新打开：加一条「重新打开」的说明，可以调用
+    expect(on.tool_choice).toBeUndefined();
+    expect(on.messages.at(-1)).toEqual({ role: "system", content: SEARCH_NOTES.on });
+    const path = await call<any>(kernel, "dialog.getPath", { conversationId });
+    expect(path.messages.filter((m: any) => m.role === "user").map((m: any) => m.searchNotice)).toEqual([null, "off", null, "on"]);
     const list = await call<Array<{ webSearch: boolean }>>(kernel, "dialog.listConversations", {});
-    expect(list[0]!.webSearch).toBe(false);
+    expect(list[0]!.webSearch).toBe(true);
   });
 
   it("重新生成：为同一条用户消息生成新回复，成为原回复的兄弟并被选中（DIALOG-0012）", async () => {
@@ -485,6 +513,98 @@ describe("dialog backend", () => {
     expect(path.messages.map((m) => m.role)).toEqual(["user"]);
     expect(path.generating).toBe(false);
   });
+
+  it("停止：已输出的部分保存为回复（标记已停止）；下一次请求的历史里带上这半截（DIALOG-0017）", async () => {
+    const kernel = await setupWithKey();
+    const conversationId = await createConversation(kernel, { webSearch: false });
+    const controller = new AbortController();
+    const requests: any[] = [];
+    vi.stubGlobal("fetch", async (_url: string, init: { body: string; signal: AbortSignal }) => {
+      requests.push(JSON.parse(init.body));
+      if (requests.length > 1) {
+        const text = `data: ${JSON.stringify({ choices: [{ delta: { content: "好的" }, finish_reason: "stop" }], usage: { prompt_tokens: 50, completion_tokens: 2, total_tokens: 52 } })}\n\ndata: [DONE]\n\n`;
+        return new Response(text, { status: 200 });
+      }
+      const encoder = new TextEncoder();
+      const body = new ReadableStream<Uint8Array>({
+        start(stream) {
+          const send = (chunk: unknown) => stream.enqueue(encoder.encode(`data: ${JSON.stringify(chunk)}\n\n`));
+          send({ model: "deepseek-flash", choices: [{ delta: { reasoning_content: "构思" } }] });
+          send({ choices: [{ delta: { content: "从前有座山，" } }] });
+          init.signal.addEventListener("abort", () => stream.error(new DOMException("aborted", "AbortError")));
+          setTimeout(() => controller.abort(), 10);
+        },
+      });
+      return new Response(body, { status: 200 });
+    });
+
+    const res = await kernel.handle({ call: "dialog.send", payload: { conversationId, content: "讲个故事" } }, { signal: controller.signal });
+    expect(res.ok).toBe(true);
+    if (res.ok) expect((res.result as { stopReason: string }).stopReason).toBe("stopped");
+    const path = await call<any>(kernel, "dialog.getPath", { conversationId });
+    const reply = path.messages.at(-1);
+    expect(reply).toMatchObject({ role: "assistant", content: "从前有座山，", reasoning: "构思", stopped: true });
+    expect(path.generating).toBe(false);
+
+    await call(kernel, "dialog.send", { conversationId, content: "继续" });
+    expect(requests[1].messages.slice(1).map((m: any) => [m.role, m.content])).toEqual([
+      ["user", "讲个故事"],
+      ["system", SEARCH_NOTES.off],
+      ["assistant", "从前有座山，"],
+      ["user", "继续"],
+    ]);
+  });
+
+  it("停止发生在搜索中：保存搜索过程（未完成的搜索记为已取消），没有最终回答", async () => {
+    const kernel = await setupWithKey();
+    const conversationId = await createConversation(kernel);
+    const controller = new AbortController();
+    const model = fakeDeepSeek(
+      [{ content: "我先搜索一下。", toolCalls: [{ id: "c1", name: "web_search", arguments: '{"query":"x"}' }] }],
+    );
+    vi.stubGlobal("fetch", async (url: string, init: { body: string; signal: AbortSignal }) => {
+      if (new URL(url).pathname === "/v1/tools/search") {
+        setTimeout(() => controller.abort(), 5);
+        return new Promise((_resolve, reject) => {
+          init.signal.addEventListener("abort", () => reject(new DOMException("aborted", "AbortError")));
+        });
+      }
+      return model.fetch(url, init);
+    });
+    const res = await kernel.handle({ call: "dialog.send", payload: { conversationId, content: "查一下" } }, { signal: controller.signal });
+    expect(res.ok).toBe(true);
+    const reply = (await call<any>(kernel, "dialog.getPath", { conversationId })).messages.at(-1);
+    expect(reply.stopped).toBe(true);
+    expect(reply.content).toBe("");
+    expect(reply.steps[0].content).toBe("我先搜索一下。");
+    expect(reply.steps[0].toolCalls[0]).toMatchObject({ name: "web_search", ok: false, result: "已被用户取消" });
+  });
+
+  it("断网中断：重试都失败时，保存已输出的部分并标记已中断（DIALOG-0018）；重试时推送 round_retry", async () => {
+    const kernel = await setupWithKey();
+    const conversationId = await createConversation(kernel, { webSearch: false });
+    let attempts = 0;
+    vi.stubGlobal("fetch", async () => {
+      attempts += 1;
+      const encoder = new TextEncoder();
+      const body = new ReadableStream<Uint8Array>({
+        start(stream) {
+          stream.enqueue(encoder.encode(`data: ${JSON.stringify({ choices: [{ delta: { content: `第 ${attempts} 次写到一半` } }] })}\n\n`));
+          setTimeout(() => stream.error(new TypeError("terminated")), 5);
+        },
+      });
+      return new Response(body, { status: 200 });
+    });
+    const events: any[] = [];
+    const res = await kernel.handle({ call: "dialog.send", payload: { conversationId, content: "讲个故事" } }, { emit: (e) => events.push(e) });
+    expect(res.ok).toBe(true);
+    if (res.ok) expect((res.result as { stopReason: string }).stopReason).toBe("interrupted");
+    expect(attempts).toBe(3);
+    expect(events.filter((e) => e.type === "round_retry")).toHaveLength(2);
+    const reply = (await call<any>(kernel, "dialog.getPath", { conversationId })).messages.at(-1);
+    expect(reply).toMatchObject({ role: "assistant", content: "第 3 次写到一半", stopped: false });
+    expect(reply.error).toContain("读取流式响应失败");
+  }, 15000);
 
   it("内部 API：其他子应用不能调用 dialog.send", async () => {
     const kernel = await setupWithKey();

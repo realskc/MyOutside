@@ -1,6 +1,6 @@
 # D-0050 搜索与抓取做成平台 API
 
-- 状态：有效（未实现）
+- 状态：有效
 - 日期：2026-10-21
 - 决策者：agent
 - 服务于：
@@ -20,4 +20,4 @@ DeepSeek Search / Fetch 包装成平台 API `platform.web.search` / `platform.we
 
 ## 相关文档
 
-- `docs/agent.md` §5
+- `docs/agent.md` §4、§5.4

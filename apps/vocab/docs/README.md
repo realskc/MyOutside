@@ -18,7 +18,7 @@ id              TEXT PK
 term            TEXT NOT NULL      -- 归一化拼写（trim + 小写 + 折叠空格），只用于机械查重
 display         TEXT NOT NULL      -- 原始写法
 sense           TEXT NOT NULL      -- 本质意项
-phonetic        TEXT               -- 美式 IPA（General American；VOCAB-0010）
+phonetic        TEXT               -- 美式 IPA（General American；VOCAB-0011）
 meaning         TEXT NOT NULL DEFAULT ''
 context         TEXT               -- 例句 / 语境
 source          TEXT               -- 来源（默认 'manual'；将来抓词为 'dialog'）
@@ -55,10 +55,10 @@ vocab.getWordLevel({ term }) → { level: "A" | "B" | "C" | "D" | null }
   // 按归一化拼写查参考词表；不要求已经有卡片（查词草稿用）
 vocab.getStats({}) → { cards, learning, mastered, dueNow }
 vocab.previewReview({ cardId }) → { again, hard, good, easy: { due, scheduledDays } }
-vocab.resolveCard({ term, sense, meaning?, context? }) → { action: "new" } | { action: "match", cardId }
+vocab.resolveCard({ term, sense, meaning?, context? }) → { action: "new", knownCardIds } | { action: "match", cardId, knownCardIds }
 
 // —— 写 ——
-vocab.addCard({ term, display?, sense, meaning?, phonetic?, context?, source?, scheduling? }) → { cardId }
+vocab.addCard({ term, display?, sense, meaning?, phonetic?, context?, source?, scheduling?, knownCardIds? }) → { cardId }
 vocab.updateCard({ cardId, patch: { sense?, meaning?, phonetic?, context? } }) → { ok }
 vocab.submitReview({ cardId, rating: "again" | "hard" | "good" | "easy" }) → { state, due, scheduledDays }
 vocab.setMastered({ cardId, mastered }) → { ok }
@@ -66,22 +66,24 @@ vocab.setMastered({ cardId, mastered }) → { ok }
 
 - `getDue` / `listCards` 返回的 Card 带 `level`（命中参考词表时为 A–D，否则 `null`）；
 - `addCard` 只负责新建，不查重；`scheduling` 用于导入 / 恢复调度状态，普通添加不传；
+- `addCard` 的 `knownCardIds`：提交时校验（VOCAB-0010）——传入判断重复时看到的这个拼写的全部卡片 id，提交时多出了别的卡片就 `CONFLICT`；不传不校验；
 - `previewReview` 只读；ts-fsrs fuzz 关闭，预览与实际结果一致。
 
 ## 4. 添加流程（VOCAB-0002、D-0008）
 
-1. `vocab.resolveCard`：按 `term` 查已有卡片；没有 → `new`；有 → 调用 `platform.ai.chat`，提供已有卡片的「单词 + 意项 + 释义」列表，强制调用 `submit_decision` 工具返回 `matchIndex`（temperature 0）；解析失败视为无同类；
+1. `vocab.resolveCard`：按 `term` 查已有卡片；没有 → `new`；有 → 调用 `platform.ai.chat`，提供已有卡片的「单词 + 意项 + 释义」列表，要求调用 `submit_decision` 工具返回 `matchIndex`（temperature 0，思考强度 `low`，VOCAB-0010）；解析失败视为无同类；返回判断时看到的卡片 id（`knownCardIds`）；
 2. 界面根据结果：
-   - `new` → `vocab.addCard`；
-   - `match` → 展示已有卡片，用户选择：替换（`vocab.updateCard`，保留调度）/ 仍新增（`vocab.addCard`）/ 放弃；
+   - `new` → `vocab.addCard`（带 `knownCardIds`）；
+   - `match` → 展示已有卡片，用户选择：替换（`vocab.updateCard`，保留调度）/ 仍新增（`vocab.addCard`，带 `knownCardIds`）/ 放弃；
+   - 添加时遇到 `CONFLICT`（判断之后这个词又多出了卡片）→ 自动重新判断一次；
 3. 未配置 AI 密钥或调用失败时，界面回退为只做机械检查。
 
 ## 5. 查词（VOCAB-0007、VOCAB-0004、VOCAB-0010）
 
 - 界面直接调用 `platform.ai.chat`，带 `make_card` 工具；AI 返回卡片草稿（单词 / 意项 / 音标 / 释义 / 例句），内容一律中文、例句英文；
-- 音标统一要求 **美式 IPA（General American）**；system prompt 与 `make_card` 的 `phonetic` 字段描述都明确这一点（VOCAB-0010）；
+- 音标统一要求 **美式 IPA（General American）**；system prompt 与 `make_card` 的 `phonetic` 字段描述都明确这一点（VOCAB-0011）；
 - 草稿卡用 `draft.term` 调用 `vocab.getWordLevel` 查参考词表，命中时在音标旁显示「托福 A/B/C/D」徽章；
-- 存量卡片已按 VOCAB-0010 做一次性音标清洗；旧 Vocabry 导入若带典型英式标记会警告，导入后仍需检查；
+- 存量卡片已按 VOCAB-0011 做一次性音标清洗；旧 Vocabry 导入若带典型英式标记会警告，导入后仍需检查；
 - 用户确认「加入词库」后走添加流程；结果不缓存。
 
 ## 6. 界面

@@ -5,6 +5,7 @@ import {
   ipcMain,
   Menu,
   protocol,
+  safeStorage,
   shell,
   type MenuItemConstructorOptions,
   type WebFrameMain,
@@ -12,7 +13,7 @@ import {
 import { copyFileSync, createReadStream, existsSync, mkdirSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { extname, join, normalize, resolve, sep } from "node:path";
 import { Readable } from "node:stream";
-import { createKernel, SHELL_CALLER, type Kernel } from "@myoutside/kernel";
+import { createKernel, SHELL_CALLER, type Kernel, type SecretCodec } from "@myoutside/kernel";
 import { createNodeSqliteAdapter } from "@myoutside/kernel-node";
 import { vocabApp } from "@myoutside/vocab";
 import vocabManifest from "@myoutside/vocab/manifest.json";
@@ -22,15 +23,46 @@ import { goApp } from "@myoutside/go";
 import goManifest from "@myoutside/go/manifest.json";
 import { createPureblueApp } from "@myoutside/pureblue";
 import pureblueManifest from "@myoutside/pureblue/manifest.json";
+import { createZheyeApp } from "@myoutside/zheye";
+import zheyeManifest from "@myoutside/zheye/manifest.json";
 import { startLanServer } from "./lan-server";
+import { runAiCheck } from "./ai-check";
 
 // 数据目录使用正式名称：%APPDATA%/MyOutside
 app.setName("MyOutside");
 
-// 冒烟模式下关闭站点隔离：capturePage 对跨源 iframe（OOPIF）拍不到内容，仅测试用
+/** 真实的数据目录（冒烟模式改用临时目录前先记下，用来复制数据库） */
+const REAL_USER_DATA = app.getPath("userData");
+
 if (process.env.MYOUTSIDE_SMOKE === "1") {
+  // 关闭站点隔离：capturePage 对跨源 iframe（OOPIF）拍不到内容，仅测试用
   app.commandLine.appendSwitch("disable-site-isolation-trials");
+  // 独立的浏览器配置目录：不和正在运行的 MyOutside 抢单实例锁、不共用配置
+  const smokeProfile = join(app.getPath("temp"), "myoutside-smoke-profile");
+  mkdirSync(smokeProfile, { recursive: true });
+  // Windows 上 safeStorage 的密钥记在配置目录的 Local State 里：带过去，才能解密数据库副本里的凭据（macOS 用钥匙串，不受影响）
+  const localState = join(REAL_USER_DATA, "Local State");
+  if (existsSync(localState)) copyFileSync(localState, join(smokeProfile, "Local State"));
+  app.setPath("userData", smokeProfile);
 }
+
+/**
+ * 凭据加解密（D-0075）：Electron safeStorage——macOS 上加密密钥由系统钥匙串保管（Windows 上是 DPAPI）。
+ * 系统不支持时返回 undefined，凭据退回明文保存。
+ */
+function createSecretCodec(): SecretCodec | undefined {
+  if (!safeStorage.isEncryptionAvailable()) {
+    console.warn("[host] 系统不支持 safeStorage，凭据将以明文保存");
+    return undefined;
+  }
+  return {
+    encrypt: (plain) => safeStorage.encryptString(plain).toString("base64"),
+    decrypt: (cipher) => safeStorage.decryptString(Buffer.from(cipher, "base64")),
+  };
+}
+
+/** 冒烟测试默认在后台运行：不显示窗口、不抢焦点、不在 Dock 出现；MYOUTSIDE_SMOKE_SHOW=1 时显示（调试用） */
+const SMOKE_HIDDEN = process.env.MYOUTSIDE_SMOKE === "1" && process.env.MYOUTSIDE_SMOKE_SHOW !== "1";
 
 protocol.registerSchemesAsPrivileged([
   { scheme: "app", privileges: { standard: true, secure: true, supportFetchAPI: true, corsEnabled: true } },
@@ -61,8 +93,16 @@ function mimeFor(file: string): string {
   }
 }
 
+/** apps/host：按打包文件所在位置推算（dist/ 或冒烟测试的 dist-smoke/ 都在 apps/host 下） */
+const HOST_DIR = resolve(__dirname, "..");
+/** 各子应用的目录：apps/<id> */
+const appDir = (id: string) => resolve(HOST_DIR, "..", id);
+
+/** 子应用可以请外壳用系统默认程序打开的文件类型（只限它自己目录下的文本文件，D-0077） */
+const OPENABLE_EXTENSIONS = new Set([".md", ".json", ".txt"]);
+
 function buildUiDirs(kernel: Kernel): Record<string, string> {
-  const appPath = app.getAppPath(); // apps/host
+  const appPath = HOST_DIR;
   const uiDirs: Record<string, string> = {
     shell: resolve(appPath, "renderer"),
   };
@@ -172,12 +212,15 @@ async function createMainWindow(): Promise<BrowserWindow> {
     height: 860,
     title: "MyOutside",
     backgroundColor: "#f6f7f9",
+    show: !SMOKE_HIDDEN,
     webPreferences: {
       preload: join(__dirname, "preload.cjs"),
       contextIsolation: true,
       sandbox: false,
       nodeIntegration: false,
       nodeIntegrationInSubFrames: true,
+      // 后台冒烟：窗口不可见时照常渲染，截图才有内容
+      ...(SMOKE_HIDDEN ? { backgroundThrottling: false, paintWhenInitiallyHidden: true } : {}),
     },
   });
   await win.loadURL("app://shell/index.html");
@@ -303,8 +346,10 @@ function prepareSmokeDataDir(realDataDir: string): string {
 
 /** 冒烟截图：先确保窗口可见（被遮挡时 capturePage 会失败），失败自动重试 */
 async function captureWindow(win: BrowserWindow, attempts: number, delayMs: number): Promise<Buffer> {
-  win.show();
-  win.focus();
+  if (!SMOKE_HIDDEN) {
+    win.show();
+    win.focus();
+  }
   for (let attempt = 0; attempt < attempts; attempt += 1) {
     await new Promise((resolve) => setTimeout(resolve, delayMs));
     try {
@@ -339,11 +384,124 @@ function makeSilentWav(seconds: number): Buffer {
   return buffer;
 }
 
+async function waitFor(win: BrowserWindow, condition: string, attempts = 40, delayMs = 250): Promise<boolean> {
+  for (let i = 0; i < attempts; i += 1) {
+    if ((await win.webContents.executeJavaScript(condition)) as boolean) return true;
+    await new Promise((resolve) => setTimeout(resolve, delayMs));
+  }
+  return false;
+}
+
+/**
+ * 哲野试验台（ZHEYE-0020）：流程页能读到配方；在临时数据副本里写一次演示试跑，看试跑页能显示；
+ * MYOUTSIDE_SMOKE_ZHEYE_LIVE=1 时再经界面真跑一次（真实调用 DeepSeek，花费几毛钱，最多等 25 分钟）。
+ */
+async function smokeZheye(win: BrowserWindow): Promise<void> {
+  await win.loadURL("app://zheye/index.html");
+  await waitFor(win, 'typeof window.outside === "object" && document.querySelectorAll("#view-flow .node").length > 0');
+  const flow = await win.webContents.executeJavaScript(
+    `(async () => {
+      const r = await window.outside.call("zheye.getRecipe", { type: "concept" });
+      const nodes = [...document.querySelectorAll("#view-flow .node")];
+      if (nodes[4]) nodes[4].click();
+      await new Promise((resolve) => setTimeout(resolve, 300));
+      return { ok: r.ok, stages: r.ok && r.result.recipe ? r.result.recipe.stages.length : null, error: r.ok ? r.result.error : r.error.message,
+        nodes: nodes.length, files: document.querySelectorAll(".file-card").length, rendered: (document.querySelector(".flow-detail .pre") || {}).textContent?.length || 0,
+        hasOpen: typeof window.outside.openAppFile === "function" };
+    })()`,
+  );
+  console.log("[smoke] zheye flow:", JSON.stringify(flow));
+  writeFileSync(join(app.getPath("temp"), "myoutside-zheye-flow.png"), await captureWindow(win, 8, 300));
+
+  // 演示试跑：经内部事务 API 写入（只在临时数据副本里）
+  const demo = await win.webContents.executeJavaScript(
+    `(async () => {
+      const call = async (name, payload) => { const r = await window.outside.call(name, payload); if (!r.ok) throw new Error(name + ": " + r.error.message); return r.result; };
+      const { recipe } = await call("zheye.getRecipe", { type: "concept" });
+      const runId = "smoke-" + Date.now();
+      await call("zheye.trialCreate", { id: runId, subject: "通货膨胀（演示）", type: "concept", flow: recipe.name, recipeHash: recipe.hash, recipe });
+      const usage = { promptTokens: 4200, completionTokens: 900, totalTokens: 5100, reasoningTokens: 600, cacheHitTokens: 1200 };
+      await call("zheye.trialAppend", { runId, stage: "research", kind: "stage_start", data: { name: "搜集资料", system: "（系统提示词）", user: "讲解对象：通货膨胀（概念）" } });
+      await call("zheye.trialAppend", { runId, stage: "research", kind: "doc", data: { doc: "资料", op: "write", content: "- 通胀：物价普遍、持续上涨\\n- 例子：1923 年德国" } });
+      await call("zheye.trialAppend", { runId, stage: "research", kind: "round", data: { index: 1, reasoning: "先搜一下通胀的经典例子。", content: "", usage, model: "deepseek-flash", costYuan: 0.0123, webCalls: 1,
+        toolCalls: [
+          { id: "a", name: "web_search", arguments: JSON.stringify({ query: "恶性通胀 例子" }), ok: true, summary: "搜索：恶性通胀 例子", result: "[1] 魏玛德国恶性通胀\\nhttps://example.com" },
+          { id: "b", name: "write_doc", arguments: JSON.stringify({ name: "资料", content: "- 通胀：物价普遍、持续上涨\\n- 例子：1923 年德国" }), ok: true, summary: "重写「资料」", result: "已写入" } ] } });
+      await call("zheye.trialAppend", { runId, stage: "research", kind: "stage_end", data: { stopReason: "done", error: null, costYuan: 0.0123 } });
+      await call("zheye.trialAppend", { runId, stage: "write", kind: "stage_start", data: { name: "编写文章", system: "（系统提示词）", user: "（草稿）" } });
+      const article = "## 从一个例子说起\\n\\n1923 年的德国，面包早上和晚上的价格不一样。\\n\\n## [物价普遍上涨时，存钱的人吃亏](#断言:物价普遍上涨时，存钱的人吃亏)\\n\\n[货币](#概念:货币)的购买力下降……";
+      await call("zheye.trialAppend", { runId, stage: "write", kind: "doc", data: { doc: "文章", op: "write", content: article } });
+      await call("zheye.trialAppend", { runId, stage: "write", kind: "doc", data: { doc: "文章", op: "edit", content: article.replace("不一样", "可能不一样"), old: "不一样", new: "可能不一样" } });
+      await call("zheye.trialAppend", { runId, stage: "write", kind: "round", data: { index: 1, reasoning: "按大纲写。", content: "写好了。", usage, model: "deepseek-flash", costYuan: 0.02, webCalls: 0,
+        toolCalls: [
+          { id: "c", name: "write_doc", arguments: JSON.stringify({ name: "文章", content: article }), ok: true, summary: "重写「文章」", result: "已写入" },
+          { id: "d", name: "edit_doc", arguments: JSON.stringify({ name: "文章", old: "不一样", new: "可能不一样" }), ok: true, summary: "修改「文章」", result: "已修改" } ] } });
+      await call("zheye.trialAppend", { runId, stage: "write", kind: "stage_end", data: { stopReason: "done", error: null, costYuan: 0.02 } });
+      await call("zheye.trialFinish", { runId, status: "done", error: null, docs: {}, usage, costYuan: 0.0323, webCalls: 1 });
+      return runId;
+    })()`,
+  );
+  await win.reload();
+  await waitFor(win, 'document.querySelectorAll(".run-item").length > 0');
+  const runView = await win.webContents.executeJavaScript(
+    `(async () => {
+      document.querySelector(".run-item").click();
+      for (let i = 0; i < 20 && !document.querySelector(".docs-panel .doc-body"); i += 1) await new Promise((r) => setTimeout(r, 150));
+      await new Promise((r) => setTimeout(r, 300));
+      return { stages: document.querySelectorAll(".stage").length, rounds: document.querySelectorAll(".round").length, tools: document.querySelectorAll(".tool").length,
+        marks: document.querySelectorAll(".docs-panel .zy-mark").length, version: (document.querySelector(".doc-bar .small") || {}).textContent || "",
+        strip: document.querySelectorAll(".graph-strip .node").length, title: (document.querySelector(".run-title h2") || {}).textContent || "" };
+    })()`,
+  );
+  console.log("[smoke] zheye demo run:", demo, JSON.stringify(runView));
+  writeFileSync(join(app.getPath("temp"), "myoutside-zheye-run.png"), await captureWindow(win, 8, 300));
+
+  if (process.env.MYOUTSIDE_SMOKE_ZHEYE_LIVE !== "1") return;
+  const subject = process.env.MYOUTSIDE_SMOKE_ZHEYE_SUBJECT ?? "通货膨胀";
+  await win.webContents.executeJavaScript(
+    `(() => { document.getElementById("subject").value = ${JSON.stringify(subject)}; document.getElementById("btn-start").click(); return true; })()`,
+  );
+  const started = Date.now();
+  let midShot = false;
+  let last = "";
+  while (Date.now() - started < 25 * 60_000) {
+    await new Promise((resolve) => setTimeout(resolve, 5000));
+    const state = (await win.webContents.executeJavaScript(
+      `(async () => { const r = await window.outside.call("zheye.trialList", {}); const run = r.ok ? r.result.find((item) => !item.id.startsWith("smoke-")) : null;
+        return run ? { status: run.status, cost: run.costYuan, web: run.webCalls, stages: document.querySelectorAll(".graph-strip .node-done").length, live: !!document.querySelector(".round.live") } : null; })()`,
+    )) as { status: string; cost: number; web: number; stages: number; live: boolean } | null;
+    const line = JSON.stringify(state);
+    if (line !== last) console.log("[smoke] zheye live:", Math.round((Date.now() - started) / 1000) + "s", line);
+    last = line;
+    if (state && !midShot && state.live && state.stages >= 1) {
+      writeFileSync(join(app.getPath("temp"), "myoutside-zheye-live.png"), await captureWindow(win, 4, 100));
+      midShot = true;
+    }
+    if (state && state.status !== "running") break;
+  }
+  await new Promise((resolve) => setTimeout(resolve, 2500));
+  const final = await win.webContents.executeJavaScript(
+    `(async () => { const list = await window.outside.call("zheye.trialList", {}); const run = list.result.find((item) => !item.id.startsWith("smoke-"));
+      const detail = await window.outside.call("zheye.trialGet", { runId: run.id });
+      const docs = {}; for (const e of detail.result.events) if (e.kind === "doc") docs[e.data.doc] = e.data.content;
+      const failures = detail.result.events.filter((e) => e.kind === "round").flatMap((e) => e.data.toolCalls).filter((c) => !c.ok).map((c) => c.name + ": " + c.result.slice(0, 120));
+      return { status: run.status, error: run.error, cost: run.costYuan, web: run.webCalls, usage: run.usage, seconds: Math.round(((run.finishedAt || Date.now()) - run.startedAt) / 1000),
+        events: detail.result.events.length, rounds: detail.result.events.filter((e) => e.kind === "round").length,
+        docLengths: Object.fromEntries(Object.entries(docs).map(([k, v]) => [k, v.length])), failures, article: docs["文章"] || "", prerequisites: docs["前置"] || "" }; })()`,
+  );
+  console.log("[smoke] zheye live final:", JSON.stringify({ ...final, article: undefined, prerequisites: undefined }));
+  writeFileSync(join(app.getPath("temp"), "myoutside-zheye-article.md"), `${final.article}\n\n---\n\n${final.prerequisites}\n`);
+  writeFileSync(join(app.getPath("temp"), "myoutside-zheye-final.png"), await captureWindow(win, 6, 300));
+}
+
 async function runSmoke(win: BrowserWindow): Promise<void> {
-  const guard = setTimeout(() => {
-    console.error("[smoke] 超时，强制退出");
-    app.quit();
-  }, process.env.MYOUTSIDE_SMOKE_LIVE === "1" ? 120000 : 30000);
+  const guard = setTimeout(
+    () => {
+      console.error("[smoke] 超时，强制退出");
+      app.quit();
+    },
+    process.env.MYOUTSIDE_SMOKE_ZHEYE_LIVE === "1" ? 27 * 60_000 : process.env.MYOUTSIDE_SMOKE_LIVE === "1" ? 120000 : 45000,
+  );
   try {
     await new Promise((resolve) => setTimeout(resolve, 1200)); // 等 iframe 加载
     const shell = await win.webContents.executeJavaScript(
@@ -380,7 +538,7 @@ async function runSmoke(win: BrowserWindow): Promise<void> {
     }
 
     const settingsCheck = await win.webContents.executeJavaScript(
-      `(async () => { document.getElementById("btn-settings").click(); await new Promise((r) => setTimeout(r, 400)); return { hasLangSelect: !!document.getElementById("set-lang"), hasApiKey: !!document.getElementById("set-api-key"), brand: document.querySelector(".brand").textContent }; })()`,
+      `(async () => { document.getElementById("btn-settings").click(); await new Promise((r) => setTimeout(r, 400)); return { hasLangSelect: !!document.getElementById("set-lang"), hasApiKey: !!document.getElementById("set-api-key"), brand: document.querySelector(".brand").textContent, usageRows: (await new Promise((r) => setTimeout(r, 400)), document.querySelectorAll("#usage-table tbody tr").length) }; })()`,
     );
     console.log("[smoke] settings:", JSON.stringify(settingsCheck));
 
@@ -449,6 +607,13 @@ async function runSmoke(win: BrowserWindow): Promise<void> {
         const firstUser = pathResult.result.messages.find((message) => message.role === "user");
         await window.outside.call("dialog.editUserMessage", { messageId: firstUser.id, content: ${JSON.stringify("你好！用一句话介绍你自己。")} });
         await window.outside.call("dialog.appendMessage", { conversationId, role: "assistant", content: ${JSON.stringify(demoAssistant)}, reasoning: ${JSON.stringify(demoReasoning)}, model: "deepseek-flash", usage: { promptTokens: 32, completionTokens: 48, totalTokens: 80, reasoningTokens: 18 } });
+        // 被停止 / 出错中断的回复（DIALOG-0017、DIALOG-0018）
+        const base = { conversationId, reasoning: null, model: "deepseek-flash", usage: null, steps: null, sources: null, contextTokens: null };
+        const q1 = await window.outside.call("dialog.appendMessage", { conversationId, role: "user", content: "讲一个长一点的故事。" });
+        const steps = [{ reasoning: "先搜一下有没有现成的故事。", content: "", toolCalls: [{ id: "c1", name: "web_search", arguments: "{}", ok: true, summary: "搜索：长故事", result: "" }] }];
+        await window.outside.call("dialog.saveReply", { ...base, parentId: q1.result.messageId, content: "从前有座山，山里有座庙，", reasoning: "组织回答。", steps, stopped: true });
+        const q2 = await window.outside.call("dialog.appendMessage", { conversationId, role: "user", content: "继续。" });
+        await window.outside.call("dialog.saveReply", { ...base, parentId: q2.result.messageId, content: "庙里有个老和尚，", error: "读取流式响应失败：terminated" });
         return conversationId;
       })()`,
     );
@@ -460,7 +625,7 @@ async function runSmoke(win: BrowserWindow): Promise<void> {
     );
     console.log("[smoke] dialog reasoning toggle:", reasoningOpen);
     const rendering = await win.webContents.executeJavaScript(
-      `({ katex: document.querySelectorAll(".katex").length, display: document.querySelectorAll(".math-display").length, table: !!document.querySelector(".bubble table"), webSearchToggle: !!document.getElementById("web-search-toggle"), context: (document.getElementById("usage-total") || {}).textContent || "" })`,
+      `({ katex: document.querySelectorAll(".katex").length, display: document.querySelectorAll(".math-display").length, table: !!document.querySelector(".bubble table"), webSearchToggle: !!document.getElementById("web-search-toggle"), tags: [...document.querySelectorAll(".stopped-tag")].map((tag) => tag.textContent + "|" + tag.title), stoppedReasoning: ((document.querySelector(".msg .stopped-tag") || {}).closest ? document.querySelector(".msg .stopped-tag").closest(".msg").querySelector(".reasoning-body").textContent : null), context: (document.getElementById("usage-total") || {}).textContent || "" })`,
     );
     console.log("[smoke] dialog rendering:", JSON.stringify(rendering));
     const dialogShotPath = join(app.getPath("temp"), "myoutside-dialog.png");
@@ -481,6 +646,12 @@ async function runSmoke(win: BrowserWindow): Promise<void> {
         const state = (await win.webContents.executeJavaScript(
           `({ live: !!document.querySelector(".msg.live"), steps: document.querySelectorAll(".msg.live .step-tool").length, text: ((document.querySelector(".msg.live .bubble") || {}).innerText || "").length, stop: document.getElementById("btn-send").classList.contains("stop") })`,
         )) as { live: boolean; steps: number; text: number; stop: boolean };
+        // 可选：生成到一半时正常退出（MYOUTSIDE_SMOKE_QUIT_MID=1），验证退出前会保存已生成的部分
+        if (process.env.MYOUTSIDE_SMOKE_QUIT_MID === "1" && state.live && state.text > 80) {
+          console.log("[smoke] quitting mid-generation:", JSON.stringify(state));
+          app.quit();
+          return;
+        }
         if (!midShot && state.live && state.text > 80) {
           const mid = await captureWindow(win, 4, 100);
           writeFileSync(join(app.getPath("temp"), "myoutside-dialog-live.png"), mid);
@@ -598,6 +769,7 @@ async function runSmoke(win: BrowserWindow): Promise<void> {
       `(${pureblueTrackPng.length} bytes)`,
     );
 
+    await smokeZheye(win);
   } catch (error) {
     console.error("[smoke] 失败：", error);
   } finally {
@@ -607,6 +779,7 @@ async function runSmoke(win: BrowserWindow): Promise<void> {
 }
 
 app.whenReady().then(async () => {
+  if (SMOKE_HIDDEN) app.dock?.hide();
   // 单实例：重复双击时聚焦已有窗口
   if (!app.requestSingleInstanceLock()) {
     app.quit();
@@ -620,21 +793,30 @@ app.whenReady().then(async () => {
     }
   });
 
-  let dataDir = app.getPath("userData");
+  let dataDir = REAL_USER_DATA;
   if (process.env.MYOUTSIDE_SMOKE === "1") {
-    dataDir = prepareSmokeDataDir(dataDir);
+    dataDir = prepareSmokeDataDir(REAL_USER_DATA);
     console.log("[smoke] 临时数据副本:", dataDir);
   }
   mkdirSync(dataDir, { recursive: true });
   const dbPath = join(dataDir, "myoutside.db");
   console.log("[host] data dir:", dataDir);
 
-  const kernel = createKernel({ storage: createNodeSqliteAdapter({ path: dbPath }) });
+  const kernel = createKernel({ storage: createNodeSqliteAdapter({ path: dbPath }), secrets: createSecretCodec() });
   kernel.registerApp(vocabApp, vocabManifest);
   kernel.registerApp(dialogApp, dialogManifest);
   kernel.registerApp(goApp, goManifest);
   kernel.registerApp(createPureblueApp({ dataDir: join(dataDir, "apps", "pureblue") }), pureblueManifest);
+  // 哲野的配方从仓库里的 apps/zheye/recipes 读：改了提示词，下一次试跑就生效（ZHEYE-0021）
+  kernel.registerApp(createZheyeApp({ recipesDir: join(appDir("zheye"), "recipes") }), zheyeManifest);
   kernel.start();
+
+  // pnpm ai:check：在临时数据副本上用真实接口检查平台 AI / 搜索 / 抓取，不打开窗口，结束即退出
+  if (process.env.MYOUTSIDE_AI_CHECK === "1") {
+    const passed = await runAiCheck(kernel);
+    app.exit(passed ? 0 : 1);
+    return;
+  }
   const appIds = new Set(kernel.listApps().map((item) => item.id));
   registerMediaProtocol(dataDir, appIds);
 
@@ -692,10 +874,17 @@ app.whenReady().then(async () => {
           }
         }
       : undefined;
+    if (quitting) {
+      return { ok: false, error: { code: "ABORTED", message: "MyOutside 正在退出" }, dataVersion: kernel.dataVersion };
+    }
+    const done = kernel.handle({ call: request.call, payload: request.payload }, { caller, emit, signal: controller.signal });
+    const entry = { controller, done };
+    inflight.add(entry);
     let result;
     try {
-      result = await kernel.handle({ call: request.call, payload: request.payload }, { caller, emit, signal: controller.signal });
+      result = await done;
     } finally {
+      inflight.delete(entry);
       if (runId) runs.delete(runId);
     }
     if (request.call === "platform.settings.set" && result.ok) {
@@ -739,6 +928,19 @@ app.whenReady().then(async () => {
     return result.canceled ? null : (result.filePaths[0] ?? null);
   });
 
+  // 用系统默认程序打开子应用自己目录下的一个文本文件（例如哲野试验台的「在编辑器里打开」，D-0077）
+  ipcMain.handle("host:openAppFile", async (event, path: unknown) => {
+    const caller = callerOf(event.senderFrame);
+    if (!caller || caller === SHELL_CALLER || typeof path !== "string") return { ok: false, error: "无法识别调用者" };
+    const base = appDir(caller);
+    const file = normalize(join(base, path));
+    if (!file.startsWith(normalize(base) + sep)) return { ok: false, error: "只能打开本应用目录下的文件" };
+    if (!OPENABLE_EXTENSIONS.has(extname(file).toLowerCase())) return { ok: false, error: "只能打开 .md / .json / .txt 文件" };
+    if (!existsSync(file)) return { ok: false, error: "文件不存在" };
+    const failure = await shell.openPath(file);
+    return failure ? { ok: false, error: failure } : { ok: true };
+  });
+
   registerAppProtocol(uiDirs);
   const win = await createMainWindow();
   win.setTitle(STRINGS[currentLang].appName);
@@ -746,6 +948,21 @@ app.whenReady().then(async () => {
   if (process.env.MYOUTSIDE_SMOKE === "1") {
     await runSmoke(win);
   }
+});
+
+/** 进行中的调用：正常退出时先取消它们，等它们收尾（例如保存已生成的部分）再退出（DIALOG-0017） */
+const inflight = new Set<{ controller: AbortController; done: Promise<unknown> }>();
+const QUIT_GRACE_MS = 3000;
+let quitting = false;
+
+app.on("before-quit", (event) => {
+  if (quitting || inflight.size === 0) return;
+  event.preventDefault();
+  quitting = true;
+  const pending = [...inflight];
+  for (const call of pending) call.controller.abort();
+  const timeout = new Promise((resolve) => setTimeout(resolve, QUIT_GRACE_MS));
+  void Promise.race([Promise.allSettled(pending.map((call) => call.done)), timeout]).then(() => app.quit());
 });
 
 app.on("window-all-closed", () => {

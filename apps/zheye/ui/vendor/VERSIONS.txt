@@ -1,0 +1,4 @@
+由 scripts/vendor-dialog-ui.mjs 生成，请勿手改。
+marked 18.1.1
+dompurify 3.4.17
+katex 0.19.1

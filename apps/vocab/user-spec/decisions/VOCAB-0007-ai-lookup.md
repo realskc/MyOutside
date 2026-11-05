@@ -12,7 +12,7 @@
 - 输入单词 → 界面调用平台 AI 做翻译与解说；请求中带一个「生成卡片」工具（`make_card`），AI 返回结构化的卡片草稿（单词 / 意项 / 音标 / 释义 / 例句）；
 - 用户确认后走添加流程（VOCAB-0002）；
 - 查词结果不缓存，每次实时调用；
-- 音标目前只由 AI 产出，可以手工修正；统一按 [VOCAB-0010](VOCAB-0010-general-american-phonetic.md) 的 General American 标准。
+- 音标目前只由 AI 产出，可以手工修正；统一按 [VOCAB-0011](VOCAB-0011-general-american-phonetic.md) 的 General American 标准。
 
 ## 理由
 
@@ -28,4 +28,4 @@
 
 ## 修订记录
 
-- 2026-10-26：作者要求音标统一为美式 IPA；见 [VOCAB-0010](VOCAB-0010-general-american-phonetic.md)。
+- 2026-10-26：作者要求音标统一为美式 IPA；见 [VOCAB-0011](VOCAB-0011-general-american-phonetic.md)。

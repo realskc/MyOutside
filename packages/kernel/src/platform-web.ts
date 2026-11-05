@@ -1,7 +1,7 @@
 import { z } from "zod";
 import { deepseekPost } from "./deepseek.js";
 import type { RecordUsage } from "./platform-ai.js";
-import type { ApiDefinition, DbAdapter, ReadContext } from "./types.js";
+import type { ApiDefinition, DbAdapter, ReadContext, SecretCodec } from "./types.js";
 
 export const WebSearchInputSchema = z.object({
   /** 搜索词，1～128 字符；支持 site:、lang:、after:、before: 等搜索语法 */
@@ -36,7 +36,7 @@ interface RawSearchResult {
  * 平台 API：网页搜索（DeepSeek 自研搜索引擎，D-0050）。
  * 密钥由平台保管；按调用者计量（按次计费：5 元 / 千次成功请求）。
  */
-export function createWebSearchDefinition(storage: DbAdapter, recordUsage: RecordUsage): ApiDefinition {
+export function createWebSearchDefinition(storage: DbAdapter, recordUsage: RecordUsage, secrets?: SecretCodec): ApiDefinition {
   return {
     kind: "read",
     visibility: "public",
@@ -44,6 +44,7 @@ export function createWebSearchDefinition(storage: DbAdapter, recordUsage: Recor
     handler: async (ctx: ReadContext, input: z.infer<typeof WebSearchInputSchema>) => {
       const response = await deepseekPost(
         storage,
+        secrets,
         "/v1/tools/search",
         {
           query: input.query,
@@ -73,13 +74,13 @@ export function createWebSearchDefinition(storage: DbAdapter, recordUsage: Recor
 }
 
 /** 平台 API：抓取单个网页，返回 Markdown 正文（D-0050）。按调用者计量。 */
-export function createWebFetchDefinition(storage: DbAdapter, recordUsage: RecordUsage): ApiDefinition {
+export function createWebFetchDefinition(storage: DbAdapter, recordUsage: RecordUsage, secrets?: SecretCodec): ApiDefinition {
   return {
     kind: "read",
     visibility: "public",
     input: WebFetchInputSchema,
     handler: async (ctx: ReadContext, input: z.infer<typeof WebFetchInputSchema>) => {
-      const response = await deepseekPost(storage, "/v1/tools/fetch", { url: input.url }, ctx.signal, "网页抓取");
+      const response = await deepseekPost(storage, secrets, "/v1/tools/fetch", { url: input.url }, ctx.signal, "网页抓取");
       const data = (await response.json()) as { title?: string; content?: string };
       recordUsage({ caller: ctx.caller, kind: "web.fetch" });
       return { title: data.title ?? "", content: data.content ?? "" };

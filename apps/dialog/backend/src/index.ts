@@ -14,6 +14,7 @@ import {
   SendMessageInput,
   SetReasoningEffortInput,
   SetSystemPromptInput,
+  SetSearchNoticeInput,
   SetWebSearchInput,
   SwitchBranchInput,
 } from "@myoutside/contracts";
@@ -137,6 +138,24 @@ export const dialogApp: AppModule = {
         ctx.addColumn("message", "steps TEXT"); // JSON：回复过程中调用了工具的各轮
         ctx.addColumn("message", "sources TEXT"); // JSON：引用的来源
         ctx.addColumn("message", "context_tokens INTEGER"); // 生成时最后一次请求的输入 token 数
+      },
+    },
+    {
+      id: "0003_stopped",
+      up: (ctx) => {
+        ctx.addColumn("message", "stopped INTEGER NOT NULL DEFAULT 0"); // 生成被停止，内容是已生成的部分
+      },
+    },
+    {
+      id: "0004_error",
+      up: (ctx) => {
+        ctx.addColumn("message", "error TEXT"); // 生成被错误中断时的原因，内容是已生成的部分
+      },
+    },
+    {
+      id: "0005_search_notice",
+      up: (ctx) => {
+        ctx.addColumn("message", "search_notice TEXT"); // 用户消息：联网搜索开关在这里变了（off / on），发给模型时跟一条 system 说明（DIALOG-0019）
       },
     },
   ],
@@ -299,7 +318,7 @@ export const dialogApp: AppModule = {
           siblingIds: siblings.map((m) => m.id),
         };
       });
-      const systemPrompt = buildSystemPrompt(conversation, conversation.web_search !== 0);
+      const systemPrompt = buildSystemPrompt(conversation);
       return {
         messages,
         hasMore: path.length > limit,
@@ -347,12 +366,22 @@ export const dialogApp: AppModule = {
         steps: input.steps ? JSON.stringify(input.steps) : null,
         sources: input.sources ? JSON.stringify(input.sources) : null,
         context_tokens: input.contextTokens,
+        stopped: input.stopped ? 1 : 0,
+        error: input.error ?? null,
         active_child_id: null,
         created_at: now,
       });
       ctx.db.update("message", { active_child_id: id }, { id: parent.id });
       ctx.db.update("conversation", { updated_at: now }, { id: conversation.id });
       return { messageId: id };
+    }),
+
+    /** 记下这条用户消息发出时联网搜索开关的变化（生成回复前由后端调用，DIALOG-0019） */
+    setSearchNotice: defineTx(SetSearchNoticeInput, (ctx, input) => {
+      const message = getMessageOrThrow(ctx.db, input.messageId);
+      if (message.role !== "user") throw new KernelError("VALIDATION", "只有用户消息能记联网搜索的变化");
+      ctx.db.update("message", { search_notice: input.notice }, { id: message.id });
+      return { ok: true as const };
     }),
 
     setWebSearch: defineTx(SetWebSearchInput, (ctx, input) => {

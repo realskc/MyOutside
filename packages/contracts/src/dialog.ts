@@ -65,6 +65,15 @@ export const MessageSchema = z.object({
   sources: z.array(ReplySourceSchema).nullable(),
   /** 生成这条回复时，最后一次请求的上下文长度（输入 token 数） */
   contextTokens: z.number().int().nullable(),
+  /** 生成被停止（按停止或正常关闭 MyOutside），内容是停止前已生成的部分 */
+  stopped: z.boolean(),
+  /** 生成被错误中断（例如断网、重试都失败）时的原因；内容是中断前已生成的部分 */
+  error: z.string().nullable(),
+  /**
+   * 仅用户消息：发这条消息时联网搜索开关变了——off 关闭 / on 重新打开（DIALOG-0019）。
+   * 发给模型时，这条消息后面跟一条 role = system 的说明
+   */
+  searchNotice: z.enum(["off", "on"]).nullable(),
   activeChildId: z.string().nullable(),
   createdAt: z.number().int(),
 });
@@ -140,7 +149,8 @@ export const GenerateOutput = z.object({
   messageId: z.string(),
   /** 回答的那条用户消息 */
   parentId: z.string(),
-  stopReason: z.enum(["done", "max_rounds"]),
+  /** stopped：被停止，已生成的部分已保存；interrupted：出错中断，已生成的部分已保存 */
+  stopReason: z.enum(["done", "max_rounds", "stopped", "interrupted"]),
 });
 export type GenerateOutput = z.infer<typeof GenerateOutput>;
 
@@ -155,8 +165,16 @@ export const SaveReplyInput = z.object({
   steps: z.array(ReplyStepSchema).nullable(),
   sources: z.array(ReplySourceSchema).nullable(),
   contextTokens: z.number().int().nullable(),
+  stopped: z.boolean().optional(),
+  error: z.string().nullable().optional(),
 });
 export type SaveReplyInput = z.infer<typeof SaveReplyInput>;
+
+export const SetSearchNoticeInput = z.object({
+  messageId: z.string(),
+  notice: z.enum(["off", "on"]).nullable(),
+});
+export type SetSearchNoticeInput = z.infer<typeof SetSearchNoticeInput>;
 
 export const SetWebSearchInput = z.object({
   conversationId: z.string(),
@@ -235,6 +253,7 @@ export interface DialogApi {
   "dialog.editAndSend": { input: EditAndSendInput; output: GenerateOutput };
   "dialog.saveReply": { input: SaveReplyInput; output: { messageId: string } };
   "dialog.setWebSearch": { input: SetWebSearchInput; output: OkOutput };
+  "dialog.setSearchNotice": { input: SetSearchNoticeInput; output: OkOutput };
   "dialog.createConversation": { input: CreateConversationInput; output: CreateConversationOutput };
   "dialog.appendMessage": { input: AppendMessageInput; output: AppendMessageOutput };
   "dialog.editUserMessage": { input: EditUserMessageInput; output: EditUserMessageOutput };

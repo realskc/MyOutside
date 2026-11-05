@@ -25,6 +25,9 @@ export interface MessageRow {
   steps: string | null;
   sources: string | null;
   context_tokens: number | null;
+  stopped: number;
+  error: string | null;
+  search_notice: string | null;
   active_child_id: string | null;
   created_at: number;
 }
@@ -72,6 +75,9 @@ export function rowToMessage(row: MessageRow): Message {
     steps: parseSteps(row.steps),
     sources: parseJson<ReplySource[]>(row.sources),
     contextTokens: row.context_tokens,
+    stopped: row.stopped === 1,
+    error: row.error,
+    searchNotice: row.search_notice === "off" || row.search_notice === "on" ? row.search_notice : null,
     activeChildId: row.active_child_id,
     createdAt: row.created_at,
   };

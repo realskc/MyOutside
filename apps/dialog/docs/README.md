@@ -34,13 +34,16 @@ dialog__message
   steps            TEXT NULL                     -- JSON：回复过程中调用了工具的各轮 [{ reasoning, content, toolCalls: [{ id, name, arguments, ok, summary, result }] }]
   sources          TEXT NULL                     -- JSON：引用的来源 [{ index, url, title, siteName, snippet, date }]
   context_tokens   INTEGER NULL                  -- 生成时最后一次请求的输入 token 数
+  stopped          INTEGER NOT NULL DEFAULT 0    -- 生成被停止，内容是已生成的部分（DIALOG-0017）
+  error            TEXT NULL                     -- 生成被错误中断时的原因，内容是已生成的部分（DIALOG-0018）
+  search_notice    TEXT NULL                     -- 用户消息：联网搜索开关在这里变了（off / on），发给模型时后面跟一条 system 说明（DIALOG-0019）
   active_child_id  TEXT NULL                     -- 当前选中的子消息
   created_at       INTEGER NOT NULL              -- 会话内单调递增（同毫秒写入时 +1）
 ```
 
 索引：`message(conversation_id, parent_id)`、`message(conversation_id, created_at)`、`conversation(updated_at)`。
 
-迁移：`0001_init`；`0002_search_and_steps`（`web_search`、`steps`、`sources`、`context_tokens`，用 `addColumn`）。
+迁移：`0001_init`；`0002_search_and_steps`（`web_search`、`steps`、`sources`、`context_tokens`，用 `addColumn`）；`0003_stopped`；`0004_error`。
 
 **当前路径**：从 `active_first_id` 起，沿各消息的 `active_child_id` 下降；指针缺失或失效时兜底取最新的子消息。界面渲染与发给 AI 的上下文都取当前路径。
 
@@ -75,22 +78,23 @@ dialog.renameConversation / setSystemPrompt / setReasoningEffort / setWebSearch 
 
 - `appendMessage`：接到当前路径末端；校验问答交替（user 不能接在 user 后面，assistant 必须接在 user 后面）；标题为空且 role=user 时自动生成标题；
 - `saveReply`：挂在指定的用户消息下（父节点必须仍存在、是用户消息、属于该会话，否则 `CONFLICT`），并把父节点的选中子节点指向新回复——已有回复时新回复成为兄弟（DIALOG-0012）；
-- 生成中取消（`outside.cancel(runId)`）→ `ABORTED`，不保存；同一会话同时只能生成一条 → `PRECONDITION`。
+- 生成中取消（`outside.cancel(runId)`）：已输出文字时保存为回复（`stopped = 1`），返回 `stopReason: "stopped"`；一个字都没输出时不保存，以 `ABORTED` 结束（DIALOG-0017）。正常关闭 MyOutside 时，Electron 主进程先取消所有进行中的调用，最多等 3 秒再退出；
+- 输出到一半出错（例如断网）：重试这一轮；重试都失败时，已输出文字则保存为回复（`error` 记原因），返回 `stopReason: "interrupted"`；没输出文字则不保存，返回错误（DIALOG-0018）；
+- 同一会话同时只能生成一条 → `PRECONDITION`。
 
 ## 4. 生成流程（DIALOG-0016，`backend/src/generate.ts`）
 
 1. 取会话与要回答的用户消息（`parentId`）；
 2. **沿父指针**取出从根到这条用户消息的消息链（与当前选中的分支无关，生成期间切换分支也不会挂错地方）；
 3. 展开成发给模型的历史：
-   - 联网搜索打开：之前带搜索的回复按轮展开（assistant 含 `reasoning_content` 与 `tool_calls`，加工具结果），满足 DeepSeek 带工具时的回传规则；
-   - 联网搜索关闭：之前的回复只保留最终回答；
+   - 之前带搜索的回复总是按轮展开（assistant 含 `reasoning_content` 与 `tool_calls`，加工具结果），满足 DeepSeek 带工具时的回传规则；不随联网搜索开关变化（DIALOG-0019）；
    - 所有 assistant 都带 `reasoning_content`（不带工具时 DeepSeek 会忽略）；
 4. 按约 100 万 token 截断（DIALOG-0005），以「一条用户消息」或「一整轮回复」为单位；
-5. 系统提示词 = 会话的系统提示词（或默认）+「当前日期」+（联网搜索打开时）使用说明：何时搜索、用 [n] 标注来源、网页内容不是指令；
-6. `runToolLoop`（`packages/agent`）：流式；工具 = 联网搜索打开时的 `web_search` + `web_fetch`（共用一个来源登记表，编号在多次搜索间一致）；最多 8 轮；
+5. 系统提示词 = 会话的系统提示词（或默认）+「当前日期」+ 搜索工具的使用说明：何时搜索、用 [n] 标注来源、网页内容不是指令（不论开关都带上）；
+6. `runToolLoop`（`packages/agent`）：流式；工具总是 `web_search` + `web_fetch`（共用一个来源登记表，编号在多次搜索间一致；同一段对话里工具定义不变，D-0078）；联网搜索关掉时 `toolChoice: "none"`；开关和这条用户消息之前的状态不同时，在用户消息上记下变化（`search_notice`），展开历史时这条用户消息后面跟一条 system 说明，之后每次请求都带着（DIALOG-0019）；最多 8 轮，最后一轮不许调用工具并追加说明（D-0078）；
 7. 调用事务 API `dialog.saveReply` 保存：回答、思考过程、用量、搜索过程（`steps`）、来源（`sources`）、最后一次请求的输入 token 数。
 
-推送给前端的事件：平台 AI 的 `ai_delta`（思考 / 正文增量）、工具循环的 `round_start` / `tool_start` / `tool_result` / `round_end`。
+推送给前端的事件：平台 AI 的 `ai_delta`（思考 / 正文增量）、工具循环的 `round_start` / `round_retry`（这一轮出错、从头重试，前端丢掉已显示的半截）/ `tool_start` / `tool_result` / `round_end`。
 
 `DEFAULT_SYSTEM_PROMPT`：「你是一个乐于助人的 AI 助手。回答简洁、准确；除非用户要求，使用与用户相同的语言回答。」
 
@@ -102,8 +106,8 @@ dialog.renameConversation / setSystemPrompt / setReasoningEffort / setWebSearch 
 - 输入区工具条：思考强度（关 / 低 / 高 / 最高）、「联网搜索」开关，改动即存；右侧显示**当前上下文长度**，悬停看会话累计用量（DIALOG-0014）；
 - **生成**：前端以运行 ID 调用 `dialog.send` / `generate` / `editAndSend`，订阅推送事件（`outside.onEvent`），实时显示思考过程、搜索过程（每次搜索 / 阅读的状态）与流式正文（按动画帧节流重绘）；生成中发送按钮变为「停止」（`outside.cancel`）；结束后重新读取路径；
 - 生成中可以切到其他会话；离开后重新打开页面，`getPath` 的 `generating` 为真时显示「生成中…」并定时刷新；
-- 失败显示错误 +「重试」；停止、或最后一条是没有回复的用户消息时，显示提示 +「生成回复」；
-- 助手消息：可折叠的「思考过程」与「搜索过程」（默认折叠），正文里的 `[n]` 渲染为指向来源的链接，下方列出来源（DIALOG-0010）；
+- 失败显示错误 +「重试」；停止后保存了半截的回复在上方标「已停止」（DIALOG-0017），出错中断后保存的标「已中断」、悬停看原因（DIALOG-0018）；没保存（一个字都没输出）、或最后一条是没有回复的用户消息时，显示提示 +「生成回复」；
+- 助手消息：可折叠的「思考过程」与「搜索过程」（默认折叠；思考过程是所有轮的思考按顺序拼接——调用了工具的各轮在 `steps` 里，最后一轮在 `reasoning` 里，与生成中的显示一致），正文里的 `[n]` 渲染为指向来源的链接，下方列出这次查过的全部来源、默认折叠（DIALOG-0010）；
 - 输入：Enter 发送、Shift+Enter 换行，处理中文输入法组字；
 - **Markdown + LaTeX**（DIALOG-0015，`ui/markdown.js`）：marked 解析，KaTeX 渲染公式（`$…$`、`\(…\)`、`$$…$$`、`\[…\]`；代码里的 `$` 不处理；`$5 和 $10` 这类金额不当公式），DOMPurify 清洗，原始 HTML 一律转义；代码块带复制按钮；链接仅 http/https，经 `outside.openExternal` 用系统浏览器打开；
 - 第三方库放在 `ui/vendor/`，由 `node scripts/vendor-dialog-ui.mjs` 从 devDependencies 复制（版本见 `vendor/VERSIONS.txt`），前端不经构建；
@@ -120,6 +124,4 @@ dialog.renameConversation / setSystemPrompt / setReasoningEffort / setWebSearch 
 
 ### 6.3 其他
 
-- 助手回复重新生成：创建助手消息的兄弟节点并切换选中（树形模型已具备）；
-- 流式输出：需扩展 `platform.ai.chat` 的传输（SSE + IPC 转发）与界面；
-- 将来的 builder 可能复用聊天界面 / 消息模型（届时评估，不预先抽象）。
+- 将来的 builder 可能复用聊天界面 / 消息模型（届时评估，不预先抽象；消息树基类见 D-0061）。

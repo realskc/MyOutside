@@ -1,0 +1,9 @@
+{
+  "id": "zheye",
+  "name": "哲野",
+  "protocolVersion": 1,
+  "ui": "ui/index.html",
+  "backend": "backend/src/index.ts",
+  "owns": ["trial_run", "trial_event"],
+  "uses": ["platform.ai.chat", "platform.web.search", "platform.web.fetch"]
+}

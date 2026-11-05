@@ -43,11 +43,18 @@
       reasoning: "思考过程",
       thinking: "思考中…",
       searchProcess: (n) => `搜索过程（${n} 步）`,
-      sources: "来源",
+      sourcesCount: (n) => `来源（${n}）`,
       retry: "重试",
       generateNow: "生成回复",
       noReply: "这条消息还没有回复（上次生成被中断）。",
       stopped: "已停止生成。",
+      stoppedTag: "已停止",
+      searchOffTag: "关闭了联网搜索",
+      searchOnTag: "打开了联网搜索",
+      searchNoticeTitle: "发这条消息时联网搜索开关变了；之后发给模型的内容里，这条消息后面都会跟一条说明",
+      stoppedTitle: "生成被停止，这是停止前已生成的部分",
+      interruptedTag: "已中断",
+      interruptedTitle: (reason) => `生成出错中断，这是中断前已生成的部分。原因：${reason}`,
       errorPrefix: "生成失败：",
       needKey: "请先在「设置」里配置 DeepSeek API Key。",
       confirmDelete: (title) => `删除会话「${title}」？此操作不可恢复。`,
@@ -96,11 +103,18 @@
       reasoning: "Reasoning",
       thinking: "Thinking…",
       searchProcess: (n) => `Search process (${n} steps)`,
-      sources: "Sources",
+      sourcesCount: (n) => `Sources (${n})`,
       retry: "Retry",
       generateNow: "Generate reply",
       noReply: "This message has no reply yet (the last generation was interrupted).",
       stopped: "Generation stopped.",
+      stoppedTag: "Stopped",
+      searchOffTag: "Web search turned off",
+      searchOnTag: "Web search turned on",
+      searchNoticeTitle: "The web search switch changed with this message; every later request includes a note right after it",
+      stoppedTitle: "Generation was stopped; this is what had been generated",
+      interruptedTag: "Interrupted",
+      interruptedTitle: (reason) => `Generation failed midway; this is what had been generated. Reason: ${reason}`,
       errorPrefix: "Generation failed: ",
       needKey: "Configure the DeepSeek API key in Settings first.",
       confirmDelete: (title) => `Delete conversation “${title}”? This cannot be undone.`,
@@ -453,6 +467,20 @@
     role.className = "msg-role";
     role.textContent = t(roleKey);
     head.appendChild(role);
+    if (message && (message.stopped || message.error)) {
+      const tag = document.createElement("span");
+      tag.className = "stopped-tag" + (message.error ? " interrupted" : "");
+      tag.textContent = message.error ? t("interruptedTag") : t("stoppedTag");
+      tag.title = message.error ? t("interruptedTitle", message.error) : t("stoppedTitle");
+      head.appendChild(tag);
+    }
+    if (message && message.searchNotice) {
+      const tag = document.createElement("span");
+      tag.className = "stopped-tag search-notice";
+      tag.textContent = message.searchNotice === "off" ? t("searchOffTag") : t("searchOnTag");
+      tag.title = t("searchNoticeTitle");
+      head.appendChild(tag);
+    }
     if (message && message.siblingCount > 1) head.appendChild(buildBranchSwitcher(message));
     return head;
   }
@@ -462,8 +490,13 @@
     wrap.className = `msg ${message.role}`;
     wrap.appendChild(messageHead(message.role === "user" ? "you" : "assistant", message));
 
-    if (message.role === "assistant" && message.reasoning) {
-      wrap.appendChild(buildCollapsible(t("reasoning"), buildReasoningBody(message.reasoning)));
+    // 思考过程：所有轮的思考按顺序拼在一起（调用了工具的各轮存在 steps 里，最后一轮存在 reasoning 里），与生成中的显示一致
+    const reasoning =
+      message.role === "assistant"
+        ? [...(message.steps || []).map((step) => step.reasoning), message.reasoning].filter(Boolean).join("\n\n")
+        : "";
+    if (reasoning) {
+      wrap.appendChild(buildCollapsible(t("reasoning"), buildReasoningBody(reasoning)));
     }
     if (message.role === "assistant" && message.steps && message.steps.length > 0) {
       wrap.appendChild(buildCollapsible(t("searchProcess", countTools(message.steps)), buildStepsBody(message.steps)));
@@ -567,13 +600,8 @@
     return body;
   }
 
+  /** 来源：全部列出，默认折叠（DIALOG-0010） */
   function buildSources(sources) {
-    const box = document.createElement("div");
-    box.className = "sources";
-    const label = document.createElement("div");
-    label.className = "sources-label";
-    label.textContent = t("sources");
-    box.appendChild(label);
     const list = document.createElement("ol");
     for (const source of sources) {
       const item = document.createElement("li");
@@ -593,8 +621,10 @@
       }
       list.appendChild(item);
     }
-    box.appendChild(list);
-    return box;
+    const body = document.createElement("div");
+    body.className = "sources";
+    body.appendChild(list);
+    return buildCollapsible(t("sourcesCount", sources.length), body);
   }
 
   function renderPendingUser(text) {
@@ -759,6 +789,13 @@
           run.rounds.push({ reasoning: "", content: "", tools: [] });
         }
         break;
+      case "round_retry": {
+        // 这一轮出错、即将从头重试：丢掉已显示的半截
+        const round = current();
+        round.reasoning = "";
+        round.content = "";
+        break;
+      }
       case "ai_delta":
         if (event.reasoning) current().reasoning += event.reasoning;
         if (event.content) current().content += event.content;

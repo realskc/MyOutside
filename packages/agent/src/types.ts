@@ -28,6 +28,8 @@ export interface AgentTool {
   maxChars?: number;
   /** 结果来自不可信来源（网页等）：交给模型时包上边界说明 */
   untrusted?: boolean;
+  /** 以相同参数重复调用时照常执行（结果会随状态变化的工具，例如读取一份正在修改的稿子）；默认不再执行 */
+  repeatable?: boolean;
 }
 
 /** 一轮里的一次工具调用 */
@@ -53,6 +55,8 @@ export interface Round {
   toolCalls: ToolCallRecord[];
   usage: AiUsage | null;
   model: string;
+  /** 这一轮之前由循环追加给模型的说明（例如轮数用完时的提示，D-0078） */
+  note?: string;
 }
 
 export type StopReason = "done" | "max_rounds" | "aborted" | "error";
@@ -65,10 +69,22 @@ export interface ToolLoopOptions {
   model?: string;
   /** 流式：模型输出的增量经 ctx.emit 推送（平台 AI 的 ai_delta 事件） */
   stream?: boolean;
-  /** 最多几轮（默认 8）；达到时最后一轮不再提供工具，让模型直接回答 */
+  /**
+   * 最多几轮（默认 8）。最后一轮工具定义照常带上（不在对话中改动工具定义，D-0078），
+   * 但设 tool_choice = none 不许调用，并追加 finalRoundNote，让模型直接回复
+   */
   maxRounds?: number;
+  /** 最后一轮追加给模型的说明（默认：轮数用完，请说明做到了哪里、还有什么没做完） */
+  finalRoundNote?: string;
+  /**
+   * 这一次整个循环能不能调用工具（默认 auto）。none：工具定义照常带上（D-0078），但每一轮都不许调用，
+   * 例如对话关掉了联网搜索（DIALOG-0019）；说明由调用方放进 messages
+   */
+  toolChoice?: "auto" | "none";
   /** 可重试的上游错误最多重试几次（默认 2） */
   retries?: number;
+  /** 每一轮结束（工具都执行完）时调用，例如把这一轮及时保存下来；会等它完成再进入下一轮 */
+  onRound?(round: Round): void | Promise<void>;
 }
 
 export interface ToolLoopResult {
@@ -89,6 +105,8 @@ export interface ToolLoopResult {
 /** 工具循环推送的事件（模型输出的增量由平台 AI 推送：{ type: "ai_delta" }） */
 export type LoopEvent =
   | { type: "round_start"; round: number }
+  /** 这一轮出错、即将从头重试：界面应丢掉这一轮已显示的输出 */
+  | { type: "round_retry"; round: number; attempt: number }
   | { type: "tool_start"; round: number; callId: string; tool: string; summary: string }
   | { type: "tool_result"; round: number; callId: string; tool: string; ok: boolean; summary: string }
   | { type: "round_end"; round: number };

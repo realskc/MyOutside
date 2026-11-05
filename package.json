@@ -8,13 +8,12 @@
     "test": "pnpm -r test",
     "typecheck": "pnpm -r typecheck",
     "simulate": "tsx scripts/simulate-dialog.ts",
-    "ai:ping": "tsx scripts/ai-ping.ts",
     "import:vocabry": "tsx scripts/import-vocabry.ts",
     "build:toefl": "tsx scripts/build-toefl-levels.ts",
     "dev": "pnpm --filter @myoutside/host dev",
     "dev:lan": "pnpm --filter @myoutside/host dev:lan",
     "smoke": "pnpm --filter @myoutside/host smoke",
-    "ai:check": "tsx scripts/real-check.ts"
+    "ai:check": "pnpm --filter @myoutside/host ai:check"
   },
   "devDependencies": {
     "@myoutside/kernel": "workspace:*",

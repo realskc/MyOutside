@@ -1,7 +1,7 @@
 import { z } from "zod";
 import { deepseekPost, readSse, readStringSetting } from "./deepseek.js";
 import { KernelError } from "./errors.js";
-import type { ApiDefinition, DbAdapter, ReadContext } from "./types.js";
+import type { ApiDefinition, DbAdapter, ReadContext, SecretCodec } from "./types.js";
 
 const DEFAULT_MODEL = "deepseek-flash";
 
@@ -49,6 +49,11 @@ export const AiChatInputSchema = z.object({
   temperature: z.number().optional(),
   /** 思考强度（none 关闭思考；不传 = 服务默认 high） */
   reasoningEffort: z.enum(["none", "low", "high", "max"]).optional(),
+  /**
+   * 这一次能不能调用工具（D-0078）：none = 工具定义照常带上、但这一次不许调用（例如轮数用完时）。
+   * 不提供 required / 指定工具：思考模式下不支持（D-0059）。
+   */
+  toolChoice: z.enum(["auto", "none"]).optional(),
   /** 流式：增量经推送通道发出（事件 ai_delta），最终仍返回完整结果 */
   stream: z.boolean().optional(),
 });
@@ -106,9 +111,15 @@ export type RecordUsage = (record: UsageRecord) => void;
  * - 请求透传 messages（含 reasoning_content 回传）/ tools / 思考强度；
  * - 响应返回内容、思考过程、工具调用、可直接追加进历史的 assistant 消息、结束原因与 usage；
  * - stream = true 时，增量经 ctx.emit 推送：{ type: "ai_delta", content?, reasoning? }；
+ *   中途被取消时不报错，返回已经收到的部分，finishReason = "aborted"（未拼完的工具调用丢弃；拿不到 usage）；
+ *   中途出错（例如断网）时照常报错，已经收到的部分放在错误的 details.partial = { content, reasoning } 里；
  * - 每次成功调用按调用者记一条用量。
  */
-export function createPlatformAiDefinition(storage: DbAdapter, recordUsage: RecordUsage = () => {}): ApiDefinition {
+export function createPlatformAiDefinition(
+  storage: DbAdapter,
+  recordUsage: RecordUsage = () => {},
+  secrets?: SecretCodec,
+): ApiDefinition {
   return {
     kind: "read",
     visibility: "public",
@@ -124,11 +135,12 @@ export function createPlatformAiDefinition(storage: DbAdapter, recordUsage: Reco
         model,
         messages,
         ...(input.tools ? { tools: input.tools } : {}),
+        ...(input.tools && input.toolChoice ? { tool_choice: input.toolChoice } : {}),
         ...(input.temperature !== undefined ? { temperature: input.temperature } : {}),
         ...(input.reasoningEffort ? { reasoning_effort: input.reasoningEffort } : {}),
         ...(input.stream ? { stream: true, stream_options: { include_usage: true } } : {}),
       };
-      const response = await deepseekPost(storage, "/chat/completions", body, ctx.signal, "AI 请求");
+      const response = await deepseekPost(storage, secrets, "/chat/completions", body, ctx.signal, "AI 请求");
 
       let content = "";
       let reasoning = "";
@@ -139,44 +151,66 @@ export function createPlatformAiDefinition(storage: DbAdapter, recordUsage: Reco
 
       if (input.stream) {
         const partial: Array<{ id: string; name: string; arguments: string }> = [];
-        for await (const raw of readSse(response, ctx.signal)) {
-          const chunk = raw as {
-            model?: string;
-            choices?: Array<{
-              delta?: {
-                content?: string | null;
-                reasoning_content?: string | null;
-                tool_calls?: Array<{ index: number; id?: string; function?: { name?: string; arguments?: string } }>;
-              };
-              finish_reason?: string | null;
-            }>;
-            usage?: DeepSeekUsage;
-          };
-          if (chunk.model) responseModel = chunk.model;
-          if (chunk.usage) usage = mapUsage(chunk.usage);
-          const choice = chunk.choices?.[0];
-          if (!choice) continue;
-          const delta = choice.delta ?? {};
-          if (delta.reasoning_content) {
-            reasoning += delta.reasoning_content;
-            ctx.emit({ type: "ai_delta", reasoning: delta.reasoning_content });
+        try {
+          for await (const raw of readSse(response, ctx.signal)) {
+            const chunk = raw as {
+              model?: string;
+              choices?: Array<{
+                delta?: {
+                  content?: string | null;
+                  reasoning_content?: string | null;
+                  tool_calls?: Array<{ index: number; id?: string; function?: { name?: string; arguments?: string } }>;
+                };
+                finish_reason?: string | null;
+              }>;
+              usage?: DeepSeekUsage;
+            };
+            if (chunk.model) responseModel = chunk.model;
+            if (chunk.usage) usage = mapUsage(chunk.usage);
+            const choice = chunk.choices?.[0];
+            if (!choice) continue;
+            const delta = choice.delta ?? {};
+            if (delta.reasoning_content) {
+              reasoning += delta.reasoning_content;
+              ctx.emit({ type: "ai_delta", reasoning: delta.reasoning_content });
+            }
+            if (delta.content) {
+              content += delta.content;
+              ctx.emit({ type: "ai_delta", content: delta.content });
+            }
+            // 流式下工具调用的参数分片到达：按 index 拼装
+            for (const piece of delta.tool_calls ?? []) {
+              const slot = (partial[piece.index] ??= { id: "", name: "", arguments: "" });
+              if (piece.id) slot.id = piece.id;
+              if (piece.function?.name) slot.name += piece.function.name;
+              if (piece.function?.arguments) slot.arguments += piece.function.arguments;
+            }
+            if (choice.finish_reason) finishReason = choice.finish_reason;
           }
-          if (delta.content) {
-            content += delta.content;
-            ctx.emit({ type: "ai_delta", content: delta.content });
+        } catch (cause) {
+          // 流式中途被取消：返回已经收到的部分（finishReason = "aborted"），由调用方决定要不要保留
+          if (cause instanceof KernelError && cause.code === "ABORTED") {
+            finishReason = "aborted";
+          } else if (cause instanceof KernelError && (content !== "" || reasoning !== "")) {
+            // 流式中途出错（例如断网）：已经收到的部分附在错误里（details.partial），由调用方决定要不要保留
+            throw new KernelError(cause.code, cause.message, {
+              ...((cause.details as Record<string, unknown> | undefined) ?? {}),
+              partial: { content, reasoning },
+            });
+          } else {
+            throw cause;
           }
-          // 流式下工具调用的参数分片到达：按 index 拼装
-          for (const piece of delta.tool_calls ?? []) {
-            const slot = (partial[piece.index] ??= { id: "", name: "", arguments: "" });
-            if (piece.id) slot.id = piece.id;
-            if (piece.function?.name) slot.name += piece.function.name;
-            if (piece.function?.arguments) slot.arguments += piece.function.arguments;
-          }
-          if (choice.finish_reason) finishReason = choice.finish_reason;
         }
-        toolCalls = partial
-          .filter((slot) => slot && slot.name)
-          .map((slot) => ({ id: slot.id, type: "function" as const, function: { name: slot.name, arguments: slot.arguments } }));
+        toolCalls =
+          finishReason === "aborted"
+            ? []
+            : partial
+                .filter((slot) => slot && slot.name)
+                .map((slot) => ({
+                  id: slot.id,
+                  type: "function" as const,
+                  function: { name: slot.name, arguments: slot.arguments },
+                }));
       } else {
         const data = (await response.json()) as {
           model?: string;
@@ -203,7 +237,7 @@ export function createPlatformAiDefinition(storage: DbAdapter, recordUsage: Reco
         responseModel = data.model ?? model;
       }
 
-      if (ctx.signal.aborted) throw new KernelError("ABORTED", "调用已取消");
+      if (ctx.signal.aborted && finishReason !== "aborted") throw new KernelError("ABORTED", "调用已取消");
       recordUsage({ caller: ctx.caller, kind: "ai.chat", model: responseModel, usage });
 
       return {

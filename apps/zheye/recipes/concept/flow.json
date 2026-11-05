@@ -1,0 +1,16 @@
+{
+  "name": "讲解概念",
+  "model": "deepseek-flash",
+  "reasoningEffort": "max",
+  "docs": ["资料", "大纲", "前置", "文章"],
+  "article": "文章",
+  "system": ["common/system.md"],
+  "stages": [
+    { "id": "research", "name": "搜集资料", "prompt": "concept/1-research.md", "maxRounds": 16 },
+    { "id": "outline", "name": "拟定大纲", "prompt": "concept/2-outline.md", "maxRounds": 8 },
+    { "id": "prerequisites", "name": "分析前置", "prompt": "concept/3-prerequisites.md", "maxRounds": 8 },
+    { "id": "write", "name": "编写文章", "prompt": "concept/4-write.md", "maxRounds": 16 },
+    { "id": "check", "name": "检查文章", "prompt": "concept/5-check.md", "maxRounds": 16 },
+    { "id": "links", "name": "修改前置、添加前置链接", "prompt": "concept/6-links.md", "maxRounds": 16 }
+  ]
+}

@@ -250,3 +250,46 @@ body {
     padding: 14px;
   }
 }
+
+/* 用量与花费 */
+.setting-row.usage-row {
+  max-width: none;
+}
+
+.setting-row.usage-row select {
+  width: auto;
+}
+
+.usage-table {
+  margin-top: 10px;
+  overflow-x: auto;
+}
+
+.usage-table table {
+  border-collapse: collapse;
+  font-size: 13px;
+  font-variant-numeric: tabular-nums;
+}
+
+.usage-table th,
+.usage-table td {
+  border-bottom: 1px solid #e5e7eb;
+  padding: 6px 12px 6px 0;
+  text-align: right;
+  white-space: nowrap;
+}
+
+.usage-table th:first-child,
+.usage-table td:first-child {
+  text-align: left;
+}
+
+.usage-table th {
+  color: #6b7280;
+  font-weight: 500;
+}
+
+.usage-table tr.total td {
+  font-weight: 600;
+  border-bottom: 0;
+}

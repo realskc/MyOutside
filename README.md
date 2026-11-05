@@ -9,6 +9,8 @@
 1. `user-spec/` — **作者的预期**（项目的源头）：产品是什么、为谁、什么重要、什么不要；以及 `decisions/`——每个实现选择为什么这样做、什么时候可以推翻。应用专属的预期与决策在 `apps/<app>/user-spec/`（目前有 `apps/go`、`apps/pureblue`）。从 `user-spec/README.md` 读起。
 2. `docs/` — **技术文档**：当前实现与技术设计（架构与协议、各子应用、未来方向），设计依据引用决策；应用专属技术文档在 `apps/<app>/docs/`。从 `docs/README.md` 读起。
 
+另有 `references/`：其他产品与项目的资料，以及作者对它们的想法（规则见 `references/README.md`）。
+
 参与开发的 agent 先读 `AGENTS.md`。
 
 ## 开发
@@ -20,12 +22,12 @@ pnpm.cmd install    # 安装依赖
 pnpm.cmd test       # 单元 / 集成测试（kernel、vocab、适配器）
 pnpm.cmd typecheck  # 全部类型检查
 pnpm.cmd simulate   # 模拟「对话应用」经内核调用 vocab（跨应用路径演示）
-pnpm.cmd ai:ping    # 用应用数据目录里的 key 做一次真实 AI 调用（验证 key、模型与思考强度）
+pnpm.cmd ai:check   # 用真实接口检查平台 AI / 搜索 / 抓取：后台运行、在数据副本上、花几分钱；密钥从系统钥匙串解密，只在内存里使用
 pnpm.cmd import:vocabry  # 从旧 Vocabry 库 + Anki 迁移卡片（近似迁移复习状态；可重复运行）
 pnpm.cmd build:toefl # 从《词以类记》分级结果重新生成参考词表数据（源：D:\Resource\TOEFL）
 pnpm.cmd dev        # 启动桌面端（Electron 窗口）
 pnpm.cmd dev:lan    # 开发用 LAN 预览：额外在 3000 端口提供 Web 界面（默认关闭）
-pnpm.cmd smoke      # 冒烟测试：自检内核 / 桥 / 子应用 iframe 后自动退出
+pnpm.cmd smoke      # 冒烟测试：后台自检内核 / 桥 / 子应用 iframe 后自动退出（MYOUTSIDE_SMOKE_SHOW=1 显示窗口）
 powershell -ExecutionPolicy Bypass -File apps/pureblue/scripts/setup-engine.ps1  # 纯蓝引擎（一次性，需 uv；下载 Python/PyTorch/模型）
 ```
 
@@ -34,6 +36,8 @@ powershell -ExecutionPolicy Bypass -File apps/pureblue/scripts/setup-engine.ps1 
 数据位置（开发期）：Windows `%APPDATA%/MyOutside/myoutside.db`，macOS `~/Library/Application Support/MyOutside/myoutside.db`；`pnpm.cmd simulate` 用的是仓库内 `data/`。纯蓝的曲目、六轨结果与分离引擎在 `%APPDATA%/MyOutside/apps/pureblue/`。
 
 不想开终端时（仅 Windows）：双击桌面的 **MyOutside** 快捷方式（静默启动，无控制台），或运行 `scripts/launch/MyOutside.cmd`（带控制台、便于看日志）；快捷方式可用 `scripts/launch/create-shortcut.ps1` 重建。应用带单实例锁，重复双击会聚焦已有窗口。
+
+macOS / Linux：在任意目录输入 `myoutside` 即可后台启动（已在运行时切到已有窗口；`myoutside --lan` 同时开启局域网预览；日志在 `~/Library/Logs/MyOutside/launch.log`）。安装一次：`ln -s "$PWD/scripts/launch/myoutside" ~/.local/bin/myoutside`（`~/.local/bin` 需在 PATH 中）。
 
 当前 v0 已实现：Electron 程序 + 内核（串行队列、事务、硬所有权、迁移、DataVersion、平台设置、平台 AI 代理（思考强度 / 思考过程 / usage 透传））+ 学英语应用（复习（间隔预览 / 完全学会）/ 查词（AI）/ 词库 / 添加（LLM 去重）/ 统计 / 词表分级标注（托福 · 词以类记））+ 对话应用（多会话 / 树形历史与分叉切换 / 思考强度与思考过程 / Markdown 渲染 / 链接外开 / usage 统计显示）+ 围棋应用（9 路特殊规则 / 双人联机 / 聊天 / 悔棋 / 棋谱回放）+ 纯蓝应用（六轨分离（含钢琴）/ 内建慢放播放器 / AB 循环 / 分轨混音 / 本地 GPU）。
 未实现：临时函数、builder、哲野、移动端、打包分发。

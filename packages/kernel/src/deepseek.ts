@@ -1,5 +1,6 @@
+import { readCredential } from "./credentials.js";
 import { KernelError } from "./errors.js";
-import type { DbAdapter } from "./types.js";
+import type { DbAdapter, SecretCodec } from "./types.js";
 
 const DEFAULT_BASE_URL = "https://api.deepseek.com";
 
@@ -14,8 +15,8 @@ export function readStringSetting(storage: DbAdapter, key: string): string | nul
 }
 
 /** 读取 DeepSeek 的密钥与地址；密钥只在平台内部使用，子应用拿不到 */
-export function deepseekConfig(storage: DbAdapter): { apiKey: string; baseUrl: string } {
-  const apiKey = readStringSetting(storage, "ai.deepseek.apiKey");
+export function deepseekConfig(storage: DbAdapter, secrets?: SecretCodec): { apiKey: string; baseUrl: string } {
+  const apiKey = readCredential(storage, "ai.deepseek.apiKey", secrets);
   if (!apiKey) throw new KernelError("PRECONDITION", "尚未配置 DeepSeek API Key（设置 → DeepSeek API Key）");
   const baseUrl = (readStringSetting(storage, "ai.deepseek.baseUrl") ?? DEFAULT_BASE_URL).replace(/\/+$/, "");
   return { apiKey, baseUrl };
@@ -34,12 +35,13 @@ export function isRetryableStatus(status: number): boolean {
  */
 export async function deepseekPost(
   storage: DbAdapter,
+  secrets: SecretCodec | undefined,
   path: string,
   body: unknown,
   signal: AbortSignal,
   label: string,
 ): Promise<Response> {
-  const { apiKey, baseUrl } = deepseekConfig(storage);
+  const { apiKey, baseUrl } = deepseekConfig(storage, secrets);
   let response: Response;
   try {
     response = await fetch(`${baseUrl}${path}`, {

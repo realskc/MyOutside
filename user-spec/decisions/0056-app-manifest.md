@@ -1,6 +1,6 @@
 # D-0056 应用清单（manifest）的内容与形式：每个子应用一份 JSON 文件
 
-- 状态：有效（未实现）
+- 状态：有效
 - 日期：2026-10-23
 - 决策者：agent（「要有清单、清单在 builder 上有独立的权限限制」是作者的预期；内容与形式是 agent 的方案）
 - 服务于：
@@ -39,7 +39,7 @@ API 函数与迁移仍由后端代码提供（它们本来就是代码）。
 
 ## 相关文档
 
-- `docs/architecture.md` §2.1；`docs/agent.md` §7.2
+- `docs/architecture.md` §2.1；`docs/agent.md` §6.1
 
 ## 修订记录
 

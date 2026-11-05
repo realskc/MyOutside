@@ -451,11 +451,6 @@ textarea {
   color: var(--muted);
 }
 
-.sources-label {
-  font-weight: 600;
-  margin-bottom: 2px;
-}
-
 .sources ol {
   margin: 0;
   padding-left: 22px;
@@ -746,4 +741,17 @@ a.cite:hover {
 #btn-send.stop {
   background: var(--danger);
   border-color: var(--danger);
+}
+
+.stopped-tag {
+  font-size: 12px;
+  color: var(--muted);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 0 6px;
+}
+
+.stopped-tag.interrupted {
+  color: var(--danger);
+  border-color: #f3c2c4;
 }
