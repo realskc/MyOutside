@@ -1,10 +1,10 @@
 # 参考：其他产品与项目
 
-这里记录 MyOutside 以外的东西：竞品、互补品、开源技术项目，以及其他任何值得参考的东西。每样东西一个文件（例如 `obsidian.md`）。
+这里记录 MyOutside 以外的东西：竞品、互补品、开源技术项目，以及其他任何值得参考的东西。每样东西一个子目录（例如 `obsidian/`），主文件是其中的 `README.md`；需要时可以在子目录里放更多文件。
 
 ## 两层内容
 
-每个文件分两部分。
+每样东西的主文件分两部分。
 
 ### 资料
 
@@ -22,7 +22,7 @@
 
 ## 目录
 
-| 文件 | 是什么 |
+| 目录 | 是什么 |
 |---|---|
-| [obsidian.md](obsidian.md) | 本地优先的 Markdown 笔记软件 |
-| [karpathy-llm-wiki.md](karpathy-llm-wiki.md) | 让 LLM 编译并维护个人知识库（wiki）的做法 |
+| [obsidian/](obsidian/README.md) | 本地优先的 Markdown 笔记软件 |
+| [karpathy-llm-wiki/](karpathy-llm-wiki/README.md) | 让 LLM 编译并维护个人知识库（wiki）的做法 |

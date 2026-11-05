@@ -14,7 +14,7 @@
 ### 人们用它做什么
 
 - CEO 的说法：很多人用它记录想法、写日记；很多用户是学生，用它追踪学习进度、整理研究笔记；也有作家、写书的人，甚至 RPG 爱好者。（The Verge Decoder 播客，[2025-08-18](https://www.theverge.com/decoder-podcast-with-nilay-patel/760522/obsidian-ceo-steph-ango-kepano-productivity-software-notes-app)）
-- 2026 年 4 月起流行的一种用法：Andrej Karpathy 的「LLM 知识库」（LLM Wiki）。把原始资料（文章、论文、代码库、图片等）放进 `raw/` 文件夹，让 LLM 把它们逐步「编译」成一个 wiki：一堆互相链接的 `.md` 文件，有资料摘要、概念文章和反向链接；提问的回答也写回 wiki；定期让 LLM 做「体检」（找矛盾、补缺、找新的联系）。wiki 几乎全由 LLM 写和维护，他自己很少直接改，Obsidian 只用来浏览。原话：「Obsidian is the IDE; the LLM is the programmer; the wiki is the codebase.」（[推文，2026-04-02](https://x.com/karpathy/status/2039805659525644595)；详见 [karpathy-llm-wiki.md](karpathy-llm-wiki.md)）
+- 2026 年 4 月起流行的一种用法：Andrej Karpathy 的「LLM 知识库」（LLM Wiki）。把原始资料（文章、论文、代码库、图片等）放进 `raw/` 文件夹，让 LLM 把它们逐步「编译」成一个 wiki：一堆互相链接的 `.md` 文件，有资料摘要、概念文章和反向链接；提问的回答也写回 wiki；定期让 LLM 做「体检」（找矛盾、补缺、找新的联系）。wiki 几乎全由 LLM 写和维护，他自己很少直接改，Obsidian 只用来浏览。原话：「Obsidian is the IDE; the LLM is the programmer; the wiki is the codebase.」（[推文，2026-04-02](https://x.com/karpathy/status/2039805659525644595)；详见 [karpathy-llm-wiki](../karpathy-llm-wiki/README.md)）
 
 ### 开放程度
 
@@ -48,4 +48,4 @@
   - 它刻意不内置 AI，理由是不想让 AI 替代你的思考。所以这是一个让你自己整理思考的地方，安静，不沾「灵气」。
   - 里面的知识大多是你自己写下的；哲野不太一样，它是 AI 讲给你听的知识。
 - 如果 MyOutside 能做出来、做得好，就一定会直接覆盖 Obsidian 的能力；这块能力只是我们宏大计划的一小部分而已。作者以后也许会进入 Obsidian 社区，看看里面的人在关注什么、有怎样的活动和需求。
-- 作者在想：我们的文档，尤其是 user spec，能不能用 Obsidian 的方式来组织，也就是用 Obsidian 这个产品来服务于我们的 user spec。（已开始用，见 [D-0079](../user-spec/decisions/0079-obsidian-for-docs.md)）
+- 作者在想：我们的文档，尤其是 user spec，能不能用 Obsidian 的方式来组织，也就是用 Obsidian 这个产品来服务于我们的 user spec。（已开始用，见 [D-0079](../../user-spec/decisions/0079-obsidian-for-docs.md)）

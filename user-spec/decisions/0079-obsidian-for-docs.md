@@ -4,7 +4,7 @@
 - 日期：2026-11-05
 - 决策者：作者（用 Obsidian 组织文档；设置提交进仓库、两台电脑共用）；agent（具体设置）
 - 服务于：
-  - 作者预期：[references/obsidian.md「我们的想法」](../../references/obsidian.md)（用 Obsidian 来服务我们的 user spec）
+  - 作者预期：[references/obsidian「我们的想法」](../../references/obsidian/README.md)（用 Obsidian 来服务我们的 user spec）
 
 ## 决策
 
