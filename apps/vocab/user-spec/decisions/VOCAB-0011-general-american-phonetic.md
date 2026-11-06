@@ -15,7 +15,6 @@
 - AI 查词的 system prompt 与 `make_card` 工具 schema 都明确要求美式 IPA，并提示避免 `ɒ`、`əʊ`、`ɪə`、`eə`、`ʊə`、`zj` 等典型英式写法；
 - 手工添加 / 编辑音标时，界面文案标明「美式」，但不做不可靠的自动方言转换；
 - 存量卡片做一次性审计，逐张核对后更新 `phonetic`；保留旧值对照，不通过数据库 migration 修改用户数据；
-- 旧 Vocabry 导入流程带入的音标需要检查，避免以后重新导入时又混入英式音标。
 
 ## 实施记录
 
@@ -43,4 +42,7 @@
 
 - `apps/vocab/docs/README.md` §2、§5、§6
 - `apps/vocab/ui/ui.js`：`lookupSystemPrompt`、`CARD_TOOL`
-- `scripts/import-vocabry.ts`
+
+## 修订记录
+
+- 2026-11-06：Vocabry 导入脚本已删除（一次性导入工具，不再保留），去掉「检查导入流程带入的音标」一条。

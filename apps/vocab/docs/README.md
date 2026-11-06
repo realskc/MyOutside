@@ -37,12 +37,11 @@ term   TEXT PK    -- 归一化拼写
 level  TEXT       -- 'A' | 'B' | 'C' | 'D'
 ```
 
-参考数据（不是用户数据），迁移 `0002_word_level` 一次性种入。数据文件由 `pnpm build:toefl [源文件]`（`scripts/build-toefl-levels.ts`）生成并**随仓库提交**（见 VOCAB-0009）：输出 `[term, level]` 数组；同一词跨分类 / 级别时取最高优先级 A > B > C > D。
+参考数据（不是用户数据），在迁移 `0001_init` 里一次性种入。数据文件由 `pnpm build:toefl [源文件]`（`scripts/build-toefl-levels.ts`）生成并**随仓库提交**（见 VOCAB-0009）：输出 `[term, level]` 数组；同一词跨分类 / 级别时取最高优先级 A > B > C > D。
 
 ### 迁移
 
-- `0001_init`：建 `card` 表与索引；
-- `0002_word_level`：建 `word_level` 表并种入参考词表。
+- `0001_init`：建 `card` 表与索引，建 `word_level` 表并种入参考词表。开发阶段改表结构就改它（见 `user-spec/workflow.md`「当前阶段的节奏」）；
 
 ## 3. API
 
@@ -83,7 +82,7 @@ vocab.setMastered({ cardId, mastered }) → { ok }
 - 界面直接调用 `platform.ai.chat`，带 `make_card` 工具；AI 返回卡片草稿（单词 / 意项 / 音标 / 释义 / 例句），内容一律中文、例句英文；
 - 音标统一要求 **美式 IPA（General American）**；system prompt 与 `make_card` 的 `phonetic` 字段描述都明确这一点（VOCAB-0011）；
 - 草稿卡用 `draft.term` 调用 `vocab.getWordLevel` 查参考词表，命中时在音标旁显示「托福 A/B/C/D」徽章；
-- 存量卡片已按 VOCAB-0011 做一次性音标清洗；旧 Vocabry 导入若带典型英式标记会警告，导入后仍需检查；
+- 存量卡片已按 VOCAB-0011 做一次性音标清洗；
 - 用户确认「加入词库」后走添加流程；结果不缓存。
 
 ## 6. 界面
@@ -97,7 +96,6 @@ vocab.setMastered({ cardId, mastered }) → { ok }
 
 ## 7. 脚本
 
-- `pnpm import:vocabry`（`scripts/import-vocabry.ts`）：从旧 Vocabry 库 + Anki 迁移卡片，近似迁移复习状态，可重复运行；
 - `pnpm build:toefl`：生成参考词表（§2）；
 - `pnpm simulate`（`scripts/simulate-dialog.ts`）：模拟「对话应用经内核调用 vocab」的跨应用路径，使用仓库内 `data/` 目录。
 

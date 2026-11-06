@@ -107,6 +107,7 @@ export const dialogApp: AppModule = {
             "system_prompt TEXT",
             "reasoning_effort TEXT NOT NULL DEFAULT 'high'",
             "active_first_id TEXT",
+            "web_search INTEGER NOT NULL DEFAULT 1", // 联网搜索开关，默认打开（DIALOG-0009）
             "created_at INTEGER NOT NULL",
             "updated_at INTEGER NOT NULL",
           ].join(", "),
@@ -122,6 +123,12 @@ export const dialogApp: AppModule = {
             "reasoning TEXT",
             "model TEXT",
             "usage TEXT",
+            "steps TEXT", // JSON：回复过程中调用了工具的各轮
+            "sources TEXT", // JSON：引用的来源
+            "context_tokens INTEGER", // 生成时最后一次请求的输入 token 数
+            "stopped INTEGER NOT NULL DEFAULT 0", // 生成被停止，内容是已生成的部分
+            "error TEXT", // 生成被错误中断时的原因，内容是已生成的部分
+            "search_notice TEXT", // 用户消息：联网搜索开关在这里变了（off / on），发给模型时跟一条 system 说明（DIALOG-0019）
             "active_child_id TEXT",
             "created_at INTEGER NOT NULL",
           ].join(", "),
@@ -129,33 +136,6 @@ export const dialogApp: AppModule = {
         ctx.createIndex("conversation_updated", "conversation", "updated_at");
         ctx.createIndex("message_conversation_parent", "message", "conversation_id, parent_id");
         ctx.createIndex("message_conversation_created", "message", "conversation_id, created_at");
-      },
-    },
-    {
-      id: "0002_search_and_steps",
-      up: (ctx) => {
-        ctx.addColumn("conversation", "web_search INTEGER NOT NULL DEFAULT 1"); // 联网搜索开关，默认打开（DIALOG-0009）
-        ctx.addColumn("message", "steps TEXT"); // JSON：回复过程中调用了工具的各轮
-        ctx.addColumn("message", "sources TEXT"); // JSON：引用的来源
-        ctx.addColumn("message", "context_tokens INTEGER"); // 生成时最后一次请求的输入 token 数
-      },
-    },
-    {
-      id: "0003_stopped",
-      up: (ctx) => {
-        ctx.addColumn("message", "stopped INTEGER NOT NULL DEFAULT 0"); // 生成被停止，内容是已生成的部分
-      },
-    },
-    {
-      id: "0004_error",
-      up: (ctx) => {
-        ctx.addColumn("message", "error TEXT"); // 生成被错误中断时的原因，内容是已生成的部分
-      },
-    },
-    {
-      id: "0005_search_notice",
-      up: (ctx) => {
-        ctx.addColumn("message", "search_notice TEXT"); // 用户消息：联网搜索开关在这里变了（off / on），发给模型时跟一条 system 说明（DIALOG-0019）
       },
     },
   ],

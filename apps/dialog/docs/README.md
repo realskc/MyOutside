@@ -43,7 +43,7 @@ app_dialog__message
 
 索引：`message(conversation_id, parent_id)`、`message(conversation_id, created_at)`、`conversation(updated_at)`。
 
-迁移：`0001_init`；`0002_search_and_steps`（`web_search`、`steps`、`sources`、`context_tokens`，用 `addColumn`）；`0003_stopped`；`0004_error`。
+迁移：只有 `0001_init`，直接建出上面的完整表结构（开发阶段改表结构就改它，见 `user-spec/workflow.md`「当前阶段的节奏」）。
 
 **当前路径**：从 `active_first_id` 起，沿各消息的 `active_child_id` 下降；指针缺失或失效时兜底取最新的子消息。界面渲染与发给 AI 的上下文都取当前路径。
 

@@ -174,6 +174,10 @@ export const goApp: AppModule = {
             "score_black INTEGER",
             "score_white INTEGER",
             "score_neutral INTEGER",
+            "recorded INTEGER NOT NULL DEFAULT 0",
+            "undo_seat TEXT",
+            "undo_target INTEGER",
+            "undo_requested_at INTEGER",
             "created_at INTEGER NOT NULL",
             "updated_at INTEGER NOT NULL",
           ].join(", "),
@@ -206,8 +210,28 @@ export const goApp: AppModule = {
             "created_at INTEGER NOT NULL",
           ].join(", "),
         );
+        ctx.createTable(
+          "record",
+          [
+            "id TEXT PRIMARY KEY",
+            "created_at INTEGER NOT NULL",
+            "finished_at INTEGER NOT NULL",
+            "end_reason TEXT NOT NULL",
+            "winner TEXT",
+            "move_count INTEGER NOT NULL",
+            "board TEXT NOT NULL",
+            "moves TEXT NOT NULL",
+            "positions TEXT NOT NULL",
+            "score_black INTEGER",
+            "score_white INTEGER",
+            "score_neutral INTEGER",
+            "captured_seat TEXT",
+            "captured_count INTEGER NOT NULL DEFAULT 0",
+          ].join(", "),
+        );
         ctx.createIndex("move_no", "move", "move_no");
         ctx.createIndex("chat_id", "chat", "id");
+        ctx.createIndex("record_finished", "record", "finished_at");
 
         const now = Date.now();
         ctx.insert("game", {
@@ -229,35 +253,6 @@ export const goApp: AppModule = {
           created_at: now,
           updated_at: now,
         });
-      },
-    },
-    {
-      id: "0002_records_undo",
-      up: (ctx) => {
-        ctx.createTable(
-          "record",
-          [
-            "id TEXT PRIMARY KEY",
-            "created_at INTEGER NOT NULL",
-            "finished_at INTEGER NOT NULL",
-            "end_reason TEXT NOT NULL",
-            "winner TEXT",
-            "move_count INTEGER NOT NULL",
-            "board TEXT NOT NULL",
-            "moves TEXT NOT NULL",
-            "positions TEXT NOT NULL",
-            "score_black INTEGER",
-            "score_white INTEGER",
-            "score_neutral INTEGER",
-            "captured_seat TEXT",
-            "captured_count INTEGER NOT NULL DEFAULT 0",
-          ].join(", "),
-        );
-        ctx.createIndex("record_finished", "record", "finished_at");
-        ctx.exec("ALTER TABLE app_go__game ADD COLUMN recorded INTEGER NOT NULL DEFAULT 0");
-        ctx.exec("ALTER TABLE app_go__game ADD COLUMN undo_seat TEXT");
-        ctx.exec("ALTER TABLE app_go__game ADD COLUMN undo_target INTEGER");
-        ctx.exec("ALTER TABLE app_go__game ADD COLUMN undo_requested_at INTEGER");
       },
     },
   ],

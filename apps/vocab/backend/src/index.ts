@@ -95,11 +95,6 @@ export const vocabApp: AppModule = {
         ctx.createIndex("card_term", "card", "term");
         ctx.createIndex("card_due", "card", "due");
         ctx.createIndex("card_status", "card", "status");
-      },
-    },
-    {
-      id: "0002_word_level",
-      up: (ctx) => {
         // 参考词表（非用户数据）：随迁移一次性种入
         ctx.createTable("word_level", "term TEXT PRIMARY KEY, level TEXT NOT NULL");
         for (const [term, level] of WORD_LEVELS) {
