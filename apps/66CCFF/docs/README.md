@@ -6,9 +6,9 @@
 
 - **后端**：`backend/src/index.ts` 的 `createX66CCFFApp({ dataDir, engineDir? })`（宿主在启动时用数据目录构造并注册）；`demucs.ts` 负责引擎探测与分离进程。
 - **界面**：`ui/` 静态 HTML / CSS / JS（零构建）。
-- **引擎**：`scripts/setup-engine.ps1` 安装到 `<userData>/apps/66CCFF/engine`（Python 3.12 venv + Demucs + CUDA PyTorch；见 [PB-0003](../user-spec/decisions/PB-0003-engine-setup-script.md)）。
-- **MIDI 引擎（可选）**：`scripts/setup-midi-engine.ps1` 安装到 `<userData>/apps/66CCFF/midi-engine`（独立 Python 3.10 venv + Basic Pitch + ONNX Runtime；见 [PB-0007](../user-spec/decisions/PB-0007-basic-pitch-midi.md)）；`scripts/transcribe_midi.py` 负责单音频（单条 stem 或选定 stem 混合）转 MIDI。
-- **媒体**：宿主 `media://<appId>/<相对路径>` 协议读取 `<userData>/apps/<appId>/`（见 [PB-0004](../user-spec/decisions/PB-0004-app-files-and-media-protocol.md)）。
+- **引擎**：`scripts/setup-engine.ps1` 安装到 `<userData>/apps/66CCFF/engine`（Python 3.12 venv + Demucs + CUDA PyTorch；见 [66CCFF-0003](../user-spec/decisions/66CCFF-0003-engine-setup-script.md)）。
+- **MIDI 引擎（可选）**：`scripts/setup-midi-engine.ps1` 安装到 `<userData>/apps/66CCFF/midi-engine`（独立 Python 3.10 venv + Basic Pitch + ONNX Runtime；见 [66CCFF-0007](../user-spec/decisions/66CCFF-0007-basic-pitch-midi.md)）；`scripts/transcribe_midi.py` 负责单音频（单条 stem 或选定 stem 混合）转 MIDI。
+- **媒体**：宿主 `media://<appId>/<相对路径>` 协议读取 `<userData>/apps/<appId>/`（见 [66CCFF-0004](../user-spec/decisions/66CCFF-0004-app-files-and-media-protocol.md)）。
 
 ## 2. 数据
 
@@ -34,7 +34,7 @@ app_66CCFF__stem(id, track_id, job_id, kind, file, size, created_at)
 | `66CCFF.deleteTrack` | 内部异步 | 事务删除记录 + 删除文件目录 |
 | `insertTrack` / `insertJob` / `updateJob` / `finishJob` / `deleteTrackTx` | 内部事务 | 供异步函数使用 |
 
-- `startSeparation` 用 `runId` 推送 `{ type: "progress", progress, message }`；取消用 `bridge.cancel(runId)`（见 [PB-0006](../user-spec/decisions/PB-0006-separation-job-execution.md)）。
+- `startSeparation` 用 `runId` 推送 `{ type: "progress", progress, message }`；取消用 `bridge.cancel(runId)`（见 [66CCFF-0006](../user-spec/decisions/66CCFF-0006-separation-job-execution.md)）。
 - 所有 API 目前是内部 API；将来给 agent 用时按需公开并声明权限。
 
 ## 4. 引擎与分离
@@ -75,5 +75,5 @@ app_66CCFF__stem(id, track_id, job_id, kind, file, size, created_at)
 - MIDI 转写目前只有命令行验证，没有界面 / API；输出单轨 MIDI，未做 MIDI 播放或多轨合并。
 - 取消只对当前页面发起的任务有效；刷新后正在运行的任务无法从界面取消（会继续并靠轮询显示）。
 - 没有导出、变调、两轨快捷预设、波形；这些见应用 user spec 的「未定 / 非目标」。
-- `media://` 没有跨应用权限：目前任意子应用理论上能猜到并读取其它应用的 media 路径；builder / 不可信应用出现前必须收紧（PB-0004）。
-- 两个引擎安装脚本都只有 Windows 版本；macOS / Linux 需要另行安装（PB-0003、PB-0007）。
+- `media://` 没有跨应用权限：目前任意子应用理论上能猜到并读取其它应用的 media 路径；builder / 不可信应用出现前必须收紧（66CCFF-0004）。
+- 两个引擎安装脚本都只有 Windows 版本；macOS / Linux 需要另行安装（66CCFF-0003、66CCFF-0007）。

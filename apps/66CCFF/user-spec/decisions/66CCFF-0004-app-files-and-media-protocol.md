@@ -1,4 +1,4 @@
-# PB-0004 应用文件放 `<userData>/apps/66CCFF`，用 `media://` 提供给界面
+# 66CCFF-0004 应用文件放 `<userData>/apps/66CCFF`，用 `media://` 提供给界面
 
 - 状态：有效
 - 日期：2026-11-04

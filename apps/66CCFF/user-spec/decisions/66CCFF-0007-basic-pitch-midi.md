@@ -1,11 +1,11 @@
-# PB-0007 MIDI 转写：Basic Pitch，独立 Python 3.10 + ONNX，单音频输入
+# 66CCFF-0007 MIDI 转写：Basic Pitch，独立 Python 3.10 + ONNX，单音频输入
 
 - 状态：有效（引擎已安装；界面 / API 待接入）
 - 日期：2026-11-06
 - 决策者：讨论
 - 服务于：
   - 作者预期：[`../README.md`](../README.md)「核心流程与预期」可选的 MIDI 转写（单条 stem 或选定 stem 的混合音频）
-  - 上游决策：[PB-0003](PB-0003-engine-setup-script.md)（应用管理自己的引擎）
+  - 上游决策：[66CCFF-0003](66CCFF-0003-engine-setup-script.md)（应用管理自己的引擎）
 
 ## 背景
 

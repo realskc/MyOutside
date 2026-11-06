@@ -1,4 +1,4 @@
-# PB-0001 六轨分离引擎：Demucs v4 `htdemucs_6s`，本地 CUDA
+# 66CCFF-0001 六轨分离引擎：Demucs v4 `htdemucs_6s`，本地 CUDA
 
 - 状态：有效
 - 日期：2026-11-04
