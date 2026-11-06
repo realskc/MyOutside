@@ -1,4 +1,4 @@
-# PB-0004 应用文件放 `<userData>/apps/pureblue`，用 `media://` 提供给界面
+# PB-0004 应用文件放 `<userData>/apps/66CCFF`，用 `media://` 提供给界面
 
 - 状态：有效
 - 日期：2026-11-04
@@ -13,7 +13,7 @@
 
 ## 决策
 
-- 应用文件根：`<userData>/apps/pureblue/`（曲目、分离结果、引擎）；
+- 应用文件根：`<userData>/apps/66CCFF/`（曲目、分离结果、引擎）；
 - 宿主增加 `media://<appId>/<相对路径>` 协议，按应用 id 映射到 `<userData>/apps/<appId>/`，支持 Range 请求与路径穿越检查；
 - 数据库只存相对路径。将来文件仓库实现后再迁移。
 

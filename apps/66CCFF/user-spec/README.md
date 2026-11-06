@@ -1,6 +1,6 @@
-# 纯蓝（0x66CCFF）user spec
+# 纯蓝（66CCFF）user spec
 
-> 应用 id：`pureblue`；中文名：纯蓝；英文名：0x66CCFF。
+> 应用 id：`66CCFF`；中文名：纯蓝；英文名：66CCFF。
 > 这是作者对纯蓝的预期；技术文档见 [`../docs/README.md`](../docs/README.md)；决策见 [`decisions/`](decisions/README.md)。
 
 ## 1. 是什么

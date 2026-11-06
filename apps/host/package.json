@@ -18,7 +18,7 @@
     "@myoutside/vocab": "workspace:*",
     "@myoutside/dialog": "workspace:*",
     "@myoutside/go": "workspace:*",
-    "@myoutside/pureblue": "workspace:*",
+    "@myoutside/66ccff": "workspace:*",
     "@myoutside/zheye": "workspace:*"
   },
   "devDependencies": {

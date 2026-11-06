@@ -86,12 +86,13 @@ const t = (key) => DICT[lang][key];
 const IS_WEB = location.protocol === "http:" || location.protocol === "https:";
 
 function appUrl(id) {
-  return IS_WEB ? `/apps/${encodeURIComponent(id)}/index.html` : `app://${id}/index.html`;
+  // app:// 的 host 大小写不敏感；应用 id 本身保留原始大小写。
+  return IS_WEB ? `/apps/${encodeURIComponent(id)}/index.html` : `app://${id.toLowerCase()}/index.html`;
 }
 
 function appIdFromSrc(src) {
-  if (src.startsWith("app://")) return src.slice("app://".length).split("/")[0] || null;
-  if (src.startsWith("/apps/")) return src.slice("/apps/".length).split("/")[0] || null;
+  if (src.startsWith("app://")) return (src.slice("app://".length).split("/")[0] || null)?.toLowerCase() ?? null;
+  if (src.startsWith("/apps/")) return (src.slice("/apps/".length).split("/")[0] || null)?.toLowerCase() ?? null;
   return null;
 }
 
@@ -174,7 +175,9 @@ async function loadApps() {
     }
     const currentId = appIdFromSrc(panel.getAttribute("src") || "");
     if (currentId) {
-      const active = appsEl.querySelector(`[data-app-id="${currentId}"]`);
+      const active = [...appsEl.querySelectorAll(".app-item")].find(
+        (item) => item.dataset.appId.toLowerCase() === currentId,
+      );
       if (active) setActive(active);
     }
     if (!bootstrapped) {

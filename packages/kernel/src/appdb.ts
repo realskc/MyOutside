@@ -2,17 +2,23 @@ import { KernelError } from "./errors.js";
 import type { AppDb, DbAdapter, MigrationCtx, SqlValue, WhereValue } from "./types.js";
 
 const IDENT = /^[A-Za-z_][A-Za-z0-9_]*$/;
+/** 应用 id 允许数字开头；所有物理表名统一加 `app_` 前缀，避免 SQL 标识符/关键字问题。 */
+const APP_ID = /^[A-Za-z0-9][A-Za-z0-9_]*$/;
 const ORDER_BY = /^[A-Za-z_][A-Za-z0-9_]*(\s+(ASC|DESC))?$/i;
 
 function assertIdent(value: string, what: string): void {
   if (!IDENT.test(value)) throw new Error(`非法的${what}：${JSON.stringify(value)}`);
 }
 
-/** 逻辑表名 → 物理表名：`card`（app 为 vocab）→ `vocab__card` */
+function assertAppId(value: string): void {
+  if (!APP_ID.test(value)) throw new Error(`非法的应用 id：${JSON.stringify(value)}`);
+}
+
+/** 逻辑表名 → 物理表名：`card`（app 为 vocab）→ `app_vocab__card` */
 export function physicalTableName(appId: string, table: string): string {
-  assertIdent(appId, "应用 id");
+  assertAppId(appId);
   assertIdent(table, "表名");
-  return `${appId}__${table}`;
+  return `app_${appId}__${table}`;
 }
 
 function isOperatorObject(value: WhereValue): value is Exclude<WhereValue, SqlValue> {
@@ -143,7 +149,7 @@ export function createMigrationCtx(adapter: DbAdapter, appId: string): Migration
     createIndex(indexName, tableName, columnsSql) {
       assertIdent(indexName, "索引名");
       adapter.execute(
-        `CREATE INDEX IF NOT EXISTS ${appId}__${indexName} ON ${physicalTableName(appId, tableName)} (${columnsSql})`,
+        `CREATE INDEX IF NOT EXISTS ${physicalTableName(appId, indexName)} ON ${physicalTableName(appId, tableName)} (${columnsSql})`,
       );
     },
     addColumn(tableName, columnSql) {

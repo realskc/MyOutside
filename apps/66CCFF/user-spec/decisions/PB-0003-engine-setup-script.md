@@ -12,8 +12,8 @@
 
 ## 决策
 
-- 提供 `apps/pureblue/scripts/setup-engine.ps1`：用 uv 创建 Python 3.12 venv，安装 Demucs + CUDA 版 PyTorch，预下载 `htdemucs_6s` 模型；
-- 应用只检测 `<userData>/apps/pureblue/engine/venv` 是否存在，并在界面提示安装命令；不在应用内执行 pip。
+- 提供 `apps/66CCFF/scripts/setup-engine.ps1`：用 uv 创建 Python 3.12 venv，安装 Demucs + CUDA 版 PyTorch，预下载 `htdemucs_6s` 模型；
+- 应用只检测 `<userData>/apps/66CCFF/engine/venv` 是否存在，并在界面提示安装命令；不在应用内执行 pip。
 
 ## 考虑过、没有采用
 

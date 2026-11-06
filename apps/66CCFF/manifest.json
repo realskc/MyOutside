@@ -1,6 +1,6 @@
 {
-  "id": "pureblue",
-  "name": "纯蓝",
+  "id": "66CCFF",
+  "name": "66CCFF",
   "protocolVersion": 1,
   "ui": "ui/index.html",
   "backend": "backend/src/index.ts",

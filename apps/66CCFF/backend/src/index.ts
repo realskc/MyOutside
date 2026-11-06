@@ -9,11 +9,11 @@ import {
   GetTrackInput,
   ImportTrackInput,
   ListTracksInput,
-  PureblueStemKind,
+  X66CCFFStemKind,
   StartSeparationInput,
-  type PureblueJobStatus,
-  type PureblueStemKind as StemKind,
-  type PureblueTrackDetail,
+  type X66CCFFJobStatus,
+  type X66CCFFStemKind as StemKind,
+  type X66CCFFTrackDetail,
 } from "@myoutside/contracts";
 import {
   defineAsync,
@@ -58,7 +58,7 @@ const FinishJobInput = z.object({
   jobId: z.string(),
   trackId: z.string(),
   stems: z.array(
-    z.object({ kind: PureblueStemKind, file: z.string(), size: z.number().int() }),
+    z.object({ kind: X66CCFFStemKind, file: z.string(), size: z.number().int() }),
   ),
 });
 
@@ -95,8 +95,8 @@ interface StemRow {
   created_at: number;
 }
 
-export interface PureblueAppOptions {
-  /** 应用私有文件根（<userData>/apps/pureblue） */
+export interface X66CCFFAppOptions {
+  /** 应用私有文件根（<userData>/apps/66CCFF） */
   dataDir: string;
   /** 分离引擎目录；默认 dataDir/engine */
   engineDir?: string;
@@ -117,7 +117,7 @@ function probeDuration(file: string): number {
   }
 }
 
-export function createPureblueApp({ dataDir, engineDir = join(dataDir, "engine") }: PureblueAppOptions): AppModule {
+export function createX66CCFFApp({ dataDir, engineDir = join(dataDir, "engine") }: X66CCFFAppOptions): AppModule {
   const base = resolve(dataDir);
   const engine = resolve(engineDir);
 
@@ -142,8 +142,8 @@ export function createPureblueApp({ dataDir, engineDir = join(dataDir, "engine")
 
   const isStale = (job: JobRow | undefined): boolean =>
     !!job && job.status === "running" && Date.now() - job.updated_at > STALE_JOB_MS;
-  const effectiveStatus = (job: JobRow | undefined): PureblueJobStatus | null =>
-    !job ? null : isStale(job) ? "failed" : (job.status as PureblueJobStatus);
+  const effectiveStatus = (job: JobRow | undefined): X66CCFFJobStatus | null =>
+    !job ? null : isStale(job) ? "failed" : (job.status as X66CCFFJobStatus);
   const effectiveError = (job: JobRow | undefined): string | null =>
     !job ? null : isStale(job) ? "任务已中断（应用关闭或崩溃）" : job.error;
 
@@ -158,7 +158,7 @@ export function createPureblueApp({ dataDir, engineDir = join(dataDir, "engine")
     updatedAt: row.updated_at,
   });
 
-  const toDetail = (db: AppDb, track: TrackRow): PureblueTrackDetail => {
+  const toDetail = (db: AppDb, track: TrackRow): X66CCFFTrackDetail => {
     const stems = db
       .all<StemRow>("stem", { track_id: track.id })
       .sort((a, b) => STEM_ORDER.indexOf(a.kind as StemKind) - STEM_ORDER.indexOf(b.kind as StemKind));
@@ -181,8 +181,8 @@ export function createPureblueApp({ dataDir, engineDir = join(dataDir, "engine")
   };
 
   return {
-    id: "pureblue",
-    name: "纯蓝",
+    id: "66CCFF",
+    name: "66CCFF",
     owns: ["track", "job", "stem"],
 
     migrations: [
@@ -276,10 +276,10 @@ export function createPureblueApp({ dataDir, engineDir = join(dataDir, "engine")
           engineDir: engine,
           pythonPath: python,
           setupCommand:
-            "powershell -ExecutionPolicy Bypass -File apps/pureblue/scripts/setup-engine.ps1",
+            "powershell -ExecutionPolicy Bypass -File apps/66CCFF/scripts/setup-engine.ps1",
           message: python
             ? "引擎已安装；首次分离会自动下载模型"
-            : "引擎未安装：请运行 apps/pureblue/scripts/setup-engine.ps1",
+            : "引擎未安装：请运行 apps/66CCFF/scripts/setup-engine.ps1",
         };
         return output;
       }),
@@ -306,7 +306,7 @@ export function createPureblueApp({ dataDir, engineDir = join(dataDir, "engine")
           copyFileSync(source, dest);
           const duration = probeDuration(source);
           const title = input.title?.trim() || basename(source, extname(source)).trim() || "未命名曲目";
-          await ctx.call("pureblue.insertTrack", {
+          await ctx.call("66CCFF.insertTrack", {
             id,
             title,
             file: rel(dest),
@@ -335,13 +335,13 @@ export function createPureblueApp({ dataDir, engineDir = join(dataDir, "engine")
         const running = ctx.db.get<JobRow>("job", { track_id: track.id, status: "running" });
         if (running) {
           if (!isStale(running)) throw new KernelError("PRECONDITION", "这首曲目正在分离");
-          await ctx.call("pureblue.updateJob", {
+          await ctx.call("66CCFF.updateJob", {
             jobId: running.id,
             patch: { status: "failed", error: "任务已中断（应用关闭或崩溃）" },
           });
         }
         const jobId = randomUUID();
-        await ctx.call("pureblue.insertJob", { id: jobId, trackId: track.id });
+        await ctx.call("66CCFF.insertJob", { id: jobId, trackId: track.id });
         const workDir = join(base, "jobs", jobId);
         let lastMessage = "准备中";
         let lastWrite = 0;
@@ -353,7 +353,7 @@ export function createPureblueApp({ dataDir, engineDir = join(dataDir, "engine")
           if (now - lastWrite < 800) return;
           lastWrite = now;
           void ctx
-            .call("pureblue.updateJob", { jobId, patch: { progress, message } })
+            .call("66CCFF.updateJob", { jobId, patch: { progress, message } })
             .catch(() => undefined);
         };
 
@@ -377,7 +377,7 @@ export function createPureblueApp({ dataDir, engineDir = join(dataDir, "engine")
             stems.push({ kind, file: rel(dest), size: statSync(dest).size });
           }
           if (stems.length === 0) throw new KernelError("INTERNAL", "没有生成任何轨道");
-          await ctx.call("pureblue.finishJob", { jobId, trackId: track.id, stems });
+          await ctx.call("66CCFF.finishJob", { jobId, trackId: track.id, stems });
           // 成功切换引用后再清理旧分轨目录；清理失败只会留下孤儿目录（允许）
           try {
             for (const entry of readdirSync(join(base, "tracks", track.id), { withFileTypes: true })) {
@@ -398,7 +398,7 @@ export function createPureblueApp({ dataDir, engineDir = join(dataDir, "engine")
           const aborted = ctx.signal.aborted;
           const message = error instanceof Error ? error.message : String(error);
           try {
-            await ctx.call("pureblue.updateJob", {
+            await ctx.call("66CCFF.updateJob", {
               jobId,
               patch: {
                 status: aborted ? "cancelled" : "failed",
@@ -421,12 +421,12 @@ export function createPureblueApp({ dataDir, engineDir = join(dataDir, "engine")
         const running = ctx.db.get<JobRow>("job", { track_id: track.id, status: "running" });
         if (running) {
           if (!isStale(running)) throw new KernelError("PRECONDITION", "分离进行中，不能删除");
-          await ctx.call("pureblue.updateJob", {
+          await ctx.call("66CCFF.updateJob", {
             jobId: running.id,
             patch: { status: "failed", error: "任务已中断（应用关闭或崩溃）" },
           });
         }
-        await ctx.call("pureblue.deleteTrackTx", { trackId: track.id });
+        await ctx.call("66CCFF.deleteTrackTx", { trackId: track.id });
         rmSync(join(base, "tracks", track.id), { recursive: true, force: true });
         return { ok: true as const };
       }),

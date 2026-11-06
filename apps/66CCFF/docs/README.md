@@ -1,21 +1,21 @@
-# 纯蓝（pureblue）技术文档
+# 纯蓝（66CCFF）技术文档
 
-> 应用 id `pureblue`。作者预期见 [`../user-spec/README.md`](../user-spec/README.md)；应用决策见 [`../user-spec/decisions/README.md`](../user-spec/decisions/README.md)。
+> 应用 id `66CCFF`。作者预期见 [`../user-spec/README.md`](../user-spec/README.md)；应用决策见 [`../user-spec/decisions/README.md`](../user-spec/decisions/README.md)。
 
 ## 1. 组成
 
-- **后端**：`backend/src/index.ts` 的 `createPureblueApp({ dataDir, engineDir? })`（宿主在启动时用数据目录构造并注册）；`demucs.ts` 负责引擎探测与分离进程。
+- **后端**：`backend/src/index.ts` 的 `createX66CCFFApp({ dataDir, engineDir? })`（宿主在启动时用数据目录构造并注册）；`demucs.ts` 负责引擎探测与分离进程。
 - **界面**：`ui/` 静态 HTML / CSS / JS（零构建）。
-- **引擎**：`scripts/setup-engine.ps1` 安装到 `<userData>/apps/pureblue/engine`（Python 3.12 venv + Demucs + CUDA PyTorch；见 [PB-0003](../user-spec/decisions/PB-0003-engine-setup-script.md)）。
-- **MIDI 引擎（可选）**：`scripts/setup-midi-engine.ps1` 安装到 `<userData>/apps/pureblue/midi-engine`（独立 Python 3.10 venv + Basic Pitch + ONNX Runtime；见 [PB-0007](../user-spec/decisions/PB-0007-basic-pitch-midi.md)）；`scripts/transcribe_midi.py` 负责单音频（单条 stem 或选定 stem 混合）转 MIDI。
+- **引擎**：`scripts/setup-engine.ps1` 安装到 `<userData>/apps/66CCFF/engine`（Python 3.12 venv + Demucs + CUDA PyTorch；见 [PB-0003](../user-spec/decisions/PB-0003-engine-setup-script.md)）。
+- **MIDI 引擎（可选）**：`scripts/setup-midi-engine.ps1` 安装到 `<userData>/apps/66CCFF/midi-engine`（独立 Python 3.10 venv + Basic Pitch + ONNX Runtime；见 [PB-0007](../user-spec/decisions/PB-0007-basic-pitch-midi.md)）；`scripts/transcribe_midi.py` 负责单音频（单条 stem 或选定 stem 混合）转 MIDI。
 - **媒体**：宿主 `media://<appId>/<相对路径>` 协议读取 `<userData>/apps/<appId>/`（见 [PB-0004](../user-spec/decisions/PB-0004-app-files-and-media-protocol.md)）。
 
 ## 2. 数据
 
 ```
-pureblue__track(id, title, file, ext, size, duration, created_at)
-pureblue__job(id, track_id, status, progress, message, error, created_at, updated_at)
-pureblue__stem(id, track_id, job_id, kind, file, size, created_at)
+app_66CCFF__track(id, title, file, ext, size, duration, created_at)
+app_66CCFF__job(id, track_id, status, progress, message, error, created_at, updated_at)
+app_66CCFF__stem(id, track_id, job_id, kind, file, size, created_at)
 ```
 
 - `file` 是相对应用文件根的路径；曲目在 `tracks/<id>/source.<ext>`，六轨在 `tracks/<id>/stems-<jobId>/<kind>.mp3`（每次分离独立目录，成功后切换引用并清理旧目录）；
@@ -26,12 +26,12 @@ pureblue__stem(id, track_id, job_id, kind, file, size, created_at)
 
 | 函数 | 类型 | 说明 |
 |---|---|---|
-| `pureblue.listTracks` | 只读 | 曲目列表 + 最新任务状态 / 轨数 |
-| `pureblue.getTrack` | 只读 | 曲目详情 + stems + 最新任务 |
-| `pureblue.getEngineStatus` | 只读 | 引擎目录 / Python / 安装提示 |
-| `pureblue.importTrack` | 内部异步 | 校验并复制音频、ffprobe 时长，事务写入 |
-| `pureblue.startSeparation` | 内部异步 | 创建任务、运行 Demucs、进度事件、事务写六轨 |
-| `pureblue.deleteTrack` | 内部异步 | 事务删除记录 + 删除文件目录 |
+| `66CCFF.listTracks` | 只读 | 曲目列表 + 最新任务状态 / 轨数 |
+| `66CCFF.getTrack` | 只读 | 曲目详情 + stems + 最新任务 |
+| `66CCFF.getEngineStatus` | 只读 | 引擎目录 / Python / 安装提示 |
+| `66CCFF.importTrack` | 内部异步 | 校验并复制音频、ffprobe 时长，事务写入 |
+| `66CCFF.startSeparation` | 内部异步 | 创建任务、运行 Demucs、进度事件、事务写六轨 |
+| `66CCFF.deleteTrack` | 内部异步 | 事务删除记录 + 删除文件目录 |
 | `insertTrack` / `insertJob` / `updateJob` / `finishJob` / `deleteTrackTx` | 内部事务 | 供异步函数使用 |
 
 - `startSeparation` 用 `runId` 推送 `{ type: "progress", progress, message }`；取消用 `bridge.cancel(runId)`（见 [PB-0006](../user-spec/decisions/PB-0006-separation-job-execution.md)）。
@@ -55,8 +55,8 @@ pureblue__stem(id, track_id, job_id, kind, file, size, created_at)
 ## 5. MIDI 转写（验证）
 
 - 引擎：Spotify Basic Pitch `0.4.0`，独立 Python 3.10 venv + ONNX Runtime；不安装 TensorFlow，也不与 Demucs 的 Python 3.12 环境混用；
-- 安装：`powershell -ExecutionPolicy Bypass -File apps/pureblue/scripts/setup-midi-engine.ps1`；
-- 转写：`apps/pureblue/scripts/transcribe_midi.py <音频> <输出.mid>`，可选 `--instrument-name`、`--program`、`--min-frequency`、`--max-frequency`、阈值参数；
+- 安装：`powershell -ExecutionPolicy Bypass -File apps/66CCFF/scripts/setup-midi-engine.ps1`；
+- 转写：`apps/66CCFF/scripts/transcribe_midi.py <音频> <输出.mid>`，可选 `--instrument-name`、`--program`、`--min-frequency`、`--max-frequency`、阈值参数；
 - 输入只接受**一个音频文件**；可以是单条 stem，也可以是选定的几条 stem 混合；不转整首歌；输出一个单轨 MIDI；鼓轨没有音高，不转；
 - 脚本 stdout 输出 JSON 摘要（音符数、音高范围、时长、输出路径），供后续后端接入；
 - 验证：本机 3 分 02 秒的 piano stem → 1,131 个音符，guitar stem → 880 个音符；piano + guitar 混成一条音频后 → 1,525 个音符、10,334 字节；冷启动约 20 秒（模型加载），预热后约 5 秒；输出在 `tracks/<id>/midi-validation/`（尚未写入数据库、尚未接入界面）；

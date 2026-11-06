@@ -32,7 +32,7 @@ SQLite 单文件（<userData>/myoutside.db）
 | `packages/kernel-node` | Node 存储适配器（`node:sqlite` 的 `DatabaseSync`） |
 | `apps/vocab`、`apps/dialog` | 子应用：`backend/`（AppModule）、`ui/`（静态界面，D-0011）、`test/` |
 | `apps/go` | 围棋子应用：`backend/`（9 路规则、联机、悔棋、棋谱）、`ui/`（Canvas 棋盘 + 聊天）、`user-spec/`、`docs/`；应用自包含，见 D-0073 |
-| `apps/pureblue` | 纯蓝：`backend/`（六轨分离任务、曲目、引擎探测）、`ui/`（内建慢放播放器）、`user-spec/`、`docs/`、`manifest.json`；应用自包含，见 D-0073 |
+| `apps/66CCFF` | 纯蓝：`backend/`（六轨分离任务、曲目、引擎探测）、`ui/`（内建慢放播放器）、`user-spec/`、`docs/`、`manifest.json`；应用自包含，见 D-0073 |
 | `apps/host` | Electron 程序：主进程、preload、外壳界面（`renderer/`） |
 
 ## 2. 子应用模块（AppModule）
@@ -142,7 +142,7 @@ dialog.captureWord（写）
 
 ### 5.1 AppDb
 
-子应用通过 `ctx.db` 访问数据；逻辑表名自动加前缀：`card`（应用 vocab）→ 物理表 `vocab__card`。
+子应用通过 `ctx.db` 访问数据；逻辑表名自动加前缀：`card`（应用 vocab）→ 物理表 `app_vocab__card`。
 
 ```ts
 insert(table, row) / update(table, patch, where) / delete(table, where)

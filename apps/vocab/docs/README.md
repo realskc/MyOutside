@@ -11,7 +11,7 @@
 
 ## 2. 数据模型
 
-### `vocab__card`（VOCAB-0001）
+### `app_vocab__card`（VOCAB-0001）
 
 ```
 id              TEXT PK
@@ -30,7 +30,7 @@ created_at      INTEGER NOT NULL
 
 索引：`term`、`due`、`status`。
 
-### `vocab__word_level`（VOCAB-0005）
+### `app_vocab__word_level`（VOCAB-0005）
 
 ```
 term   TEXT PK    -- 归一化拼写

@@ -1,4 +1,4 @@
-/* 纯蓝 0x66CCFF：六轨分离 + 慢放练习（v1） */
+/* 纯蓝 66CCFF：六轨分离 + 慢放练习（v1） */
 (() => {
   const bridge = window.outside;
   if (!bridge) {
@@ -8,7 +8,7 @@
 
   const DICT = {
     zh: {
-      appTitle: "纯蓝",
+      appTitle: "66CCFF",
       import: "导入音频",
       emptyHint: "导入一首歌，分离成六轨，然后慢放练习。",
       noTracks: "还没有曲目",
@@ -55,7 +55,7 @@
       stemPiano: "钢琴",
     },
     en: {
-      appTitle: "Pure Blue",
+      appTitle: "66CCFF",
       import: "Import audio",
       emptyHint: "Import a song, split it into six stems, then practise slowly.",
       noTracks: "No tracks yet",
@@ -235,7 +235,7 @@
 
   async function loadEngine() {
     try {
-      engine = await callOrThrow("pureblue.getEngineStatus", {});
+      engine = await callOrThrow("66CCFF.getEngineStatus", {});
     } catch {
       engine = null;
     }
@@ -258,7 +258,7 @@
   // ---- 曲目 ----
 
   async function loadTracks() {
-    tracks = await callOrThrow("pureblue.listTracks", {});
+    tracks = await callOrThrow("66CCFF.listTracks", {});
     if (currentId && !tracks.some((track) => track.id === currentId)) currentId = null;
     if (!currentId && tracks.length > 0) currentId = tracks[0].id;
     renderTrackList();
@@ -329,7 +329,7 @@
       return;
     }
     try {
-      detail = await callOrThrow("pureblue.getTrack", { trackId: currentId });
+      detail = await callOrThrow("66CCFF.getTrack", { trackId: currentId });
       renderDetail();
       schedulePoll();
     } catch (error) {
@@ -445,7 +445,7 @@
       stemParams.set(stem.kind, { muted: false, solo: false, volume: 1 });
       const audio = document.createElement("audio");
       audio.preload = "auto";
-      audio.src = `media://pureblue/${stem.file}`;
+      audio.src = `media://66ccff/${stem.file}`;
       audio.preservesPitch = true;
       audio.webkitPreservesPitch = true;
       audio.addEventListener("loadedmetadata", () => updateTransport());
@@ -760,7 +760,7 @@
     importBtn.disabled = true;
     toast(t("importing"));
     try {
-      const track = await callOrThrow("pureblue.importTrack", { path });
+      const track = await callOrThrow("66CCFF.importTrack", { path });
       await loadTracks();
       await selectTrack(track.id);
       toast(t("imported"));
@@ -796,7 +796,7 @@
     jobMessageEl.textContent = t("separating");
     jobMessageEl.classList.remove("error");
     try {
-      await callOrThrow("pureblue.startSeparation", { trackId }, { runId });
+      await callOrThrow("66CCFF.startSeparation", { trackId }, { runId });
       if (currentId === trackId) toast(t("separated"));
     } catch (error) {
       if (error.code === "ABORTED") {
@@ -821,7 +821,7 @@
     if (!window.confirm(t("deleteConfirm", detail.title))) return;
     stopPlayback();
     try {
-      await callOrThrow("pureblue.deleteTrack", { trackId: detail.id });
+      await callOrThrow("66CCFF.deleteTrack", { trackId: detail.id });
       currentId = null;
       detail = null;
       playerSignature = null;

@@ -142,6 +142,7 @@
 | [D-0078](0078-tools-unchanged-within-conversation.md) | 对话中不改动工具定义；轮数用完时用 tool_choice = none | 有效 |
 | [D-0079](0079-obsidian-for-docs.md) | 用 Obsidian 查看和编辑文档：打开整个仓库，链接保持标准 Markdown | 有效 |
 | [D-0080](0080-device-access.md) | 设备上的数据是普通文件夹；子应用访问设备要在清单里登记，经内核与设备之间的通道 | 有效（未实现） |
+| [D-0081](0081-app-table-prefix.md) | 所有应用的物理表名统一加 `app_` 前缀；应用 id 可数字开头 | 有效 |
 
 ## 应用专属决策
 
@@ -151,3 +152,4 @@
 | 学英语（vocab） | [`apps/vocab/user-spec/`](../../apps/vocab/user-spec/README.md) · [decisions](../../apps/vocab/user-spec/decisions/README.md) · [docs](../../apps/vocab/docs/README.md) |
 | 对话（dialog） | [`apps/dialog/user-spec/`](../../apps/dialog/user-spec/README.md) · [decisions](../../apps/dialog/user-spec/decisions/README.md) · [docs](../../apps/dialog/docs/README.md) |
 | 哲野（zheye） | [`apps/zheye/user-spec/`](../../apps/zheye/user-spec/README.md) · [decisions](../../apps/zheye/user-spec/decisions/README.md) · [docs](../../apps/zheye/docs/README.md) |
+| 纯蓝（66CCFF） | [`apps/66CCFF/user-spec/`](../../apps/66CCFF/user-spec/README.md) · [decisions](../../apps/66CCFF/user-spec/decisions/README.md) · [docs](../../apps/66CCFF/docs/README.md) |

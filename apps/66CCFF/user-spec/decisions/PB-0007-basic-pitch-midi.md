@@ -16,10 +16,10 @@ Spotify Basic Pitch 是 Apache-2.0 的音频转 MIDI 模型，支持复音和音
 ## 决策
 
 - 使用 Basic Pitch `0.4.0`，只接受单个音频文件，输出单个**单轨** `.mid`；输入可以是单条 stem，也可以是选定的几条 stem 混合；不转整首歌、不做多轨合并；
-- 使用**独立的** `<userData>/apps/pureblue/midi-engine` 引擎：Python 3.10 + ONNX Runtime，不安装 TensorFlow；
+- 使用**独立的** `<userData>/apps/66CCFF/midi-engine` 引擎：Python 3.10 + ONNX Runtime，不安装 TensorFlow；
 - 不把 Basic Pitch 装进 Demucs 的 Python 3.12 venv：Basic Pitch 官方支持到 Python 3.11，Python 3.11+ 的依赖会拉 TensorFlow `<2.15.1`，而它没有 Python 3.12 的轮子；独立环境也避免和 Demucs 的 numpy / scipy 依赖互相影响；
-- 安装脚本：`apps/pureblue/scripts/setup-midi-engine.ps1`；脚本额外安装 `setuptools<81`，因为 Basic Pitch 依赖的 `resampy` 仍导入 `pkg_resources`；
-- 转写脚本：`apps/pureblue/scripts/transcribe_midi.py`，stdout 输出 JSON 摘要，便于后续接入异步 API / `runId` 进度；
+- 安装脚本：`apps/66CCFF/scripts/setup-midi-engine.ps1`；脚本额外安装 `setuptools<81`，因为 Basic Pitch 依赖的 `resampy` 仍导入 `pkg_resources`；
+- 转写脚本：`apps/66CCFF/scripts/transcribe_midi.py`，stdout 输出 JSON 摘要，便于后续接入异步 API / `runId` 进度；
 - 鼓轨不转（Basic Pitch 不是鼓转写模型）；钢琴 / 吉他 / 贝斯 / 人声 / 其他可以单独转，也可以按需混成一条音频后转，并可按乐器设置频率范围；
 - 当前验证产物放在 `tracks/<id>/midi-validation/`，不写入数据库；界面接入后再改为正式的 `midi-<jobId>` 目录和记录。
 

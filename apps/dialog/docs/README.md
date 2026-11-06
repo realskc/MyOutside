@@ -12,7 +12,7 @@
 ## 2. 数据模型（DIALOG-0001）
 
 ```
-dialog__conversation
+app_dialog__conversation
   id               TEXT PK
   title            TEXT NOT NULL DEFAULT ''      -- 空 = 显示「新对话」；首条用户消息自动生成
   system_prompt    TEXT NULL                     -- null = 默认提示词（后端常量）
@@ -22,7 +22,7 @@ dialog__conversation
   created_at       INTEGER NOT NULL
   updated_at       INTEGER NOT NULL              -- 最近活动时间；列表倒序
 
-dialog__message
+app_dialog__message
   id               TEXT PK
   conversation_id  TEXT NOT NULL
   parent_id        TEXT NULL                     -- null = 根消息
@@ -120,7 +120,7 @@ dialog.renameConversation / setSystemPrompt / setReasoningEffort / setWebSearch 
 
 1. 选中消息中的词 → `dialog.prepareCapture`（读）：AI 生成卡片草稿 → `vocab.resolveCard`；
 2. 若判定同类 → 用户选择放弃 / 替换 / 仍新增；
-3. `dialog.captureWord`（写）：写 `dialog__capture` 行 + `ctx.call("vocab.addCard" / "vocab.updateCard")`——一次事务两处落账；`context` 带消息原句，`source: "dialog"`。
+3. `dialog.captureWord`（写）：写 `app_dialog__capture` 行 + `ctx.call("vocab.addCard" / "vocab.updateCard")`——一次事务两处落账；`context` 带消息原句，`source: "dialog"`。
 
 ### 6.3 其他
 

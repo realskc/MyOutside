@@ -2,9 +2,9 @@ import { spawn } from "node:child_process";
 import { existsSync, mkdirSync, readdirSync } from "node:fs";
 import { join } from "node:path";
 import { KernelError } from "@myoutside/kernel";
-import type { PureblueStemKind } from "@myoutside/contracts";
+import type { X66CCFFStemKind } from "@myoutside/contracts";
 
-const STEMS: PureblueStemKind[] = ["vocals", "drums", "bass", "other", "guitar", "piano"];
+const STEMS: X66CCFFStemKind[] = ["vocals", "drums", "bass", "other", "guitar", "piano"];
 
 /** 应用管理的 venv 中的 Python；未安装返回 null */
 export function enginePython(engineDir: string): string | null {
@@ -27,7 +27,7 @@ export interface RunDemucsOptions {
  * 后台运行 Demucs 六轨分离，返回各轨文件路径。
  * 进度从 stderr/stdout 的百分比行解析；取消时终止子进程。
  */
-export function runDemucs(options: RunDemucsOptions): Promise<Partial<Record<PureblueStemKind, string>>> {
+export function runDemucs(options: RunDemucsOptions): Promise<Partial<Record<X66CCFFStemKind, string>>> {
   const python = enginePython(options.engineDir);
   if (!python) {
     throw new KernelError("PRECONDITION", "分离引擎未安装");
@@ -119,7 +119,7 @@ export function runDemucs(options: RunDemucsOptions): Promise<Partial<Record<Pur
           const dirs = readdirSync(modelDir, { withFileTypes: true }).filter((entry) => entry.isDirectory());
           if (dirs.length === 0) throw new Error("未找到分离输出目录");
           const trackDir = join(modelDir, dirs[0]!.name);
-          const files: Partial<Record<PureblueStemKind, string>> = {};
+          const files: Partial<Record<X66CCFFStemKind, string>> = {};
           for (const kind of STEMS) {
             const file = join(trackDir, `${kind}.mp3`);
             if (existsSync(file)) files[kind] = file;

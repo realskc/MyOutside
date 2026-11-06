@@ -21,8 +21,8 @@ import { dialogApp } from "@myoutside/dialog";
 import dialogManifest from "@myoutside/dialog/manifest.json";
 import { goApp } from "@myoutside/go";
 import goManifest from "@myoutside/go/manifest.json";
-import { createPureblueApp } from "@myoutside/pureblue";
-import pureblueManifest from "@myoutside/pureblue/manifest.json";
+import { createX66CCFFApp } from "@myoutside/66ccff";
+import x66ccffManifest from "@myoutside/66ccff/manifest.json";
 import { createZheyeApp } from "@myoutside/zheye";
 import zheyeManifest from "@myoutside/zheye/manifest.json";
 import { startLanServer } from "./lan-server";
@@ -116,10 +116,16 @@ function buildUiDirs(kernel: Kernel): Record<string, string> {
   return uiDirs;
 }
 
-function registerAppProtocol(uiDirs: Record<string, string>): void {
+/** URL host 是大小写不敏感的；应用 id 保留原始大小写，这里做 host → id 映射。 */
+function buildAppIdByHost(kernel: Kernel): Map<string, string> {
+  return new Map(kernel.listApps().map(({ id }) => [id.toLowerCase(), id]));
+}
+
+function registerAppProtocol(uiDirs: Record<string, string>, appIdByHost: Map<string, string>): void {
   protocol.handle("app", async (request) => {
     const url = new URL(request.url);
-    const base = uiDirs[url.hostname];
+    const appId = url.hostname === SHELL_CALLER ? SHELL_CALLER : appIdByHost.get(url.hostname);
+    const base = appId ? uiDirs[appId] : undefined;
     if (!base) return new Response("Not Found", { status: 404 });
     const rel = decodeURIComponent(url.pathname).replace(/^\/+/, "") || "index.html";
     const file = normalize(join(base, rel));
@@ -146,12 +152,12 @@ const MEDIA_MIME: Record<string, string> = {
 };
 
 /** 应用私有文件（媒体）：media://<appId>/<相对路径> → <dataDir>/apps/<appId>/<相对路径> */
-function registerMediaProtocol(dataDir: string, appIds: Set<string>): void {
+function registerMediaProtocol(dataDir: string, appIds: Set<string>, appIdByHost: Map<string, string>): void {
   const appsRoot = resolve(dataDir, "apps");
   protocol.handle("media", async (request) => {
     const url = new URL(request.url);
-    const appId = url.hostname;
-    if (!appIds.has(appId)) return new Response("Not Found", { status: 404 });
+    const appId = appIdByHost.get(url.hostname);
+    if (!appId || !appIds.has(appId)) return new Response("Not Found", { status: 404 });
     const relativePath = decodeURIComponent(url.pathname).replace(/^\/+/, "");
     const appRoot = normalize(join(appsRoot, appId));
     const file = normalize(join(appRoot, relativePath));
@@ -701,12 +707,12 @@ async function runSmoke(win: BrowserWindow): Promise<void> {
     writeFileSync(goShotPath, goPng);
     console.log("[smoke] go screenshot:", goShotPath, `(${goPng.length} bytes)`);
 
-    // 纯蓝：验证 app://pureblue 能加载、曲目列表 / 引擎状态 / media:// 音频链路
-    const smokeAppDir = join(app.getPath("temp"), "myoutside-smoke-data", "apps", "pureblue");
+    // 纯蓝：验证 app://66ccff 能加载、曲目列表 / 引擎状态 / media:// 音频链路
+    const smokeAppDir = join(app.getPath("temp"), "myoutside-smoke-data", "apps", "66CCFF");
     const smokeWavPath = join(smokeAppDir, "smoke.wav");
     mkdirSync(smokeAppDir, { recursive: true });
     writeFileSync(smokeWavPath, makeSilentWav(1));
-    await win.loadURL("app://pureblue/index.html");
+    await win.loadURL("app://66ccff/index.html");
     for (let i = 0; i < 24; i += 1) {
       const ready = (await win.webContents.executeJavaScript(
         'document.readyState === "complete" && typeof window.outside === "object" && !!document.getElementById("btn-import")',
@@ -714,12 +720,12 @@ async function runSmoke(win: BrowserWindow): Promise<void> {
       if (ready) break;
       await new Promise((resolve) => setTimeout(resolve, 250));
     }
-    const pureblueCheck = await win.webContents.executeJavaScript(
+    const x66ccffCheck = await win.webContents.executeJavaScript(
       `(async () => {
-        const list = await window.outside.call("pureblue.listTracks", {});
-        const engine = await window.outside.call("pureblue.getEngineStatus", {});
+        const list = await window.outside.call("66CCFF.listTracks", {});
+        const engine = await window.outside.call("66CCFF.getEngineStatus", {});
         const audio = await new Promise((resolve) => {
-          const element = new Audio("media://pureblue/smoke.wav");
+          const element = new Audio("media://66ccff/smoke.wav");
           let done = false;
           const finish = (result) => { if (!done) { done = true; resolve(result); } };
           element.addEventListener("canplaythrough", () => finish({ ok: true, duration: element.duration }));
@@ -738,20 +744,20 @@ async function runSmoke(win: BrowserWindow): Promise<void> {
         };
       })()`,
     );
-    console.log("[smoke] pureblue:", JSON.stringify(pureblueCheck));
-    const pureblueShotPath = join(app.getPath("temp"), "myoutside-pureblue.png");
-    const purebluePng = await captureWindow(win, 8, 400);
-    writeFileSync(pureblueShotPath, purebluePng);
-    console.log("[smoke] pureblue screenshot:", pureblueShotPath, `(${purebluePng.length} bytes)`);
+    console.log("[smoke] 66CCFF:", JSON.stringify(x66ccffCheck));
+    const x66ccffShotPath = join(app.getPath("temp"), "myoutside-66CCFF.png");
+    const x66ccffPng = await captureWindow(win, 8, 400);
+    writeFileSync(x66ccffShotPath, x66ccffPng);
+    console.log("[smoke] 66CCFF screenshot:", x66ccffShotPath, `(${x66ccffPng.length} bytes)`);
 
     // 纯蓝：真实导入一段静音 WAV（临时数据），验证导入 + 详情界面
-    const pureblueImport = await win.webContents.executeJavaScript(
+    const x66ccffImport = await win.webContents.executeJavaScript(
       `(async () => {
-        const r = await window.outside.call("pureblue.importTrack", { path: ${JSON.stringify(smokeWavPath)} });
+        const r = await window.outside.call("66CCFF.importTrack", { path: ${JSON.stringify(smokeWavPath)} });
         return { ok: r.ok, id: r.ok ? r.result.id : null, error: r.ok ? null : r.error };
       })()`,
     );
-    console.log("[smoke] pureblue import:", JSON.stringify(pureblueImport));
+    console.log("[smoke] 66CCFF import:", JSON.stringify(x66ccffImport));
     await win.reload();
     for (let i = 0; i < 24; i += 1) {
       const ready = (await win.webContents.executeJavaScript(
@@ -760,13 +766,13 @@ async function runSmoke(win: BrowserWindow): Promise<void> {
       if (ready) break;
       await new Promise((resolve) => setTimeout(resolve, 250));
     }
-    const pureblueTrackPng = await captureWindow(win, 8, 400);
-    const pureblueTrackShotPath = join(app.getPath("temp"), "myoutside-pureblue-track.png");
-    writeFileSync(pureblueTrackShotPath, pureblueTrackPng);
+    const x66ccffTrackPng = await captureWindow(win, 8, 400);
+    const x66ccffTrackShotPath = join(app.getPath("temp"), "myoutside-66CCFF-track.png");
+    writeFileSync(x66ccffTrackShotPath, x66ccffTrackPng);
     console.log(
-      "[smoke] pureblue track screenshot:",
-      pureblueTrackShotPath,
-      `(${pureblueTrackPng.length} bytes)`,
+      "[smoke] 66CCFF track screenshot:",
+      x66ccffTrackShotPath,
+      `(${x66ccffTrackPng.length} bytes)`,
     );
 
     await smokeZheye(win);
@@ -806,7 +812,7 @@ app.whenReady().then(async () => {
   kernel.registerApp(vocabApp, vocabManifest);
   kernel.registerApp(dialogApp, dialogManifest);
   kernel.registerApp(goApp, goManifest);
-  kernel.registerApp(createPureblueApp({ dataDir: join(dataDir, "apps", "pureblue") }), pureblueManifest);
+  kernel.registerApp(createX66CCFFApp({ dataDir: join(dataDir, "apps", "66CCFF") }), x66ccffManifest);
   // 哲野的配方从仓库里的 apps/zheye/recipes 读：改了提示词，下一次试跑就生效（ZHEYE-0021）
   kernel.registerApp(createZheyeApp({ recipesDir: join(appDir("zheye"), "recipes") }), zheyeManifest);
   kernel.start();
@@ -818,7 +824,8 @@ app.whenReady().then(async () => {
     return;
   }
   const appIds = new Set(kernel.listApps().map((item) => item.id));
-  registerMediaProtocol(dataDir, appIds);
+  const appIdByHost = buildAppIdByHost(kernel);
+  registerMediaProtocol(dataDir, appIds, appIdByHost);
 
   /** 调用者 = 发起 IPC 的页面所属的子应用（app://<id>/）；外壳 = 平台自身 */
   const callerOf = (frame: WebFrameMain | null): string | null => {
@@ -832,7 +839,8 @@ app.whenReady().then(async () => {
       return null;
     }
     if (host === SHELL_CALLER) return SHELL_CALLER;
-    return appIds.has(host) ? host : null;
+    const appId = appIdByHost.get(host);
+    return appId && appIds.has(appId) ? appId : null;
   };
 
   /** 进行中的调用（按运行 ID）：用于推送事件与取消 */
@@ -941,7 +949,7 @@ app.whenReady().then(async () => {
     return failure ? { ok: false, error: failure } : { ok: true };
   });
 
-  registerAppProtocol(uiDirs);
+  registerAppProtocol(uiDirs, appIdByHost);
   const win = await createMainWindow();
   win.setTitle(STRINGS[currentLang].appName);
 

@@ -1,6 +1,6 @@
 import type { AiUsage, Conversation, Message, ReplySource, ReplyStep } from "@myoutside/contracts";
 
-/** 数据库行（dialog__conversation） */
+/** 数据库行（app_dialog__conversation） */
 export interface ConversationRow {
   id: string;
   title: string;
@@ -12,7 +12,7 @@ export interface ConversationRow {
   updated_at: number;
 }
 
-/** 数据库行（dialog__message） */
+/** 数据库行（app_dialog__message） */
 export interface MessageRow {
   id: string;
   conversation_id: string;

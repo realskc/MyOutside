@@ -2,7 +2,7 @@ import type { Card } from "@myoutside/contracts";
 import type { SqlValue } from "@myoutside/kernel";
 import { State, type Card as FsrsCard } from "ts-fsrs";
 
-/** 数据库行（vocab__card） */
+/** 数据库行（app_vocab__card） */
 export interface CardRow {
   id: string;
   term: string;

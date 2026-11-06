@@ -255,10 +255,10 @@ export const goApp: AppModule = {
           ].join(", "),
         );
         ctx.createIndex("record_finished", "record", "finished_at");
-        ctx.exec("ALTER TABLE go__game ADD COLUMN recorded INTEGER NOT NULL DEFAULT 0");
-        ctx.exec("ALTER TABLE go__game ADD COLUMN undo_seat TEXT");
-        ctx.exec("ALTER TABLE go__game ADD COLUMN undo_target INTEGER");
-        ctx.exec("ALTER TABLE go__game ADD COLUMN undo_requested_at INTEGER");
+        ctx.exec("ALTER TABLE app_go__game ADD COLUMN recorded INTEGER NOT NULL DEFAULT 0");
+        ctx.exec("ALTER TABLE app_go__game ADD COLUMN undo_seat TEXT");
+        ctx.exec("ALTER TABLE app_go__game ADD COLUMN undo_target INTEGER");
+        ctx.exec("ALTER TABLE app_go__game ADD COLUMN undo_requested_at INTEGER");
       },
     },
   ],

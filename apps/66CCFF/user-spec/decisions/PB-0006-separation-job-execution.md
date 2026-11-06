@@ -13,7 +13,7 @@
 
 ## 决策
 
-- `pureblue.startSeparation` 定义为内部异步 API：创建任务记录 → 启动 Demucs 子进程 → 解析 stderr 进度 → 用事件推送给界面 → 完成时用事务 API 写六轨记录；
+- `66CCFF.startSeparation` 定义为内部异步 API：创建任务记录 → 启动 Demucs 子进程 → 解析 stderr 进度 → 用事件推送给界面 → 完成时用事务 API 写六轨记录；
 - 界面用 `runId` 订阅事件，并用 `bridge.cancel(runId)` 取消（取消时终止子进程、任务标记为 canceled）；
 - 同一曲目同一时间只允许一个分离任务。
 

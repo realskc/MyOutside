@@ -4,16 +4,16 @@ import { join } from "node:path";
 import { createKernel, type Kernel } from "@myoutside/kernel";
 import { createNodeSqliteAdapter } from "@myoutside/kernel-node";
 import { afterEach, describe, expect, it } from "vitest";
-import { createPureblueApp } from "../backend/src/index.js";
+import { createX66CCFFApp } from "../backend/src/index.js";
 
 const cleanup: string[] = [];
 
 function setup(): { kernel: Kernel; dataDir: string } {
-  const dataDir = mkdtempSync(join(tmpdir(), "pureblue-test-"));
+  const dataDir = mkdtempSync(join(tmpdir(), "66CCFF-test-"));
   cleanup.push(dataDir);
   const storage = createNodeSqliteAdapter({ path: ":memory:" });
   const kernel = createKernel({ storage });
-  kernel.registerApp(createPureblueApp({ dataDir }));
+  kernel.registerApp(createX66CCFFApp({ dataDir }));
   kernel.start();
   return { kernel, dataDir };
 }
@@ -35,12 +35,12 @@ afterEach(() => {
   }
 });
 
-describe("pureblue backend", () => {
+describe("66CCFF backend", () => {
   it("引擎未安装时状态为 not ready", async () => {
     const { kernel } = setup();
     const status = await call<{ ready: boolean; pythonPath: string | null; setupCommand: string }>(
       kernel,
-      "pureblue.getEngineStatus",
+      "66CCFF.getEngineStatus",
       {},
     );
     expect(status.ready).toBe(false);
@@ -54,7 +54,7 @@ describe("pureblue backend", () => {
     mkdirSync(trackDir, { recursive: true });
     writeFileSync(join(trackDir, "source.wav"), "fake");
 
-    await call(kernel, "pureblue.insertTrack", {
+    await call(kernel, "66CCFF.insertTrack", {
       id: "t1",
       title: "测试曲目",
       file: "tracks/t1/source.wav",
@@ -65,7 +65,7 @@ describe("pureblue backend", () => {
 
     const tracks = await call<Array<{ id: string; title: string; stemCount: number }>>(
       kernel,
-      "pureblue.listTracks",
+      "66CCFF.listTracks",
       {},
     );
     expect(tracks).toHaveLength(1);
@@ -73,7 +73,7 @@ describe("pureblue backend", () => {
 
     const detail = await call<{ id: string; duration: number; stems: unknown[]; job: null }>(
       kernel,
-      "pureblue.getTrack",
+      "66CCFF.getTrack",
       { trackId: "t1" },
     );
     expect(detail.id).toBe("t1");
@@ -81,8 +81,8 @@ describe("pureblue backend", () => {
     expect(detail.stems).toEqual([]);
     expect(detail.job).toBeNull();
 
-    await call(kernel, "pureblue.deleteTrackTx", { trackId: "t1" });
-    expect(await call<unknown[]>(kernel, "pureblue.listTracks", {})).toHaveLength(0);
+    await call(kernel, "66CCFF.deleteTrackTx", { trackId: "t1" });
+    expect(await call<unknown[]>(kernel, "66CCFF.listTracks", {})).toHaveLength(0);
   });
 
   it("importTrack 复制文件到应用目录并写入曲目", async () => {
@@ -90,7 +90,7 @@ describe("pureblue backend", () => {
     const source = join(dataDir, "incoming.wav");
     writeFileSync(source, "fake audio");
 
-    const track = await call<{ id: string; title: string; file: string }>(kernel, "pureblue.importTrack", {
+    const track = await call<{ id: string; title: string; file: string }>(kernel, "66CCFF.importTrack", {
       path: source,
       title: "导入测试",
     });
@@ -99,7 +99,7 @@ describe("pureblue backend", () => {
     expect(existsSync(join(dataDir, track.file))).toBe(true);
     expect(statSync(join(dataDir, track.file)).size).toBe(10);
 
-    const imported = await call<{ file: string }>(kernel, "pureblue.getTrack", { trackId: track.id });
+    const imported = await call<{ file: string }>(kernel, "66CCFF.getTrack", { trackId: track.id });
     expect(imported.file).toBe(track.file);
   });
 
@@ -107,7 +107,7 @@ describe("pureblue backend", () => {
     const { kernel, dataDir } = setup();
     const source = join(dataDir, "notes.txt");
     writeFileSync(source, "hi");
-    const result = await raw(kernel, "pureblue.importTrack", { path: source });
+    const result = await raw(kernel, "66CCFF.importTrack", { path: source });
     expect(result.ok).toBe(false);
     if (!result.ok) expect(result.error.code).toBe("VALIDATION");
   });
@@ -116,8 +116,8 @@ describe("pureblue backend", () => {
     const { kernel, dataDir } = setup();
     const source = join(dataDir, "song.mp3");
     writeFileSync(source, "fake");
-    const track = await call<{ id: string }>(kernel, "pureblue.importTrack", { path: source });
-    const result = await raw(kernel, "pureblue.startSeparation", { trackId: track.id });
+    const track = await call<{ id: string }>(kernel, "66CCFF.importTrack", { path: source });
+    const result = await raw(kernel, "66CCFF.startSeparation", { trackId: track.id });
     expect(result.ok).toBe(false);
     if (!result.ok) expect(result.error.code).toBe("PRECONDITION");
   });

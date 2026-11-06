@@ -212,13 +212,13 @@ describe("kernel", () => {
     expect(kernel.dataVersion).toBe(1);
 
     // 物理表名带应用前缀
-    const rows = storage.select<{ c: number }>("SELECT COUNT(*) AS c FROM notes__note");
+    const rows = storage.select<{ c: number }>("SELECT COUNT(*) AS c FROM app_notes__note");
     expect(rows[0]?.c).toBe(1);
   });
 
   it("迁移内种子数据：insert 自动加应用前缀", async () => {
     const { storage, kernel } = setup();
-    expect(storage.select<{ c: number }>("SELECT COUNT(*) AS c FROM seed__item")[0]?.c).toBe(2);
+    expect(storage.select<{ c: number }>("SELECT COUNT(*) AS c FROM app_seed__item")[0]?.c).toBe(2);
     const listed = await kernel.handle({ call: "seed.listItems", payload: {} });
     expect(listed.ok).toBe(true);
     if (!listed.ok) return;
@@ -232,8 +232,8 @@ describe("kernel", () => {
     const { storage, kernel } = setup();
     const r = await kernel.handle({ call: "tasks.createNoteWithTask", payload: { title: "shared" } });
     expect(r.ok).toBe(true);
-    expect(storage.select<{ c: number }>("SELECT COUNT(*) AS c FROM notes__note")[0]?.c).toBe(1);
-    expect(storage.select<{ c: number }>("SELECT COUNT(*) AS c FROM tasks__task")[0]?.c).toBe(1);
+    expect(storage.select<{ c: number }>("SELECT COUNT(*) AS c FROM app_notes__note")[0]?.c).toBe(1);
+    expect(storage.select<{ c: number }>("SELECT COUNT(*) AS c FROM app_tasks__task")[0]?.c).toBe(1);
   });
 
   it("失败回滚：事务中任一失败 → 全部不落库", async () => {
@@ -242,8 +242,8 @@ describe("kernel", () => {
     expect(r.ok).toBe(false);
     if (r.ok) return;
     expect(r.error.code).toBe("INTERNAL");
-    expect(storage.select<{ c: number }>("SELECT COUNT(*) AS c FROM tasks__task")[0]?.c).toBe(0);
-    expect(storage.select<{ c: number }>("SELECT COUNT(*) AS c FROM notes__note")[0]?.c).toBe(0);
+    expect(storage.select<{ c: number }>("SELECT COUNT(*) AS c FROM app_tasks__task")[0]?.c).toBe(0);
+    expect(storage.select<{ c: number }>("SELECT COUNT(*) AS c FROM app_notes__note")[0]?.c).toBe(0);
   });
 
   it("参数校验失败 → VALIDATION", async () => {
@@ -485,7 +485,7 @@ describe("kernel", () => {
     expect(r.ok).toBe(false);
     if (r.ok) return;
     expect(r.error.code).toBe("FORBIDDEN");
-    expect(storage.select<{ c: number }>("SELECT COUNT(*) AS c FROM notes__note")[0]?.c).toBe(0);
+    expect(storage.select<{ c: number }>("SELECT COUNT(*) AS c FROM app_notes__note")[0]?.c).toBe(0);
   });
 
   it("普通的异步函数：等外部后经本应用的事务 API 写入，每次一个短事务；事件经 emit 推出", async () => {
@@ -493,7 +493,7 @@ describe("kernel", () => {
     const events: unknown[] = [];
     const r = await kernel.handle({ call: "notes.importTwo", payload: { title: "a" } }, { emit: (e) => events.push(e) });
     expect(r.ok).toBe(true);
-    expect(storage.select<{ c: number }>("SELECT COUNT(*) AS c FROM notes__note")[0]?.c).toBe(2);
+    expect(storage.select<{ c: number }>("SELECT COUNT(*) AS c FROM app_notes__note")[0]?.c).toBe(2);
     expect(kernel.dataVersion).toBe(2);
     expect(events).toEqual([{ type: "progress", done: 1 }]);
   });
@@ -502,7 +502,7 @@ describe("kernel", () => {
     const { storage, kernel } = setup();
     const r = await kernel.handle({ call: "notes.importThenFail", payload: {} });
     expect(r.ok).toBe(false);
-    expect(storage.select<{ title: string }>("SELECT title FROM notes__note").map((row) => row.title)).toEqual(["kept"]);
+    expect(storage.select<{ title: string }>("SELECT title FROM app_notes__note").map((row) => row.title)).toEqual(["kept"]);
   });
 
   it("普通的异步函数只能是内部 API：其他子应用不能调用", async () => {
@@ -559,6 +559,6 @@ describe("kernel", () => {
     controller.abort();
     const r = await pending;
     expect(r.ok).toBe(true);
-    expect(storage.select<{ title: string }>("SELECT title FROM notes__note").map((row) => row.title)).toEqual(["partial"]);
+    expect(storage.select<{ title: string }>("SELECT title FROM app_notes__note").map((row) => row.title)).toEqual(["partial"]);
   });
 });

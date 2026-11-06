@@ -9,7 +9,7 @@
 ## 决策
 
 - 用《词以类记》托福词表的分级结果（DeepSeek 三次运行取中位数，A / B / C / D 四级）生成参考词表 `apps/vocab/backend/src/data/toefl-word-levels.json`（`pnpm build:toefl`）；
-- 参考词表随数据库迁移一次性种入 `vocab__word_level` 表，**不创建卡片**；
+- 参考词表随数据库迁移一次性种入 `app_vocab__word_level` 表，**不创建卡片**；
 - 同一个词出现在多个分类或级别时，取最高优先级（A > B > C > D）；
 - 卡片的 `term` 命中参考词表时，在复习卡背面、词库列表与查词草稿卡上显示「托福 A/B/C/D」徽章；查词草稿通过 `vocab.getWordLevel` 查询参考词表，不要求已经有卡片。
 

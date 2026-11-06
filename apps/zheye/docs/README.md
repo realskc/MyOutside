@@ -29,9 +29,9 @@
 **数据**
 
 ```
-zheye__trial_run    id, subject, type, flow, recipe_hash, recipe(JSON 快照), status, error,
+app_zheye__trial_run    id, subject, type, flow, recipe_hash, recipe(JSON 快照), status, error,
                     docs(JSON), usage(JSON), cost_yuan, web_calls, started_at, finished_at
-zheye__trial_event  run_id, seq, stage, kind(stage_start | round | doc | stage_end), data(JSON), at
+app_zheye__trial_event  run_id, seq, stage, kind(stage_start | round | doc | stage_end), data(JSON), at
 ```
 
 状态 `running` 但不在这次运行的进程里 → 读出时显示 `interrupted`。
@@ -50,14 +50,14 @@ zheye__trial_event  run_id, seq, stage, kind(stage_start | round | doc | stage_e
 ## 2. 数据模型（草案）
 
 ```
-zheye__source
+app_zheye__source
   id              TEXT PK
   title           TEXT NOT NULL DEFAULT ''
   text            TEXT NOT NULL             -- v1：粘贴的完整原文
   ref             TEXT NULL                 -- 来源备注（不做抓取）
   created_at      INTEGER NOT NULL
 
-zheye__unit
+app_zheye__unit
   id              TEXT PK
   type            TEXT NOT NULL             -- 'concept' | 'statement' | 'doc'
   target          TEXT NOT NULL             -- 词 / 句原文；doc 单元为标题或指代
@@ -68,7 +68,7 @@ zheye__unit
   created_at      INTEGER NOT NULL
   updated_at      INTEGER NOT NULL
 
-zheye__unit_prerequisite
+app_zheye__unit_prerequisite
   unit_id         TEXT NOT NULL             -- 被讲单元
   position        INTEGER NOT NULL          -- 展示顺序
   text            TEXT NOT NULL             -- 前置要素（词或句）
@@ -76,7 +76,7 @@ zheye__unit_prerequisite
   answer          TEXT NULL                 -- 'known' | 'unknown'；light 与未询问为 NULL
   prerequisite_id TEXT NULL                 -- 对应的展开单元（复用或递归创建后回填）
 
-zheye__article
+app_zheye__article
   id              TEXT PK
   unit_id         TEXT NOT NULL             -- 1:1
   content_md      TEXT NOT NULL

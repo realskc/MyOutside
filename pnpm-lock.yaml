@@ -270,9 +270,9 @@ importers:
       '@myoutside/kernel-node':
         specifier: workspace:*
         version: link:../../packages/kernel-node
-      '@myoutside/pureblue':
+      '@myoutside/66ccff':
         specifier: workspace:*
-        version: link:../pureblue
+        version: link:../66CCFF
       '@myoutside/vocab':
         specifier: workspace:*
         version: link:../vocab
@@ -290,7 +290,7 @@ importers:
         specifier: ^5.6.0
         version: 5.9.3
 
-  apps/pureblue:
+  apps/66CCFF:
     dependencies:
       '@myoutside/contracts':
         specifier: workspace:*
