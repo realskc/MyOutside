@@ -151,8 +151,6 @@ export type GoSendChatInput = z.infer<typeof GoSendChatInput>;
 export const GoUndoInput = z.object({ token: Token });
 export type GoUndoInput = z.infer<typeof GoUndoInput>;
 
-export const GoArchiveInput = z.object({});
-export type GoArchiveInput = z.infer<typeof GoArchiveInput>;
 
 export const GoListRecordsInput = z.object({});
 export type GoListRecordsInput = z.infer<typeof GoListRecordsInput>;
@@ -174,7 +172,6 @@ export interface GoApi {
   "go.acceptUndo": { input: GoUndoInput; output: OkOutput };
   "go.rejectUndo": { input: GoUndoInput; output: OkOutput };
   "go.cancelUndo": { input: GoUndoInput; output: OkOutput };
-  "go.archiveFinished": { input: GoArchiveInput; output: OkOutput };
   "go.listRecords": { input: GoListRecordsInput; output: GoRecordSummary[] };
   "go.getRecord": { input: GoGetRecordInput; output: GoRecord };
   "go.sendChat": { input: GoSendChatInput; output: OkOutput };

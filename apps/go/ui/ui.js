@@ -589,10 +589,6 @@
     loading.textContent = "…";
     recordsList.appendChild(loading);
     try {
-      // 兼容旧版本留下的“已结束但还没归档”的对局；只归档 finished，不动进行中的局。
-      if (state?.status === "finished") {
-        await call("go.archiveFinished", {});
-      }
       const records = await call("go.listRecords", {});
       renderRecordList(records);
     } catch (error) {

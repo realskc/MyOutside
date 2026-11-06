@@ -32,19 +32,3 @@ export function readCredential(storage: DbAdapter, key: string, secrets: SecretC
     throw new KernelError("PRECONDITION", "凭据无法解密（系统钥匙串拒绝访问或已变更）：请在「设置」里重新填写 DeepSeek API Key");
   }
 }
-
-/** 启动时：把明文保存的凭据改为加密保存（有加解密能力时） */
-export function encryptPlaintextCredentials(storage: DbAdapter, secrets: SecretCodec | undefined): void {
-  if (!secrets) return;
-  for (const key of CREDENTIAL_SETTINGS) {
-    const row = storage.select<{ value: string }>("SELECT value FROM platform_setting WHERE key = ?", [key])[0];
-    if (!row) continue;
-    const value = JSON.parse(row.value) as unknown;
-    if (typeof value !== "string" || value.trim() === "") continue;
-    storage.execute("UPDATE platform_setting SET value = ?, updated_at = ? WHERE key = ?", [
-      JSON.stringify(encodeSetting(key, value, secrets)),
-      Date.now(),
-      key,
-    ]);
-  }
-}

@@ -1,6 +1,5 @@
 import { randomUUID } from "node:crypto";
 import {
-  GoArchiveInput,
   GoGetRecordInput,
   GoJoinInput,
   GoListRecordsInput,
@@ -589,12 +588,6 @@ export const goApp: AppModule = {
         undo_target: null,
         undo_requested_at: null,
       });
-      return { ok: true as const };
-    }),
-
-    archiveFinished: defineTx(GoArchiveInput, (ctx) => {
-      const game = getGame(ctx.db);
-      if (game.status === "finished") archiveGame(ctx.db);
       return { ok: true as const };
     }),
 

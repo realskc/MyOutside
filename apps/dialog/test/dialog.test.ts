@@ -4,7 +4,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { dialogApp } from "../backend/src/index.js";
 import { SEARCH_NOTES } from "../backend/src/generate.js";
 import dialogManifest from "../manifest.json";
-import { estimateTokens, trimHistory } from "../backend/src/history.js";
+import { estimateTokens, trimTurns } from "../backend/src/history.js";
 
 function setup(): Kernel {
   const storage = createNodeSqliteAdapter({ path: ":memory:" });
@@ -626,11 +626,13 @@ describe("dialog backend", () => {
       { role: "assistant" as const, content: "a2" },
       { role: "user" as const, content: "u3" },
     ];
+    const trim = (budget: number) =>
+      trimTurns(messages.map((message) => ({ role: message.role, messages: [message] })), budget).map((m) => m.content);
     // 每条 2 token + 4 结构开销 = 6
-    expect(trimHistory(messages, 30).map((m) => m.content)).toEqual(["u1", "a1", "u2", "a2", "u3"]);
-    expect(trimHistory(messages, 18).map((m) => m.content)).toEqual(["u2", "a2", "u3"]);
+    expect(trim(30)).toEqual(["u1", "a1", "u2", "a2", "u3"]);
+    expect(trim(18)).toEqual(["u2", "a2", "u3"]);
     // 放不下时也至少保留最近一条用户消息，且首条必须是 user
-    expect(trimHistory(messages, 6).map((m) => m.content)).toEqual(["u3"]);
-    expect(trimHistory(messages, 1).map((m) => m.content)).toEqual(["u3"]);
+    expect(trim(6)).toEqual(["u3"]);
+    expect(trim(1)).toEqual(["u3"]);
   });
 });

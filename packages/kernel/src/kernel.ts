@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { createAppDb, createMigrationCtx, createReadonlyAppDb } from "./appdb.js";
-import { CREDENTIAL_SETTINGS, encodeSetting, encryptPlaintextCredentials } from "./credentials.js";
+import { CREDENTIAL_SETTINGS, encodeSetting } from "./credentials.js";
 import { KernelError } from "./errors.js";
 import { createPlatformAiDefinition, type UsageRecord } from "./platform-ai.js";
 import { createWebFetchDefinition, createWebSearchDefinition } from "./platform-web.js";
@@ -263,34 +263,6 @@ export function createKernel({ storage, secrets }: KernelOptions) {
          created_at INTEGER NOT NULL
        )`,
     );
-    // 早期的用量表没有花费列：补上，并按每条记录当时的时段补算一次
-    const usageColumns = storage.select<{ name: string }>("PRAGMA table_info(platform_usage)").map((column) => column.name);
-    if (!usageColumns.includes("cost_yuan")) {
-      storage.execute("ALTER TABLE platform_usage ADD COLUMN cost_yuan REAL");
-      const old = storage.select<{
-        id: number;
-        kind: string;
-        model: string | null;
-        prompt_tokens: number | null;
-        completion_tokens: number | null;
-        cache_hit_tokens: number | null;
-        created_at: number;
-      }>("SELECT id, kind, model, prompt_tokens, completion_tokens, cache_hit_tokens, created_at FROM platform_usage");
-      storage.transaction(() => {
-        for (const row of old) {
-          const cost = estimateCost({
-            kind: row.kind,
-            model: row.model,
-            promptTokens: row.prompt_tokens,
-            completionTokens: row.completion_tokens,
-            cacheHitTokens: row.cache_hit_tokens,
-            createdAt: row.created_at,
-          });
-          storage.execute("UPDATE platform_usage SET cost_yuan = ? WHERE id = ?", [cost, row.id]);
-        }
-      });
-    }
-    encryptPlaintextCredentials(storage, secrets);
     storage.transaction(() => {
       for (const { appId, migration } of migrationList) {
         const row = storage.select<{ c: number }>(

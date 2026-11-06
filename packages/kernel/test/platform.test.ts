@@ -371,22 +371,7 @@ describe("platform AI / web", () => {
     expect(later.ok && later.result).toEqual([]);
   });
 
-  it("早期没有花费列的用量表：启动时补列，并按当时的时段补算花费", () => {
-    const storage = createMemoryAdapter();
-    storage.execute(
-      `CREATE TABLE platform_usage (id INTEGER PRIMARY KEY AUTOINCREMENT, caller TEXT NOT NULL, kind TEXT NOT NULL, model TEXT,
-         prompt_tokens INTEGER, completion_tokens INTEGER, reasoning_tokens INTEGER, cache_hit_tokens INTEGER, created_at INTEGER NOT NULL)`,
-    );
-    const idle = Date.parse("2026-10-25T20:00:00+08:00"); // 周日
-    storage.execute(
-      "INSERT INTO platform_usage (caller, kind, model, prompt_tokens, completion_tokens, cache_hit_tokens, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)",
-      ["dialog", "ai.chat", "deepseek-flash", 1_000_000, 0, 0, idle],
-    );
-    createKernel({ storage }).start();
-    const [row] = storage.select<{ cost_yuan: number }>("SELECT cost_yuan FROM platform_usage");
-    expect(row!.cost_yuan).toBeCloseTo(1, 6); // 100 万未命中输入 × 2 元 × 空闲半价
-  });
-  it("凭据加密保存：数据库里只有密文；平台内部解密后使用；已有的明文在启动时改为密文（D-0075）", async () => {
+  it("凭据加密保存：数据库里只有密文；平台内部解密后使用（D-0075）", async () => {
     const codec: SecretCodec = {
       encrypt: (plain) => Buffer.from(`sealed:${plain}`).toString("base64"),
       decrypt: (cipher) => {
@@ -396,12 +381,9 @@ describe("platform AI / web", () => {
       },
     };
     const storage = createMemoryAdapter();
-    // 早期明文保存的密钥
-    createKernel({ storage }).start();
-    storage.execute("INSERT INTO platform_setting (key, value, updated_at) VALUES (?, ?, ?)", ["ai.deepseek.apiKey", JSON.stringify("sk-old"), 0]);
-
     const kernel = createKernel({ storage, secrets: codec });
     kernel.start();
+    await kernel.handle({ call: "platform.settings.set", payload: { key: "ai.deepseek.apiKey", value: "sk-old" } }, { caller: "shell" });
     const raw = () => storage.select<{ value: string }>("SELECT value FROM platform_setting WHERE key = 'ai.deepseek.apiKey'")[0]!.value;
     expect(raw()).not.toContain("sk-old");
     expect(JSON.parse(raw())).toHaveProperty("$encrypted");

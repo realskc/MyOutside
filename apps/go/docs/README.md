@@ -58,7 +58,6 @@
 | `go.acceptUndo` | tx | 对方同意；删除请求方上一手及其后的走子并重放 |
 | `go.rejectUndo` | tx | 对方拒绝 |
 | `go.cancelUndo` | tx | 请求方取消 |
-| `go.archiveFinished` | tx | 兼容旧数据：把已结束但未归档的当前局补进棋谱 |
 | `go.listRecords` | read | 最近 100 盘摘要 |
 | `go.getRecord` | read | 单盘棋谱：走子 + 每步棋盘快照 |
 | `go.sendChat` | tx | 纯文本，1–500 字；仅入座玩家 |

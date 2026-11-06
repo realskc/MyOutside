@@ -11,10 +11,6 @@ export function estimateTokens(text: string): number {
   return cjk + Math.ceil(other / 4);
 }
 
-export interface HistoryMessage {
-  role: "user" | "assistant";
-  content: string;
-}
 
 /** 一条消息（或一轮回复）展开成发给模型的若干条消息，按整体参与截断 */
 export interface HistoryTurn {
@@ -61,10 +57,4 @@ export function trimTurns(turns: HistoryTurn[], budget: number): AiMessage[] {
   }
   while (picked.length > 0 && picked[0]!.role !== "user") picked.shift();
   return picked.flatMap((turn) => turn.messages);
-}
-
-/** 纯文本历史的截断（兼容旧接口；每条消息一个单位） */
-export function trimHistory(messages: HistoryMessage[], budget: number): HistoryMessage[] {
-  const turns: HistoryTurn[] = messages.map((message) => ({ role: message.role, messages: [message] }));
-  return trimTurns(turns, budget) as HistoryMessage[];
 }
