@@ -42,8 +42,8 @@ Kyutai 与 Mirelo 的多乐器音乐转录模型：输入音频，输出 MIDI / 
 - 作者试听：MuScriptor 的效果明显好于当前 Basic Pitch。
 - 发现一个具体误判：00:23–00:25 的快速吉他音在 guitar 输出里属于 `clean electric guitar`；instrumental 输出没有单独的吉他轨，但同一串音被放进了 `acoustic piano` 轨。
 - 用 `--instruments acoustic_guitar,clean_electric_guitar,distorted_electric_guitar` 重新转 instrumental 时，这串音被识别为 `acoustic guitar`，说明它确实是吉他；不限制乐器时是**标注错误**，不是“instrumental 里没有吉他”。
-- 结论（待更多歌曲验证）：分轨后单轨转写的可控性明显更高；直接对 instrumental 多轨转录时，乐器标签和分轨会串。
+- 结论（作者听感，2026-11-08）：分轨转写和直接转 instrumental 的效果都非常好，目前没有明确证据表明直接转有明显缺陷；乐器标签误判本身不影响这个判断。更精细的对比等应用有钢琴卷帘显示功能后再做。
 
 ## 与纯蓝的关系
 
-可作为「跳过音频分离，直接把 Instrumental / Other 转成多轨 MIDI」的候选。适合测试，但权重非商用，且需要 HuggingFace 登录和较大的 GPU。当前作者试听认为其质量明显优于 Basic Pitch；更适合先用于单条 piano / guitar stem，而不是直接依赖 instrumental 的多轨标签。
+可作为「跳过音频分离，直接把 Instrumental / Other 转成多轨 MIDI」的候选。适合测试，但权重非商用，且需要 HuggingFace 登录和较大的 GPU。作者试听认为其质量明显优于 Basic Pitch；分轨转写和直接转 instrumental 两条路线都值得保留，当前不判定哪条更好，精细对比等钢琴卷帘显示功能后再做。

@@ -36,7 +36,7 @@
 | 资料 | 类型 | 备注 |
 |---|---|---|
 | [Basic Pitch](midi/basic-pitch.md) | 单音频转 MIDI | 当前引擎；轻量、支持 pitch bend；混合音频会掉音符；作者反馈转写效果一般，后续评估替代方案 |
-| [MuScriptor](midi/muscriptor.md) | 多轨转录 | 2026 新模型；代码 MIT、权重 CC BY-NC 4.0；medium 已试跑，作者听感明显好于 Basic Pitch；instrumental 多轨会误判吉他，优先用于单条 stem |
+| [MuScriptor](midi/muscriptor.md) | 多轨转录 | 2026 新模型；代码 MIT、权重 CC BY-NC 4.0；medium 已试跑，作者听感明显好于 Basic Pitch；分轨和直接转效果都好，精细对比待钢琴卷帘 |
 | [YourMT3+](midi/yourmt3.md) | 多轨转录 | 约 536MB；直接输出多乐器 MIDI；许可证存在 GPL/Apache 不一致 |
 | [mt3-infer](midi/mt3-infer.md) | 统一推理工具 | 封装 MR-MT3 / MT3-PyTorch / YourMT3；不含 MuScriptor |
 | [MR-MT3](midi/mr-mt3.md) | 多轨转录 | 跨窗口记忆，缓解乐器串轨；约 176MB |
