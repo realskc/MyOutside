@@ -85,6 +85,22 @@ export async function runAiCheck(kernel: Kernel): Promise<boolean> {
     return `回答「${r.content.replace(/\s+/g, " ").slice(0, 60)}」`;
   });
 
+  await step("原始请求原样透传（platform.ai.chatRaw，D-0082）", async () => {
+    const r = await call("platform.ai.chatRaw", {
+      body: {
+        model: "deepseek-flash",
+        messages: [{ role: "user", content: "只回答一个词：成功。" }],
+        max_tokens: 16,
+        temperature: 0,
+        reasoning_effort: "none",
+        stream: false,
+      },
+    });
+    const content = r.body?.choices?.[0]?.message?.content;
+    if (typeof content !== "string" || content.trim() === "") throw new Error("原始响应里没有正文");
+    return `回答「${content.trim()}」，用量 ${JSON.stringify(r.usage)}，估算 ¥${r.costYuan}`;
+  });
+
   await step("网页搜索", async () => {
     const r = await call("platform.web.search", { query: "DeepSeek 搜索 API 发布", count: 3, oriQuestion: "DeepSeek 最近发布了什么" });
     if (r.results.length === 0) throw new Error("没有结果");
