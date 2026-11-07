@@ -34,3 +34,4 @@
 | WeChat ClawBot | [WeChat ClawBot](WeChat-ClawBot.md)：个人微信号的官方机器人接入（iLink） | 无 |
 | LobeHub | [LobeHub](LobeHub.md)：以 agent 为工作单位的 agent 团队平台（前身 LobeChat） | 无 |
 | OpenClaw | [OpenClaw](OpenClaw.md)：开源的个人 agent；一个 agent = 工作区文件 + 凭据 + 会话，记忆是工作区里的 Markdown | 无 |
+| 知更（Unitick） | [知更](知更.md)：面向北大校园事务的个人助手；整合教学网、课程回放、校园信息、待办提醒和微信入口 | [有](知更-thoughts.md) |
