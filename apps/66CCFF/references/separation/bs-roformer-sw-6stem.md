@@ -1,6 +1,6 @@
 # BS-RoFormer SW（6-stem，社区权重）
 
-- 最近核对：2026-11-07
+- 最近核对：2026-11-08
 - 权重镜像：[enerjazzer/BS-ROFO-SW-Fixed](https://huggingface.co/enerjazzer/BS-ROFO-SW-Fixed)、[FractalSurfer/BS-RoFormer-SW-6stem](https://huggingface.co/FractalSurfer/BS-RoFormer-SW-6stem)
 - 代码/推理：[openmirlab/bs-roformer-infer](https://github.com/openmirlab/bs-roformer-infer)（MIT）
 - 浏览器版本：[elicwhite/bs-roformer-web](https://github.com/elicwhite/bs-roformer-web)（MIT）
@@ -27,6 +27,7 @@ bass, drums, other, vocals, guitar, piano
 - `bs-roformer-infer` 当前通过 git 安装，不在 PyPI 发布新版本。
 - `elicwhite/bs-roformer-web` 提供浏览器 ONNX 版本：fp16 约 336MB、fp32 约 669MB，使用 WebGPU。
 - 原 `jarredou` Hugging Face 账号已删除；当前镜像用于恢复可下载性。
+- `FractalSurfer` 镜像的 License 段明确写：上游声明 **no license**（`license: unknown`），这个镜像不授予额外权利，使用条款需要联系原作者。未声明许可证不等于公共领域。
 
 ## SDR 数字的来源核查（2026-11-07）
 
@@ -38,7 +39,7 @@ bass, drums, other, vocals, guitar, piano
 
 ## 未核实 / 风险
 
-- 权重没有明确许可证；代码 MIT 不等于权重可分发，正式分发前必须确认。
+- 权重没有明确许可证；代码 MIT 不等于权重可分发，正式分发或商业使用前必须联系权利人确认。
 - `audio-separator` 的模型列表里有 `BS-Roformer-SW.ckpt` / `BS-Roformer-SW.yaml` 条目，但没有确认它是否等同于 `BS-Rofo-SW-Fixed.ckpt`；Gemini 说的「audio-separator 已内置 Fixed 映射」需要本地验证。
 - 699MB 权重 + PyTorch 的显存/耗时需要实测；GGUF/ONNX 是另一条部署路线。
 
