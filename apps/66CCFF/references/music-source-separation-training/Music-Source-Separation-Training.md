@@ -25,6 +25,12 @@
 - 如果要从零训练六轨模型，MSST 支持自定义 `instruments` 配置，但需要带六轨标注的数据和训练算力；这不是现成权重。
 - 提供 ensemble 脚本；模型权重托管在 GitHub Releases / HuggingFace 等不同位置。
 
+## Gemini 线索的核对
+
+- Gemini 提到「MSST 社区的 RoFormer / MDX23C 吉他与钢琴专属单轨模型」。我在 MSST 官方 `pretrained_models.md` 和仓库文件树里没有找到对应的吉他 / 钢琴单轨权重或配置；这条先标为**未核实**，需要具体链接才能继续。
+- HF 快速检索能找到一个钢琴分离模型，例如 [tjpurdy/Piano-Separation-Model-small](https://huggingface.co/tjpurdy/Piano-Separation-Model-small)（CC-BY-NC-4.0，2026）；没有找到明确的开放吉他分离模型。这个结果不代表绝对不存在，但目前不能当作现成方案。
+- Gemini 的 Stage 3（Transkun、ByteDance Piano、Basic Pitch、YourMT3+、SOME）是**音频转 MIDI 的转录模型**，不是分轨模型；它们不能替代把吉他从混音/伴奏中分离出来。
+
 ## 和纯蓝的关系
 
 它是研究 SOTA 模型和组合方案的主要参考框架；比直接写模型推理更适合做 A/B 和后续替换。

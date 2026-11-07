@@ -38,6 +38,12 @@
 - **Beat This!**：节拍 / downbeat 检测，可把 MIDI 对齐到小节。
 - **De-reverb / De-echo 模型**：减少混响尾音对音符切分的干扰。
 
+## 对 Gemini 说法的核对
+
+- Gemini 说「MSST 社区有 RoFormer / MDX23C 的吉他/钢琴专属单轨模型」：在 MSST 官方预训练表和仓库文件树里没有找到；先当作未核实线索，不据此做决策。
+- Gemini 的 Transkun / ByteDance Piano / Basic Pitch / YourMT3+ / SOME 属于**转 MIDI**，不是分轨；两者不要混为一谈。
+- 目前能确认的六轨仍是 HTDemucs4 6-stem；钢琴/吉他专用分离如果要用，需要找到具体权重并单独验证许可证和效果。
+
 ## Gemini 推荐的级联路线（待验证，不是决策）
 
 Gemini 的核心建议是不要指望单个六轨模型全面变强，而是：
