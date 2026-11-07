@@ -1,6 +1,6 @@
 # 我们的想法：Obsidian
 
-> 只记作者说的，或作者明确认可的 agent 的说法（规则见 [references/README.md](../README.md)）。资料见 [Obsidian.md](Obsidian.md)。
+> 只记作者说的，或作者明确认可的 agent 的说法（规则见 [references/README.md](README.md)）。资料见 [Obsidian.md](Obsidian.md)。
 
 - 作者感觉它更像是一个「知识的家园」（2026-11-05）。
 - 它的「家」，住的主要是知识，而不是人（agent 提出，作者认可）：
@@ -8,4 +8,4 @@
   - 它刻意不内置 AI，理由是不想让 AI 替代你的思考。所以这是一个让你自己整理思考的地方，安静，不沾「灵气」。
   - 里面的知识大多是你自己写下的；哲野不太一样，它是 AI 讲给你听的知识。
 - 如果 MyOutside 能做出来、做得好，就一定会直接覆盖 Obsidian 的能力；这块能力只是我们宏大计划的一小部分而已。作者以后也许会进入 Obsidian 社区，看看里面的人在关注什么、有怎样的活动和需求。
-- 作者在想：我们的文档，尤其是 user spec，能不能用 Obsidian 的方式来组织，也就是用 Obsidian 这个产品来服务于我们的 user spec。（已开始用，见 [D-0079](../../user-spec/decisions/0079-obsidian-for-docs.md)）
+- 作者在想：我们的文档，尤其是 user spec，能不能用 Obsidian 的方式来组织，也就是用 Obsidian 这个产品来服务于我们的 user spec。（已开始用，见 [D-0079](../user-spec/decisions/0079-obsidian-for-docs.md)）

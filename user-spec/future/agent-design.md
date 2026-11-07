@@ -6,7 +6,7 @@
 ## 要做
 
 - agent 设计这件事肯定要做：MyOutside 更接近一个「富有智能的操作系统状物」，但「好的 agent」也是需要的，不可能没有 agent（见 [vision.md「数字家园」](../vision.md)）。
-- LobeHub 和 OpenClaw 都是很不错的 agent 设计（资料见 [LobeHub](../../references/lobehub/LobeHub.md)、[OpenClaw](../../references/openclaw/OpenClaw.md)）。
+- LobeHub 和 OpenClaw 都是很不错的 agent 设计（资料见 [LobeHub](../../references/LobeHub.md)、[OpenClaw](../../references/OpenClaw.md)）。
 
 ## 重点：记忆管理
 

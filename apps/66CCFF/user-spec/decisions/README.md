@@ -1,6 +1,6 @@
 # 决策（66CCFF）
 
-这里记录**纯蓝应用专属**的决策；全局 / 跨应用的决策在 [`user-spec/decisions/`](../../../../user-spec/decisions/)（`D-NNNN`）。应用 spec 见 [`../README.md`](../README.md)；技术文档见 [`../../docs/README.md`](../../docs/README.md)。
+这里记录**纯蓝应用专属**的决策；全局 / 跨应用的决策在 [全局决策索引](../../../../user-spec/decisions/README.md)（`D-NNNN`）。应用 spec 见 [`../README.md`](../README.md)；技术文档见 [`../../docs/README.md`](../../docs/README.md)。
 
 ## 约定
 

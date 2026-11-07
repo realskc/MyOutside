@@ -2,7 +2,7 @@
 
 - 官网文档：https://docs.openclaw.ai ；代码：https://github.com/openclaw/openclaw
 - 资料最近核对：2026-11-05
-- 微信的 ClawBot 插件就是给它做的接入（见 [WeChat ClawBot](../wechat/WeChat%20ClawBot.md)）。
+- 微信的 ClawBot 插件就是给它做的接入（见 [WeChat ClawBot](WeChat-ClawBot.md)）。
 
 ## 一个 agent 是什么
 

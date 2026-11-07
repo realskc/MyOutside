@@ -2,7 +2,9 @@
 
 > 这里记录 **66CCFF（纯蓝）领域**的外部工具、模型和资料线索；不是 spec，也不是决策。
 >
-> 外部项目分两类：`separation/` 是分轨 / 音频源分离，`midi/` 是音频转 MIDI / 多轨转录。Gemini 对话（2026-11-07）只作为推荐来源之一；能核对的事实以官方仓库、论文或模型页面为准，未核对的标为「待核实」。不把 Gemini 原文复制进来。
+> 外部项目分两类：`separation/` 是分轨 / 音频源分离，`midi/` 是音频转 MIDI / 多轨转录。分类目录下，一个项目直接一个 `.md`；需要多个文件时用 `<项目名>-<主题>.md`，不再建项目目录。
+>
+> Gemini 对话（2026-11-07）只作为推荐来源之一；能核对的事实以官方仓库、论文或模型页面为准，未核对的标为「待核实」。不把 Gemini 原文复制进来。
 
 ## 作者说过的目标
 
@@ -18,28 +20,28 @@
 
 | 资料 | 类型 | 是否直接给六轨 | 备注 |
 |---|---|---|---|
-| [Audio Separator](separation/audio-separator/Audio-Separator.md) | 推理工具 / Python 包 | 注册表含 BS-RoFormer SW / Demucs 6s；需确认具体权重 | UVR 模型集合、CLI / Python API、模型下载、ensemble |
-| [Music Source Separation Training](separation/music-source-separation-training/Music-Source-Separation-Training.md) | 训练 + 推理框架 | 官方表里是 HTDemucs4 6s | 包含 BS-RoFormer、Mel-Band RoFormer、SCNet、MDX23C 等；社区权重可接 |
-| [BS-RoFormer SW 6-stem](separation/bs-roformer/BS-RoFormer-SW-6stem.md) | 社区权重 | **是**（bass / drums / other / vocals / guitar / piano） | 已跑通一首歌；权重许可证 unknown；SDR 数字来自下游项目，非官方；待听感 A/B |
-| [HTDemucs 6-stem](separation/demucs/HTDemucs-6s.md) | 当前权重 | 是（六轨） | Demucs 官方称六源实验性、piano 串音/伪影明显 |
-| [BS-RoFormer](separation/bs-roformer/BS-RoFormer.md) | 模型架构 | 否（主要 2 轨） | 人声 / 伴奏强；适合作为级联第一阶段 |
-| [SCNet](separation/scnet/SCNet.md) | 模型架构 | 否（4 轨） | 鼓、贝斯、其他人声之外的分离强 |
-| [Mel-Band RoFormer Guitar](separation/becruily/Mel-Band-RoFormer-Guitar.md) | 社区单轨权重 | 否（Guitar / Other） | 目标提取吉他；许可证和效果待验证 |
-| [SCNet Jazz 4-stem](separation/scnet/SCNet-Jazz-4stem.md) | 社区单轨权重 | 否（drums / bass / piano / other） | 钢琴作为一级 source；适合去人声后的伴奏；许可证待核实 |
-| [Banquet（query-bandit）](separation/query-bandit/Banquet.md) | Query-based 分离 | 否；按 query 提取目标音色 | 论文称 guitar / piano 超过 6-stem HTDemucs；权重 CC-BY-NC-SA |
-| [AudioSep](separation/audiosep/AudioSep.md) | 文本/音频 query 分离 | 否；按文本/音频提取目标 | 32kHz；适合实验，不适合高保真导出 |
+| [Audio Separator](separation/audio-separator.md) | 推理工具 / Python 包 | 注册表含 BS-RoFormer SW / Demucs 6s；需确认具体权重 | UVR 模型集合、CLI / Python API、模型下载、ensemble |
+| [Music Source Separation Training](separation/music-source-separation-training.md) | 训练 + 推理框架 | 官方表里是 HTDemucs4 6s | 包含 BS-RoFormer、Mel-Band RoFormer、SCNet、MDX23C 等；社区权重可接 |
+| [BS-RoFormer SW 6-stem](separation/bs-roformer-sw-6stem.md) | 社区权重 | **是**（bass / drums / other / vocals / guitar / piano） | 已跑通一首歌；权重许可证 unknown；SDR 数字来自下游项目，非官方；待听感 A/B |
+| [HTDemucs 6-stem](separation/demucs-htdemucs-6s.md) | 当前权重 | 是（六轨） | Demucs 官方称六源实验性、piano 串音/伪影明显 |
+| [BS-RoFormer](separation/bs-roformer.md) | 模型架构 | 否（主要 2 轨） | 人声 / 伴奏强；适合作为级联第一阶段 |
+| [SCNet](separation/scnet.md) | 模型架构 | 否（4 轨） | 鼓、贝斯、其他人声之外的分离强 |
+| [Mel-Band RoFormer Guitar](separation/becruily-mel-band-roformer-guitar.md) | 社区单轨权重 | 否（Guitar / Other） | 目标提取吉他；许可证和效果待验证 |
+| [SCNet Jazz 4-stem](separation/scnet-jazz-4stem.md) | 社区单轨权重 | 否（drums / bass / piano / other） | 钢琴作为一级 source；适合去人声后的伴奏；许可证待核实 |
+| [Banquet（query-bandit）](separation/banquet.md) | Query-based 分离 | 否；按 query 提取目标音色 | 论文称 guitar / piano 超过 6-stem HTDemucs；权重 CC-BY-NC-SA |
+| [AudioSep](separation/audiosep.md) | 文本/音频 query 分离 | 否；按文本/音频提取目标 | 32kHz；适合实验，不适合高保真导出 |
 
 ## MIDI / 多轨转录候选
 
 | 资料 | 类型 | 备注 |
 |---|---|---|
-| [Basic Pitch](midi/basic-pitch/Basic-Pitch.md) | 单音频转 MIDI | 当前引擎；轻量、支持 pitch bend；混合音频会掉音符 |
-| [MuScriptor](midi/muscriptor/MuScriptor.md) | 多轨转录 | 2026 新模型；代码 MIT、权重 CC BY-NC 4.0；支持乐器条件 |
-| [YourMT3+](midi/yourmt3/YourMT3.md) | 多轨转录 | 约 536MB；直接输出多乐器 MIDI；许可证存在 GPL/Apache 不一致 |
-| [mt3-infer](midi/mt3-infer/MT3-Infer.md) | 统一推理工具 | 封装 MR-MT3 / MT3-PyTorch / YourMT3；不含 MuScriptor |
-| [MR-MT3](midi/mr-mt3/MR-MT3.md) | 多轨转录 | 跨窗口记忆，缓解乐器串轨；约 176MB |
-| [MT3-PyTorch](midi/mt3-pytorch/MT3-PyTorch.md) | 多轨转录 | 社区 PyTorch 移植；上游无许可证声明 |
-| [Music-to-MIDI（mason369）](midi/music-to-midi/Music-to-MIDI.md) | 下游整合工具 | 使用 BS-RoFormer SW 六轨；其 README 是 9.05 / 7.83 数字的来源之一 |
+| [Basic Pitch](midi/basic-pitch.md) | 单音频转 MIDI | 当前引擎；轻量、支持 pitch bend；混合音频会掉音符 |
+| [MuScriptor](midi/muscriptor.md) | 多轨转录 | 2026 新模型；代码 MIT、权重 CC BY-NC 4.0；支持乐器条件 |
+| [YourMT3+](midi/yourmt3.md) | 多轨转录 | 约 536MB；直接输出多乐器 MIDI；许可证存在 GPL/Apache 不一致 |
+| [mt3-infer](midi/mt3-infer.md) | 统一推理工具 | 封装 MR-MT3 / MT3-PyTorch / YourMT3；不含 MuScriptor |
+| [MR-MT3](midi/mr-mt3.md) | 多轨转录 | 跨窗口记忆，缓解乐器串轨；约 176MB |
+| [MT3-PyTorch](midi/mt3-pytorch.md) | 多轨转录 | 社区 PyTorch 移植；上游无许可证声明 |
+| [Music-to-MIDI（mason369）](midi/music-to-midi.md) | 下游整合工具 | 使用 BS-RoFormer SW 六轨；其 README 是 9.05 / 7.83 数字的来源之一 |
 
 ## 其他 MIDI 线索
 
@@ -54,9 +56,9 @@
 ## 对 Gemini 说法的核对
 
 - Gemini 说的 **BS-RoFormer SW 六轨**确实存在：`enerjazzer/BS-ROFO-SW-Fixed` / `FractalSurfer/BS-RoFormer-SW-6stem` 提供权重，`openmirlab/bs-roformer-infer` 把它作为默认模型之一；它不在 MSST 官方预训练表里，属于社区权重。
-- Gemini 说的 **MSST 社区 RoFormer / MDX23C 吉他与钢琴专属单轨模型**：MSST 官方表和文件树里没有；目前能确认的开放候选是 [`becruily/mel-band-roformer-guitar`](separation/becruily/Mel-Band-RoFormer-Guitar.md)（Guitar / Other，许可证未声明），钢琴有 HF 上的非商用模型。不能把「有专精转录模型」误当成「有六轨分离模型」。
+- Gemini 说的 **MSST 社区 RoFormer / MDX23C 吉他与钢琴专属单轨模型**：MSST 官方表和文件树里没有；目前能确认的开放候选是 [`becruily/mel-band-roformer-guitar`](separation/becruily-mel-band-roformer-guitar.md)（Guitar / Other，许可证未声明），钢琴有 HF 上的非商用模型。不能把「有专精转录模型」误当成「有六轨分离模型」。
 - Gemini 的 Transkun / ByteDance Piano / Basic Pitch / YourMT3+ / SOME 属于**转 MIDI**，不是分轨。
-- `guitar 9.05 / piano 7.83` 来自下游 [Music-to-MIDI](midi/music-to-midi/Music-to-MIDI.md) README，不是 BS-RoFormer SW 模型卡或 MSST 官方表；MVSEP 另一条记录采用 4 轨合并口径，没有单独 guitar/piano SDR。
+- `guitar 9.05 / piano 7.83` 来自下游 [Music-to-MIDI](midi/music-to-midi.md) README，不是 BS-RoFormer SW 模型卡或 MSST 官方表；MVSEP 另一条记录采用 4 轨合并口径，没有单独 guitar/piano SDR。
 - `htdemucs_6s` 的 `5.22 / 2.23` 不是 Demucs 官方基准；官方只说六源实验性、piano 串音/伪影明显。
 - `audio-separator` 的模型列表里有 `BS-Roformer-SW.ckpt`，但没有确认它等同于 `BS-Rofo-SW-Fixed.ckpt`；`bs-roformer-infer` 才是明确绑定 Fixed 版的工具。
 - 因此「强六轨」不是完全不存在：**BS-RoFormer SW 6-stem**是目前最值得实测的候选；只是它不在 MSST 官方仓库里。

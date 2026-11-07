@@ -4,12 +4,12 @@
 
 应用专属的外部资料放在 `apps/<app>/references/`，格式与这里相同；主 `references/` 只放跨应用 / 平台级资料。
 
-每样东西一个子目录（例如 `obsidian/`），里面分两种文件：
+每个外部项目直接一个 Markdown 文件，放在本目录下，文件名就是它的名字（例如 `Obsidian.md`）；不再为项目建子目录。
 
-- **资料**：文件名就是它的名字（例如 `Obsidian.md`）；
-- **我们的想法**：统一叫 `thoughts.md`。还没有想法时可以没有这个文件。
+- **资料**：文件名就是它的名字；
+- **我们的想法**：文件名用 `<项目名>-thoughts.md`（例如 `Obsidian-thoughts.md`）。还没有想法时可以没有这个文件。
 
-和它密切相关的东西（例如围绕它的一种用法）可以放进同一个子目录，资料同样以自己的名字命名。
+和它密切相关的条目可以各自成文件，用文件名区分，例如 `LLM-Wiki.md`；一个项目有多个资料文件时，用 `<项目名>-<主题>.md`。
 
 ## 资料
 
@@ -25,12 +25,12 @@
 - 「明确认可」指作者说了「说得好」「有道理」这类表示赞同的话；没有表态不算。（agent 提出，作者认可）
 - 某个想法变成了对 MyOutside 的具体预期时，写进对应的 spec 文档，并链接回这里。
 
-## 目录
+## 文件
 
-| 目录 | 资料 | 我们的想法 |
+| 项目 | 资料 | 我们的想法 |
 |---|---|---|
-| `obsidian/` | [Obsidian](obsidian/Obsidian.md)：本地优先的 Markdown 笔记软件；[LLM Wiki](obsidian/LLM%20Wiki.md)：Karpathy 提出的、让 LLM 编译并维护个人知识库的做法，用 Obsidian 浏览 | [有](obsidian/thoughts.md) |
-| `bilibili/` | [Bilibili](bilibili/Bilibili.md)：历史记录接口（非官方） | 无 |
-| `wechat/` | [WeChat ClawBot](wechat/WeChat%20ClawBot.md)：个人微信号的官方机器人接入（iLink） | 无 |
-| `lobehub/` | [LobeHub](lobehub/LobeHub.md)：以 agent 为工作单位的 agent 团队平台（前身 LobeChat） | 无 |
-| `openclaw/` | [OpenClaw](openclaw/OpenClaw.md)：开源的个人 agent；一个 agent = 工作区文件 + 凭据 + 会话，记忆是工作区里的 Markdown | 无 |
+| Obsidian | [Obsidian](Obsidian.md)：本地优先的 Markdown 笔记软件；[LLM Wiki](LLM-Wiki.md)：Karpathy 提出的、让 LLM 编译并维护个人知识库的做法，用 Obsidian 浏览 | [有](Obsidian-thoughts.md) |
+| Bilibili | [Bilibili](Bilibili.md)：历史记录接口（非官方） | 无 |
+| WeChat ClawBot | [WeChat ClawBot](WeChat-ClawBot.md)：个人微信号的官方机器人接入（iLink） | 无 |
+| LobeHub | [LobeHub](LobeHub.md)：以 agent 为工作单位的 agent 团队平台（前身 LobeChat） | 无 |
+| OpenClaw | [OpenClaw](OpenClaw.md)：开源的个人 agent；一个 agent = 工作区文件 + 凭据 + 会话，记忆是工作区里的 Markdown | 无 |
