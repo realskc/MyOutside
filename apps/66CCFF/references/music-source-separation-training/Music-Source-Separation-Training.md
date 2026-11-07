@@ -17,7 +17,12 @@
   - SCNet XL IHF（4 轨）Multisong avg 9.92；
   - BS-RoFormer（4 轨）Multisong avg 9.38；
   - BS-RoFormer 人声模型 SDR vocals 10.87（不同评测集，数字不能直接横比）。
-- 6 轨属于少数；当前表中明确的 6 轨是 HTDemucs4 6 stems，强 RoFormer / SCNet 预训练模型主要是 2 轨或 4 轨。
+- **6 轨是模型目标，不是框架自动能力**：
+  - `config_htdemucs_6stems.yaml` 的 `instruments` 是 `drums / bass / other / vocals / guitar / piano`；
+  - 对应权重是 `5c90dfd2-34c22ccb.th`，即当前纯蓝使用的 HTDemucs4 6-stem 模型；
+  - 因此 MSST **可以运行六轨**，但这条六轨路线本身没有比当前模型更新。
+- 官方预训练表中没有基于 BS-RoFormer / SCNet 的强六轨权重；强 RoFormer / SCNet 预训练模型主要是 2 轨或 4 轨。MSST 可以用这些模型做级联、单轨模型或 ensemble，但不是“一个模型直接六轨”。
+- 如果要从零训练六轨模型，MSST 支持自定义 `instruments` 配置，但需要带六轨标注的数据和训练算力；这不是现成权重。
 - 提供 ensemble 脚本；模型权重托管在 GitHub Releases / HuggingFace 等不同位置。
 
 ## 和纯蓝的关系
