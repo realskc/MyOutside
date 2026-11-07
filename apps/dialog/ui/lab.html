@@ -1,0 +1,73 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>实验室</title>
+    <link rel="stylesheet" href="vendor/katex.min.css" />
+    <link rel="stylesheet" href="ui.css" />
+    <link rel="stylesheet" href="lab.css" />
+  </head>
+  <body class="lab-body">
+    <header class="topbar lab-topbar">
+      <a class="icon-btn lab-back" href="index.html" data-i18n-title="labBack" title="返回对话">←</a>
+      <h1 data-i18n="labTitle">实验室</h1>
+      <span class="spacer"></span>
+      <span id="lab-status" class="lab-status"></span>
+      <button id="btn-blank" class="link-btn" data-i18n="labBlank">空白请求</button>
+      <button id="btn-import" class="link-btn" data-i18n="labImport">从对话导入</button>
+      <button id="btn-format" class="link-btn" data-i18n="labFormat">格式化</button>
+      <button id="btn-run" class="primary" data-i18n="labRun">运行</button>
+      <button id="btn-stop" class="primary stop hidden" data-i18n="labStop">停止</button>
+    </header>
+
+    <main class="lab-layout">
+      <section class="lab-pane lab-request">
+        <div class="lab-pane-head">
+          <span data-i18n="labRequest">请求体</span>
+          <span id="lab-source" class="lab-source"></span>
+          <span id="lab-error" class="lab-error"></span>
+        </div>
+        <textarea id="lab-request" spellcheck="false" autocomplete="off" autocapitalize="off"></textarea>
+      </section>
+
+      <section class="lab-pane lab-response">
+        <div class="lab-pane-head">
+          <div class="lab-tabs">
+            <button type="button" data-tab="content" class="active" data-i18n="labContent">正文</button>
+            <button type="button" data-tab="reasoning" data-i18n="labReasoning">思考</button>
+            <button type="button" data-tab="tools" data-i18n="labTools">工具</button>
+            <button type="button" data-tab="raw" data-i18n="labRaw">原始 JSON</button>
+          </div>
+          <select id="lab-choice" class="lab-choice hidden" data-i18n-title="labChoice" title="选择 choice"></select>
+          <span id="lab-meta" class="lab-meta"></span>
+        </div>
+        <div id="lab-response-content" class="lab-response-body lab-markdown"></div>
+        <div id="lab-response-reasoning" class="lab-response-body lab-pre hidden"></div>
+        <div id="lab-response-tools" class="lab-response-body hidden"></div>
+        <pre id="lab-response-raw" class="lab-response-body lab-raw hidden"></pre>
+        <div class="lab-response-actions">
+          <button id="btn-append" type="button" class="link-btn" data-i18n="labAppend">把回复加入消息</button>
+          <button id="btn-copy-response" type="button" class="link-btn" data-i18n="labCopyResponse">复制响应</button>
+        </div>
+      </section>
+    </main>
+
+    <section class="lab-history">
+      <div class="lab-history-head">
+        <span data-i18n="labHistory">运行记录</span>
+        <button id="btn-refresh-history" type="button" class="link-btn" data-i18n="labRefresh">刷新</button>
+      </div>
+      <div id="lab-runs" class="lab-runs"></div>
+    </section>
+
+    <div id="lab-import-panel" class="lab-modal hidden"></div>
+    <div id="lab-toast" class="toast hidden"></div>
+
+    <script src="vendor/marked.umd.js"></script>
+    <script src="vendor/purify.min.js"></script>
+    <script src="vendor/katex.min.js"></script>
+    <script src="markdown.js"></script>
+    <script src="lab.js"></script>
+  </body>
+</html>

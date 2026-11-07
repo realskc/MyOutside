@@ -69,7 +69,8 @@ export function formatToolResult(text: string, tool: Pick<AgentTool, "maxChars" 
   return body;
 }
 
-function toolSpec(tool: AgentTool): Record<string, unknown> {
+/** 把一个 AgentTool 转成 OpenAI 形状的工具定义（也供需要原始请求的地方使用） */
+export function toolSpec(tool: AgentTool): Record<string, unknown> {
   return { type: "function", function: { name: tool.name, description: tool.description, parameters: tool.parameters } };
 }
 

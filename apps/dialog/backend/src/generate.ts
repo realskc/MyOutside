@@ -1,5 +1,13 @@
-import { createSourceRegistry, runToolLoop, webFetchTool, webSearchTool } from "@myoutside/agent";
-import type { AiMessage, GenerateOutput, ReasoningEffort, ReplyStep } from "@myoutside/contracts";
+import {
+  createSourceRegistry,
+  runToolLoop,
+  toolSpec,
+  webFetchTool,
+  webSearchTool,
+  type AgentTool,
+  type SourceRegistry,
+} from "@myoutside/agent";
+import type { AiMessage, GenerateOutput, GetRequestOutput, ReasoningEffort, ReplyStep } from "@myoutside/contracts";
 import { KernelError, type AppDb, type AsyncContext, type KernelErrorCode } from "@myoutside/kernel";
 import { estimateTokens, trimTurns, type HistoryTurn } from "./history.js";
 import { parseSteps, type ConversationRow, type MessageRow } from "./mapping.js";
@@ -107,6 +115,85 @@ export function buildSystemPrompt(conversation: ConversationRow, now = new Date(
   return [conversation.system_prompt ?? DEFAULT_SYSTEM_PROMPT, `当前日期：${today(now)}。`, SEARCH_INSTRUCTIONS].join("\n\n");
 }
 
+/** 一次生成需要的全部输入：生成回复与实验室导出真实请求共用（避免两套逻辑） */
+export interface ConversationRequestParts {
+  conversation: ConversationRow;
+  parent: MessageRow;
+  webSearch: boolean;
+  /** 这条用户消息发出时联网搜索开关的变化；null = 没有变化 */
+  notice: "on" | "off" | null;
+  systemPrompt: string;
+  /** 已经展开并截断的历史（不含 system） */
+  history: AiMessage[];
+  tools: AgentTool[];
+  /** OpenAI 形状的工具定义，导入实验室时用 */
+  toolSpecs: Record<string, unknown>[];
+  sources: SourceRegistry;
+}
+
+/**
+ * 构造一次生成的全部输入。
+ * 只读：不写 search_notice；调用方（generateReply）需要时再写。
+ */
+export function buildConversationRequest(db: AppDb, conversationId: string, parentId: string): ConversationRequestParts {
+  const conversation = db.get<ConversationRow>("conversation", { id: conversationId });
+  if (!conversation) throw new KernelError("NOT_FOUND", `会话不存在：${conversationId}`);
+  const all = loadAllMessages(db, conversationId);
+  const parent = all.find((message) => message.id === parentId);
+  if (!parent || parent.role !== "user") {
+    throw new KernelError("PRECONDITION", "只能为会话里的用户消息生成请求");
+  }
+
+  const webSearch = conversation.web_search !== 0;
+  const chain = chainTo(all, parentId);
+  const before = searchStateBefore(chain.slice(0, -1));
+  const notice = (webSearch ? "on" : "off") === before ? null : webSearch ? "on" : "off";
+
+  // 用这次请求实际会带的 notice 展开历史；数据库里的记录可能还没写入（getRequest 只读）
+  const chainForRequest =
+    (parent.search_notice ?? null) === notice
+      ? chain
+      : chain.map((row) => (row.id === parent.id ? { ...row, search_notice: notice } : row));
+
+  const systemPrompt = buildSystemPrompt(conversation);
+  const history = trimTurns(expandTurns(chainForRequest), CONTEXT_TOKEN_BUDGET);
+  const sources = createSourceRegistry();
+  const tools = [webSearchTool({ sources, question: parent.content }), webFetchTool({ sources })];
+
+  return {
+    conversation,
+    parent,
+    webSearch,
+    notice,
+    systemPrompt,
+    history,
+    tools,
+    toolSpecs: tools.map(toolSpec),
+    sources,
+  };
+}
+
+/** 导出一个用户消息对应的真实请求：DeepSeek 原生 snake_case；v1 非流式（供实验室导入） */
+export function buildRawRequest(db: AppDb, conversationId: string, messageId: string): GetRequestOutput {
+  const parts = buildConversationRequest(db, conversationId, messageId);
+  return {
+    body: {
+      model: "deepseek-flash",
+      messages: [{ role: "system", content: parts.systemPrompt }, ...parts.history],
+      tools: parts.toolSpecs,
+      ...(parts.webSearch ? {} : { tool_choice: "none" }),
+      reasoning_effort: parts.conversation.reasoning_effort,
+      stream: false,
+    },
+    source: {
+      conversationId,
+      conversationTitle: parts.conversation.title,
+      messageId,
+      messageContent: parts.parent.content,
+    },
+  };
+}
+
 /** 估算当前上下文长度：最近一条带实际用量的回复的输入 token 数 + 其后内容的估算；没有就整体估算（DIALOG-0014） */
 export function estimateContextTokens(path: MessageRow[], systemPrompt: string): number {
   for (let i = path.length - 1; i >= 0; i -= 1) {
@@ -135,30 +222,17 @@ export async function generateReply(ctx: AsyncContext, conversationId: string, p
   if (running.has(conversationId)) throw new KernelError("PRECONDITION", "这个会话正在生成回复");
   running.add(conversationId);
   try {
-    const conversation = ctx.db.get<ConversationRow>("conversation", { id: conversationId });
-    if (!conversation) throw new KernelError("NOT_FOUND", `会话不存在：${conversationId}`);
-    const all = loadAllMessages(ctx.db, conversationId);
-    const parent = all.find((m) => m.id === parentId);
-    if (!parent || parent.role !== "user") throw new KernelError("PRECONDITION", "只能为会话里的用户消息生成回复");
-
-    const webSearch = conversation.web_search !== 0;
-    const chain = chainTo(all, parentId);
-    const before = searchStateBefore(chain.slice(0, -1));
-    const notice = (webSearch ? "on" : "off") === before ? null : webSearch ? "on" : "off";
-    if ((parent.search_notice ?? null) !== notice) {
-      await ctx.call("dialog.setSearchNotice", { messageId: parent.id, notice });
-      parent.search_notice = notice;
+    const parts = buildConversationRequest(ctx.db, conversationId, parentId);
+    if ((parts.parent.search_notice ?? null) !== parts.notice) {
+      await ctx.call("dialog.setSearchNotice", { messageId: parts.parent.id, notice: parts.notice });
+      parts.parent.search_notice = parts.notice;
     }
-    const systemPrompt = buildSystemPrompt(conversation);
-    const history = trimTurns(expandTurns(chain), CONTEXT_TOKEN_BUDGET);
-    const sources = createSourceRegistry();
-    const tools = [webSearchTool({ sources, question: parent.content }), webFetchTool({ sources })];
 
     const result = await runToolLoop(ctx, {
-      messages: [{ role: "system", content: systemPrompt }, ...history],
-      tools,
-      ...(webSearch ? {} : { toolChoice: "none" as const }),
-      reasoningEffort: conversation.reasoning_effort as ReasoningEffort,
+      messages: [{ role: "system", content: parts.systemPrompt }, ...parts.history],
+      tools: parts.tools,
+      ...(parts.webSearch ? {} : { toolChoice: "none" as const }),
+      reasoningEffort: parts.conversation.reasoning_effort as ReasoningEffort,
       stream: true,
       maxRounds: MAX_ROUNDS,
     });
@@ -201,7 +275,7 @@ export async function generateReply(ctx: AsyncContext, conversationId: string, p
       model: result.model || null,
       usage: result.usage,
       steps: steps.length > 0 ? steps : null,
-      sources: sources.list().length > 0 ? sources.list() : null,
+      sources: parts.sources.list().length > 0 ? parts.sources.list() : null,
       contextTokens: [...result.rounds].reverse().find((round) => round.usage)?.usage?.promptTokens ?? null,
       stopped,
       error: failed ? (result.error?.message ?? "生成失败") : null,

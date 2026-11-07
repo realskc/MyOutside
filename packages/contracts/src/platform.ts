@@ -90,6 +90,23 @@ export const AiChatOutput = z.object({
 });
 export type AiChatOutput = z.infer<typeof AiChatOutput>;
 
+/**
+ * 实验用的原始请求（D-0082）：body 原样发给 DeepSeek `/chat/completions`，不做字段过滤。
+ * 只有实验室这类明确要改「请求体中的一切」的工具使用；普通子应用用 `platform.ai.chat`。
+ */
+export const RawChatInput = z.object({
+  body: z.record(z.unknown()),
+});
+export type RawChatInput = z.infer<typeof RawChatInput>;
+
+/** 原始响应：上游 JSON 原样返回，另附整理后的 usage 与估算花费（供实验室显示） */
+export const RawChatOutput = z.object({
+  body: z.record(z.unknown()),
+  usage: AiUsageSchema.nullable(),
+  costYuan: z.number(),
+});
+export type RawChatOutput = z.infer<typeof RawChatOutput>;
+
 // —— 用量与花费 ——
 
 export interface UsageSummaryRow {
@@ -147,6 +164,8 @@ export interface PlatformApi {
   "platform.settings.get": { input: { key: string }; output: { value: unknown; isSet: boolean } };
   "platform.settings.set": { input: { key: string; value: unknown }; output: { ok: true } };
   "platform.ai.chat": { input: AiChatInput; output: AiChatOutput };
+  /** 实验用：原样透传请求体（D-0082） */
+  "platform.ai.chatRaw": { input: RawChatInput; output: RawChatOutput };
   "platform.web.search": { input: WebSearchInput; output: { results: WebSearchResult[] } };
   "platform.web.fetch": { input: WebFetchInput; output: WebFetchOutput };
   /** 用量与估算花费，按调用者汇总；只给外壳 */

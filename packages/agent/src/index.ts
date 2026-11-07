@@ -1,4 +1,4 @@
-export { DEFAULT_FINAL_ROUND_NOTE, formatToolResult, runToolLoop } from "./loop.js";
+export { DEFAULT_FINAL_ROUND_NOTE, formatToolResult, runToolLoop, toolSpec } from "./loop.js";
 export {
   apiTool,
   createSourceRegistry,

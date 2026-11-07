@@ -424,4 +424,76 @@ describe("platform AI / web", () => {
     expect(!b.ok && b.error.code).toBe("PRECONDITION");
     if (!b.ok) expect(b.error.message).toContain("重新填写");
   });
+
+  it("raw AI：请求体原样透传、返回原始响应、记录 usage 与估算花费（D-0082）", async () => {
+    const { storage, kernel } = await setup();
+    let body: Record<string, unknown> = {};
+    vi.stubGlobal("fetch", async (_url: string, init: { body: string }) => {
+      body = JSON.parse(init.body);
+      return jsonResponse({
+        id: "chat-raw-1",
+        model: "deepseek-flash",
+        choices: [{ message: { content: "原始答案", reasoning_content: "原始思考" }, finish_reason: "stop" }],
+        usage: { prompt_tokens: 10, completion_tokens: 4, total_tokens: 14, prompt_cache_hit_tokens: 2 },
+      });
+    });
+
+    const r = await kernel.handle({
+      call: "platform.ai.chatRaw",
+      payload: {
+        body: {
+          model: "deepseek-flash",
+          messages: [{ role: "user", content: "hi" }],
+          max_tokens: 123,
+          top_p: 0.5,
+          response_format: { type: "json_object" },
+          reasoning_effort: "high",
+        },
+      },
+    });
+    expect(r.ok).toBe(true);
+    if (!r.ok) return;
+    expect(body).toMatchObject({
+      max_tokens: 123,
+      top_p: 0.5,
+      response_format: { type: "json_object" },
+      reasoning_effort: "high",
+    });
+    const out = r.result as { body: any; usage: any; costYuan: number };
+    expect(out.body.id).toBe("chat-raw-1");
+    expect(out.body.choices[0].message.reasoning_content).toBe("原始思考");
+    expect(out.usage).toMatchObject({ promptTokens: 10, completionTokens: 4, totalTokens: 14, cacheHitTokens: 2 });
+    expect(out.costYuan).toBeGreaterThan(0);
+
+    await flush();
+    const rows = storage.select<{ caller: string; kind: string; model: string }>(
+      "SELECT caller, kind, model FROM platform_usage ORDER BY id",
+    );
+    expect(rows).toEqual([{ caller: "platform", kind: "ai.chat", model: "deepseek-flash" }]);
+  });
+
+  it("raw AI：拒绝流式；错误 details.body 是完整的上游错误体", async () => {
+    const { kernel } = await setup();
+    const streamed = await kernel.handle({
+      call: "platform.ai.chatRaw",
+      payload: { body: { model: "deepseek-flash", messages: [], stream: true } },
+    });
+    expect(streamed.ok).toBe(false);
+    if (!streamed.ok) expect(streamed.error.code).toBe("PRECONDITION");
+
+    vi.stubGlobal("fetch", async () =>
+      new Response(JSON.stringify({ error: { message: "bad", type: "invalid_request_error" } }), {
+        status: 400,
+        headers: { "content-type": "application/json" },
+      }),
+    );
+    const r = await kernel.handle({
+      call: "platform.ai.chatRaw",
+      payload: { body: { model: "deepseek-flash", messages: [{ role: "user", content: "hi" }] } },
+    });
+    expect(r.ok).toBe(false);
+    if (r.ok) return;
+    expect(r.error.code).toBe("UPSTREAM");
+    expect(r.error.details).toMatchObject({ status: 400, body: { error: { message: "bad" } } });
+  });
 });

@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { deepseekPost, readSse, readStringSetting } from "./deepseek.js";
 import { KernelError } from "./errors.js";
+import { estimateCost } from "./pricing.js";
 import type { ApiDefinition, DbAdapter, ReadContext, SecretCodec } from "./types.js";
 
 const DEFAULT_MODEL = "deepseek-flash";
@@ -254,6 +255,67 @@ export function createPlatformAiDefinition(
           ...(reasoning !== "" ? { reasoning_content: reasoning } : {}),
           ...(toolCalls.length > 0 ? { tool_calls: toolCalls } : {}),
         },
+      };
+    },
+  };
+}
+
+/** 实验用的原始请求：body 原样透传，响应原样返回（D-0082） */
+export const RawChatInputSchema = z.object({
+  body: z.record(z.unknown()),
+});
+
+export type RawChatInput = z.infer<typeof RawChatInputSchema>;
+
+/**
+ * 原始 AI 请求（实验室专用）：把 body 原样发到 DeepSeek `/chat/completions`，返回上游 JSON。
+ * - 不按 AiMessageSchema 校验消息结构：实验就是要能试不合法的请求；
+ * - 错误时 KernelError.details.body 带完整的上游错误体；
+ * - v1 不支持流式（stream: true 直接拒绝）；
+ * - 仍然使用平台保管的 key 与 base URL，记录 usage 与估算花费。
+ */
+export function createPlatformAiRawDefinition(
+  storage: DbAdapter,
+  recordUsage: RecordUsage = () => {},
+  secrets?: SecretCodec,
+): ApiDefinition {
+  return {
+    kind: "read",
+    visibility: "public",
+    input: RawChatInputSchema,
+    handler: async (ctx: ReadContext, input: RawChatInput) => {
+      const body = input.body;
+      if (body.stream === true) {
+        throw new KernelError("PRECONDITION", "实验 API 暂不支持流式（stream: true）");
+      }
+      const response = await deepseekPost(storage, secrets, "/chat/completions", body, ctx.signal, "AI 实验请求");
+      const text = await response.text();
+      let raw: unknown;
+      try {
+        raw = JSON.parse(text);
+      } catch {
+        throw new KernelError("UPSTREAM", "AI 实验请求返回的不是 JSON", { body: text });
+      }
+      if (typeof raw !== "object" || raw === null || Array.isArray(raw)) {
+        throw new KernelError("UPSTREAM", "AI 实验请求返回的 JSON 不是对象", { body: raw });
+      }
+      const data = raw as { model?: string; usage?: DeepSeekUsage };
+      const usage = mapUsage(data.usage);
+      const model = data.model ?? (typeof body.model === "string" ? body.model : null);
+      const createdAt = Date.now();
+      const costYuan = estimateCost({
+        kind: "ai.chat",
+        model,
+        promptTokens: usage?.promptTokens ?? null,
+        completionTokens: usage?.completionTokens ?? null,
+        cacheHitTokens: usage?.cacheHitTokens ?? null,
+        createdAt,
+      });
+      recordUsage({ caller: ctx.caller, kind: "ai.chat", model, usage });
+      return {
+        body: raw as Record<string, unknown>,
+        usage,
+        costYuan,
       };
     },
   };

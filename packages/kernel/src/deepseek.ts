@@ -58,10 +58,23 @@ export async function deepseekPost(
   }
   if (!response.ok) {
     const text = await response.text().catch(() => "");
-    if (response.status === 401) throw new KernelError("PRECONDITION", "DeepSeek API Key 无效（设置 → DeepSeek API Key）");
+    let rawBody: unknown = text;
+    try {
+      rawBody = JSON.parse(text);
+    } catch {
+      /* 不是 JSON 就保留原文 */
+    }
+    if (response.status === 401) {
+      throw new KernelError("PRECONDITION", "DeepSeek API Key 无效（设置 → DeepSeek API Key）", {
+        status: 401,
+        body: rawBody,
+      });
+    }
     throw new KernelError("UPSTREAM", `${label}失败（HTTP ${response.status}）：${text.slice(0, 300)}`, {
       status: response.status,
       retryable: isRetryableStatus(response.status),
+      /** 完整的上游错误体（实验 API 要原样看；message 里只放前 300 字） */
+      body: rawBody,
     });
   }
   return response;

@@ -17,4 +17,4 @@
 
 ## 相关文档
 
-- `apps/dialog/docs/README.md` §3、§6.3
+- `apps/dialog/docs/README.md` §3、§7.3

@@ -6,11 +6,13 @@
   "backend": "backend/src/index.ts",
   "owns": [
     "conversation",
-    "message"
+    "message",
+    "lab_run"
   ],
   "uses": [
     "platform.settings.get",
     "platform.ai.chat",
+    "platform.ai.chatRaw",
     "platform.web.search",
     "platform.web.fetch"
   ]

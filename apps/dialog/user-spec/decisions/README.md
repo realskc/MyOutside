@@ -33,3 +33,4 @@
 | [DIALOG-0017](DIALOG-0017-keep-partial-reply-on-stop.md) | 停止生成或正常关闭时，保存已生成的部分 | 有效 |
 | [DIALOG-0018](DIALOG-0018-keep-partial-reply-on-error.md) | 生成出错中断（例如断网）时，保存已生成的部分 | 有效 |
 | [DIALOG-0019](DIALOG-0019-search-off-keeps-tools.md) | 关掉联网搜索时工具定义照常带上：tool_choice = none；开关的变化以 system 消息存进会话 | 有效 |
+| [DIALOG-0020](DIALOG-0020-laboratory.md) | 实验室：对话应用里的原始请求工作台 | 有效 |

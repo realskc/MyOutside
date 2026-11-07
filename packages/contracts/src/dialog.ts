@@ -88,6 +88,95 @@ export const PathMessageSchema = MessageSchema.extend({
 });
 export type PathMessage = z.infer<typeof PathMessageSchema>;
 
+// —— 实验室（DIALOG-0020） ——
+
+export const LabRunStatus = z.enum(["ok", "error", "aborted"]);
+export type LabRunStatus = z.infer<typeof LabRunStatus>;
+
+/** 实验室的一次运行：完整请求 + 完整响应（含失败） */
+export const LabRunSchema = z.object({
+  id: z.string(),
+  title: z.string(),
+  sourceConversationId: z.string().nullable(),
+  sourceMessageId: z.string().nullable(),
+  /** 原样发给 DeepSeek 的请求体 */
+  request: z.record(z.unknown()),
+  /** 原样返回的响应体；失败时是上游错误体，可能为 null */
+  response: z.unknown().nullable(),
+  status: LabRunStatus,
+  error: z.string().nullable(),
+  model: z.string().nullable(),
+  usage: AiUsageSchema.nullable(),
+  costYuan: z.number().nullable(),
+  durationMs: z.number().int().nullable(),
+  createdAt: z.number().int(),
+});
+export type LabRun = z.infer<typeof LabRunSchema>;
+
+/** 运行记录列表项（不含大字段） */
+export const LabRunSummarySchema = LabRunSchema.pick({
+  id: true,
+  title: true,
+  status: true,
+  model: true,
+  usage: true,
+  costYuan: true,
+  durationMs: true,
+  createdAt: true,
+});
+export type LabRunSummary = z.infer<typeof LabRunSummarySchema>;
+
+/** 导出某个用户消息对应的真实请求（从对话导入实验室用） */
+export const GetRequestInput = z.object({
+  conversationId: z.string(),
+  messageId: z.string(),
+});
+export type GetRequestInput = z.infer<typeof GetRequestInput>;
+
+export const GetRequestOutput = z.object({
+  /** DeepSeek 原生请求体（snake_case）；v1 stream = false */
+  body: z.record(z.unknown()),
+  source: z.object({
+    conversationId: z.string(),
+    conversationTitle: z.string(),
+    messageId: z.string(),
+    /** 被导入的用户消息内容（界面显示来源用） */
+    messageContent: z.string(),
+  }),
+});
+export type GetRequestOutput = z.infer<typeof GetRequestOutput>;
+
+export const LabRunInput = z.object({
+  body: z.record(z.unknown()),
+  sourceConversationId: z.string().nullable().optional(),
+  sourceMessageId: z.string().nullable().optional(),
+});
+export type LabRunInput = z.infer<typeof LabRunInput>;
+
+/** 保存一次实验室运行（内部事务 API） */
+export const SaveLabRunInput = z.object({
+  request: z.record(z.unknown()),
+  response: z.unknown().nullable(),
+  status: LabRunStatus,
+  error: z.string().nullable(),
+  model: z.string().nullable(),
+  usage: AiUsageSchema.nullable(),
+  costYuan: z.number().nullable(),
+  durationMs: z.number().int().nullable(),
+  sourceConversationId: z.string().nullable(),
+  sourceMessageId: z.string().nullable(),
+});
+export type SaveLabRunInput = z.infer<typeof SaveLabRunInput>;
+
+export const LabListRunsInput = z.object({});
+export type LabListRunsInput = z.infer<typeof LabListRunsInput>;
+
+export const LabGetRunInput = z.object({ runId: z.string() });
+export type LabGetRunInput = z.infer<typeof LabGetRunInput>;
+
+export const LabDeleteRunInput = z.object({ runId: z.string() });
+export type LabDeleteRunInput = z.infer<typeof LabDeleteRunInput>;
+
 // —— API 输入 / 输出 ——
 
 export const ListConversationsInput = z.object({});
@@ -262,4 +351,11 @@ export interface DialogApi {
   "dialog.setSystemPrompt": { input: SetSystemPromptInput; output: OkOutput };
   "dialog.setReasoningEffort": { input: SetReasoningEffortInput; output: OkOutput };
   "dialog.deleteConversation": { input: DeleteConversationInput; output: OkOutput };
+  /** 实验室（DIALOG-0020）：导出真实请求、原始运行、运行记录 */
+  "dialog.getRequest": { input: GetRequestInput; output: GetRequestOutput };
+  "dialog.labRun": { input: LabRunInput; output: LabRun };
+  "dialog.saveLabRun": { input: SaveLabRunInput; output: LabRun };
+  "dialog.listLabRuns": { input: LabListRunsInput; output: LabRunSummary[] };
+  "dialog.getLabRun": { input: LabGetRunInput; output: LabRun };
+  "dialog.deleteLabRun": { input: LabDeleteRunInput; output: OkOutput };
 }

@@ -7,9 +7,15 @@ import {
   EditUserMessageInput,
   GenerateInput,
   GetPathInput,
+  GetRequestInput,
   GetUsageInput,
+  LabDeleteRunInput,
+  LabGetRunInput,
+  LabListRunsInput,
+  LabRunInput,
   ListConversationsInput,
   RenameConversationInput,
+  SaveLabRunInput,
   SaveReplyInput,
   SendMessageInput,
   SetReasoningEffortInput,
@@ -20,13 +26,23 @@ import {
 } from "@myoutside/contracts";
 import { defineAsync, defineRead, defineTx, KernelError, type AppDb, type AppModule, type SqlValue } from "@myoutside/kernel";
 import {
+  buildRawRequest,
   buildSystemPrompt,
   estimateContextTokens,
   generateReply,
   isGenerating,
   loadAllMessages,
 } from "./generate.js";
-import { parseUsage, rowToConversation, rowToMessage, type ConversationRow, type MessageRow } from "./mapping.js";
+import {
+  parseUsage,
+  rowToConversation,
+  rowToLabRun,
+  rowToLabRunSummary,
+  rowToMessage,
+  type ConversationRow,
+  type LabRunRow,
+  type MessageRow,
+} from "./mapping.js";
 
 export { DEFAULT_SYSTEM_PROMPT } from "./generate.js";
 
@@ -53,6 +69,26 @@ function requireText(value: string, what: string): string {
 
 function makeTitle(content: string): string {
   return content.replace(/\s+/g, " ").trim().slice(0, TITLE_MAX_CHARS);
+}
+
+/** 实验室运行记录的标题：取请求体里最后一条有内容的用户消息 */
+function labTitleFromRequest(body: Record<string, unknown>): string {
+  const messages = Array.isArray(body.messages) ? body.messages : [];
+  for (let i = messages.length - 1; i >= 0; i -= 1) {
+    const message = messages[i];
+    if (!message || typeof message !== "object") continue;
+    const row = message as { role?: unknown; content?: unknown };
+    if (row.role !== "user" || typeof row.content !== "string") continue;
+    const text = row.content.replace(/\s+/g, " ").trim();
+    if (text) return text.slice(0, TITLE_MAX_CHARS);
+  }
+  return "";
+}
+
+function getLabRunOrThrow(db: AppDb, runId: string): LabRunRow {
+  const row = db.get<LabRunRow>("lab_run", { id: runId });
+  if (!row) throw new KernelError("NOT_FOUND", `运行记录不存在：${runId}`);
+  return row;
 }
 
 function compareMessages(a: MessageRow, b: MessageRow): number {
@@ -93,7 +129,7 @@ function computeActivePath(messages: MessageRow[], activeFirstId: string | null)
 export const dialogApp: AppModule = {
   id: "dialog",
   name: "对话",
-  owns: ["conversation", "message"],
+  owns: ["conversation", "message", "lab_run"],
 
   migrations: [
     {
@@ -136,6 +172,30 @@ export const dialogApp: AppModule = {
         ctx.createIndex("conversation_updated", "conversation", "updated_at");
         ctx.createIndex("message_conversation_parent", "message", "conversation_id, parent_id");
         ctx.createIndex("message_conversation_created", "message", "conversation_id, created_at");
+      },
+    },
+    {
+      id: "0002_lab",
+      up: (ctx) => {
+        ctx.createTable(
+          "lab_run",
+          [
+            "id TEXT PRIMARY KEY",
+            "title TEXT NOT NULL DEFAULT ''",
+            "source_conversation_id TEXT",
+            "source_message_id TEXT",
+            "request TEXT NOT NULL", // 原样请求体（JSON）
+            "response TEXT", // 原样响应体；失败时是上游错误体
+            "status TEXT NOT NULL", // ok | error | aborted
+            "error TEXT",
+            "model TEXT",
+            "usage TEXT", // JSON：{ promptTokens, completionTokens, ... }
+            "cost_yuan REAL",
+            "duration_ms INTEGER",
+            "created_at INTEGER NOT NULL",
+          ].join(", "),
+        );
+        ctx.createIndex("lab_run_created", "lab_run", "created_at");
       },
     },
   ],
@@ -389,6 +449,91 @@ export const dialogApp: AppModule = {
       if (!original) throw new KernelError("NOT_FOUND", `消息不存在：${input.messageId}`);
       const { messageId } = (await ctx.call("dialog.editUserMessage", input)) as { messageId: string };
       return generateReply(ctx, original.conversation_id, messageId);
+    }),
+
+    // —— 实验室（DIALOG-0020） ——
+
+    /** 导出一个用户消息对应的真实请求（只读；从对话导入实验室用） */
+    getRequest: defineRead(GetRequestInput, (ctx, input) =>
+      buildRawRequest(ctx.db, input.conversationId, input.messageId),
+    ),
+
+    /**
+     * 实验室运行：把请求体原样交给平台 raw API，成功 / 失败都先存一条运行记录再返回。
+     * 运行在后端进行，前端关掉也不丢记录；取消时存为 aborted。
+     */
+    labRun: defineAsync(LabRunInput, async (ctx, input) => {
+      const started = Date.now();
+      let response: unknown = null;
+      let status: "ok" | "error" | "aborted" = "ok";
+      let error: string | null = null;
+      let model: string | null = typeof input.body.model === "string" ? input.body.model : null;
+      let usage: unknown = null;
+      let costYuan: number | null = null;
+      try {
+        const result = (await ctx.call("platform.ai.chatRaw", { body: input.body })) as {
+          body: Record<string, unknown>;
+          usage: unknown;
+          costYuan: number;
+        };
+        response = result.body;
+        usage = result.usage ?? null;
+        costYuan = result.costYuan;
+        if (typeof result.body.model === "string") model = result.body.model;
+      } catch (cause) {
+        const detail = cause as { code?: string; message?: string; details?: { body?: unknown } };
+        status = detail.code === "ABORTED" ? "aborted" : "error";
+        error = detail.message ?? String(cause);
+        response = detail.details?.body ?? null;
+      }
+      return ctx.call("dialog.saveLabRun", {
+        request: input.body,
+        response,
+        status,
+        error,
+        model,
+        usage,
+        costYuan,
+        durationMs: Date.now() - started,
+        sourceConversationId: input.sourceConversationId ?? null,
+        sourceMessageId: input.sourceMessageId ?? null,
+      });
+    }),
+
+    /** 保存一次实验室运行（内部事务 API） */
+    saveLabRun: defineTx(SaveLabRunInput, (ctx, input) => {
+      const id = randomUUID();
+      const now = Date.now();
+      ctx.db.insert("lab_run", {
+        id,
+        title: labTitleFromRequest(input.request),
+        source_conversation_id: input.sourceConversationId,
+        source_message_id: input.sourceMessageId,
+        request: JSON.stringify(input.request),
+        response: input.response == null ? null : JSON.stringify(input.response),
+        status: input.status,
+        error: input.error,
+        model: input.model,
+        usage: input.usage ? JSON.stringify(input.usage) : null,
+        cost_yuan: input.costYuan,
+        duration_ms: input.durationMs,
+        created_at: now,
+      });
+      return rowToLabRun(getLabRunOrThrow(ctx.db, id));
+    }),
+
+    listLabRuns: defineRead(LabListRunsInput, (ctx) =>
+      ctx.db
+        .all<LabRunRow>("lab_run", {}, { orderBy: "created_at DESC", limit: 200 })
+        .map(rowToLabRunSummary),
+    ),
+
+    getLabRun: defineRead(LabGetRunInput, (ctx, input) => rowToLabRun(getLabRunOrThrow(ctx.db, input.runId))),
+
+    deleteLabRun: defineTx(LabDeleteRunInput, (ctx, input) => {
+      getLabRunOrThrow(ctx.db, input.runId);
+      ctx.db.delete("lab_run", { id: input.runId });
+      return { ok: true as const };
     }),
   },
 };

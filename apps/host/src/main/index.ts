@@ -674,6 +674,45 @@ async function runSmoke(win: BrowserWindow): Promise<void> {
       const finalShot = await captureWindow(win, 6, 300);
       writeFileSync(join(app.getPath("temp"), "myoutside-dialog-final.png"), finalShot);
     }
+    // 实验室（DIALOG-0020）：页面能加载，能经桥导出某个对话的真实请求（只读，不调用模型）
+    await win.loadURL("app://dialog/lab.html");
+    for (let i = 0; i < 24; i += 1) {
+      const ready = (await win.webContents.executeJavaScript(
+        'document.readyState === "complete" && typeof window.outside === "object" && !!document.getElementById("lab-request")',
+      )) as boolean;
+      if (ready) break;
+      await new Promise((resolve) => setTimeout(resolve, 250));
+    }
+    const labCheck = await win.webContents.executeJavaScript(
+      `(async () => {
+        const list = await window.outside.call("dialog.listConversations", {});
+        const id = list.ok && list.result.length > 0 ? list.result[0].id : null;
+        let request = null;
+        if (id) {
+          const path = await window.outside.call("dialog.getPath", { conversationId: id, limit: 1000 });
+          const user = path.ok ? [...path.result.messages].reverse().find((message) => message.role === "user") : null;
+          if (user) {
+            const r = await window.outside.call("dialog.getRequest", { conversationId: id, messageId: user.id });
+            request = r.ok
+              ? { ok: true, model: r.result.body.model, messages: r.result.body.messages.length, tools: r.result.body.tools.length }
+              : { ok: false, code: r.error.code };
+          }
+        }
+        return {
+          title: document.title,
+          hasRequest: !!document.getElementById("lab-request"),
+          hasRun: !!document.getElementById("btn-run"),
+          hasHistory: !!document.getElementById("lab-runs"),
+          request,
+        };
+      })()`,
+    );
+    console.log("[smoke] dialog lab:", JSON.stringify(labCheck));
+    const labShotPath = join(app.getPath("temp"), "myoutside-dialog-lab.png");
+    const labPng = await captureWindow(win, 12, 500);
+    writeFileSync(labShotPath, labPng);
+    console.log("[smoke] dialog lab screenshot:", labShotPath, `(${labPng.length} bytes)`);
+
     // 围棋：验证 app://go 能加载、bridge 可用、9 路状态能返回
     await win.loadURL("app://go/index.html");
     for (let i = 0; i < 24; i += 1) {

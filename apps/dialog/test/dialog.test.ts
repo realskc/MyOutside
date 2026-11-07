@@ -614,6 +614,119 @@ describe("dialog backend", () => {
     if (!res.ok) expect(res.error.code).toBe("FORBIDDEN");
   });
 
+  it("getRequest：导出真实请求（system prompt、历史、工具、参数），只读不生成", async () => {
+    const kernel = await setupWithKey();
+    const conversationId = await createConversation(kernel, { reasoningEffort: "low", systemPrompt: "你是猫娘。" });
+    const model = fakeDeepSeek([{ content: "回复一", reasoning: "想一想", promptTokens: 42 }]);
+    vi.stubGlobal("fetch", model.fetch);
+    await call(kernel, "dialog.send", { conversationId, content: "问题一" });
+    const u2 = await append(kernel, conversationId, "user", "问题二");
+
+    const req = await call<{ body: any; source: any }>(kernel, "dialog.getRequest", {
+      conversationId,
+      messageId: u2,
+    });
+    expect(req.source).toMatchObject({ conversationId, messageId: u2 });
+    expect(req.body).toMatchObject({ model: "deepseek-flash", stream: false, reasoning_effort: "low" });
+    expect(req.body.messages[0].role).toBe("system");
+    expect(req.body.messages[0].content).toContain("你是猫娘。");
+    expect(req.body.messages[0].content).toMatch(/当前日期：\d{4}-\d{2}-\d{2}/);
+    expect(req.body.messages.slice(1).map((m: any) => [m.role, m.content])).toEqual([
+      ["user", "问题一"],
+      ["assistant", "回复一"],
+      ["user", "问题二"],
+    ]);
+    expect(req.body.messages[2].reasoning_content).toBe("想一想");
+    expect(req.body.tools.map((t: any) => t.function.name)).toEqual(["web_search", "web_fetch"]);
+    expect(req.body.tool_choice).toBeUndefined();
+
+    // 只读：不生成新回复，也不写 search_notice
+    const path = await call<PathResult>(kernel, "dialog.getPath", { conversationId });
+    expect(path.messages.map((m) => m.role)).toEqual(["user", "assistant", "user"]);
+    expect(model.requests).toHaveLength(1);
+  });
+
+  it("getRequest：联网搜索关闭时工具照常带上、tool_choice = none；只能导入用户消息", async () => {
+    const kernel = setup();
+    const conversationId = await createConversation(kernel, { webSearch: false });
+    const u1 = await append(kernel, conversationId, "user", "hi");
+    const a1 = await append(kernel, conversationId, "assistant", "hello");
+
+    const req = await call<{ body: any }>(kernel, "dialog.getRequest", { conversationId, messageId: u1 });
+    expect(req.body.tools.map((t: any) => t.function.name)).toEqual(["web_search", "web_fetch"]);
+    expect(req.body.tool_choice).toBe("none");
+
+    const bad = await raw(kernel, "dialog.getRequest", { conversationId, messageId: a1 });
+    expect(bad.ok).toBe(false);
+    if (!bad.ok) expect(bad.error.code).toBe("PRECONDITION");
+  });
+
+  it("labRun：请求体原样发出，成功时保存完整运行记录（可列表、读取、删除）", async () => {
+    const kernel = await setupWithKey();
+    let sent: any = null;
+    vi.stubGlobal("fetch", async (_url: string, init: { body: string }) => {
+      sent = JSON.parse(init.body);
+      return new Response(
+        JSON.stringify({
+          id: "raw-1",
+          model: "deepseek-flash",
+          choices: [{ message: { content: "原始回答", reasoning_content: "原始思考" }, finish_reason: "stop" }],
+          usage: { prompt_tokens: 10, completion_tokens: 4, total_tokens: 14 },
+        }),
+        { status: 200, headers: { "content-type": "application/json" } },
+      );
+    });
+
+    const body = { model: "deepseek-flash", messages: [{ role: "user", content: "hi" }], max_tokens: 7, top_p: 0.8, stream: false };
+    const run = await call<any>(kernel, "dialog.labRun", { body });
+    expect(sent).toEqual(body);
+    expect(run).toMatchObject({ status: "ok", error: null, model: "deepseek-flash" });
+    expect(run.request).toEqual(body);
+    expect(run.response.id).toBe("raw-1");
+    expect(run.response.choices[0].message.reasoning_content).toBe("原始思考");
+    expect(run.usage).toMatchObject({ promptTokens: 10, completionTokens: 4, totalTokens: 14 });
+    expect(run.costYuan).toBeGreaterThan(0);
+    expect(run.durationMs).toBeGreaterThanOrEqual(0);
+
+    const list = await call<any[]>(kernel, "dialog.listLabRuns", {});
+    expect(list).toHaveLength(1);
+    expect(list[0]).toMatchObject({ id: run.id, status: "ok", title: "hi" });
+    const got = await call<any>(kernel, "dialog.getLabRun", { runId: run.id });
+    expect(got.response.id).toBe("raw-1");
+
+    await call(kernel, "dialog.deleteLabRun", { runId: run.id });
+    expect(await call<any[]>(kernel, "dialog.listLabRuns", {})).toHaveLength(0);
+  });
+
+  it("labRun：上游错误也保存运行记录，响应里带完整错误体", async () => {
+    const kernel = await setupWithKey();
+    vi.stubGlobal("fetch", async () =>
+      new Response(JSON.stringify({ error: { message: "bad request", type: "invalid_request_error" } }), {
+        status: 400,
+        headers: { "content-type": "application/json" },
+      }),
+    );
+    const body = { model: "deepseek-flash", messages: [{ role: "user", content: "hi" }] };
+    const run = await call<any>(kernel, "dialog.labRun", { body });
+    expect(run.status).toBe("error");
+    expect(run.error).toContain("HTTP 400");
+    expect(run.response).toEqual({ error: { message: "bad request", type: "invalid_request_error" } });
+    expect(run.request).toEqual(body);
+
+    const list = await call<any[]>(kernel, "dialog.listLabRuns", {});
+    expect(list).toHaveLength(1);
+    expect(list[0]).toMatchObject({ status: "error" });
+  });
+
+  it("labRun：stream=true 作为错误运行保存（v1 不支持流式）", async () => {
+    const kernel = await setupWithKey();
+    const run = await call<any>(kernel, "dialog.labRun", {
+      body: { model: "deepseek-flash", messages: [{ role: "user", content: "hi" }], stream: true },
+    });
+    expect(run.status).toBe("error");
+    expect(run.error).toContain("不支持流式");
+  });
+
   it("上下文截断：估算与从最近保留（从 user 开始）", () => {
     expect(estimateTokens("你好")).toBe(2);
     expect(estimateTokens("hello")).toBe(2);

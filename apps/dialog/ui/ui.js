@@ -11,6 +11,7 @@
     zh: {
       appTitle: "对话",
       newChat: "新建对话",
+      labEntry: "实验室",
       emptyHint: "点「新建对话」开始，或从左侧选择已有会话。",
       startHint: "输入消息开始对话。",
       inputPlaceholder: "输入消息…（Enter 发送，Shift+Enter 换行）",
@@ -71,6 +72,7 @@
     en: {
       appTitle: "Chat",
       newChat: "New chat",
+      labEntry: "Lab",
       emptyHint: "Click “New chat” to start, or pick a conversation on the left.",
       startHint: "Type a message to start.",
       inputPlaceholder: "Type a message… (Enter to send, Shift+Enter for newline)",

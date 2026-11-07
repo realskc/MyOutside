@@ -143,6 +143,7 @@
 | [D-0079](0079-obsidian-for-docs.md) | 用 Obsidian 查看和编辑文档：打开整个仓库，链接保持标准 Markdown | 有效 |
 | [D-0080](0080-device-access.md) | 设备上的数据是普通文件夹；子应用访问设备要在清单里登记，经内核与设备之间的通道 | 有效（未实现） |
 | [D-0081](0081-app-table-prefix.md) | 所有应用的物理表名统一加 `app_` 前缀；应用 id 可数字开头 | 有效 |
+| [D-0082](0082-raw-ai-request-api.md) | 实验用的原始 AI 请求 API（platform.ai.chatRaw）：原样透传请求体与响应 | 有效 |
 
 ## 应用专属决策
 

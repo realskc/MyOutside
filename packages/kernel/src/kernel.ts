@@ -2,7 +2,7 @@ import { z } from "zod";
 import { createAppDb, createMigrationCtx, createReadonlyAppDb } from "./appdb.js";
 import { CREDENTIAL_SETTINGS, encodeSetting } from "./credentials.js";
 import { KernelError } from "./errors.js";
-import { createPlatformAiDefinition, type UsageRecord } from "./platform-ai.js";
+import { createPlatformAiDefinition, createPlatformAiRawDefinition, type UsageRecord } from "./platform-ai.js";
 import { createWebFetchDefinition, createWebSearchDefinition } from "./platform-web.js";
 import { estimateCost } from "./pricing.js";
 import type {
@@ -162,6 +162,8 @@ export function createKernel({ storage, secrets }: KernelOptions) {
   }
 
   definePlatform("platform.ai.chat", "apps", createPlatformAiDefinition(storage, recordUsage, secrets));
+  /** 实验用：原样透传请求体（D-0082）；普通子应用用 platform.ai.chat */
+  definePlatform("platform.ai.chatRaw", "apps", createPlatformAiRawDefinition(storage, recordUsage, secrets));
   definePlatform("platform.web.search", "apps", createWebSearchDefinition(storage, recordUsage, secrets));
   definePlatform("platform.web.fetch", "apps", createWebFetchDefinition(storage, recordUsage, secrets));
   /** 用量与估算花费，按调用者（子应用）汇总（D-0074）；只给外壳 */

@@ -5,7 +5,7 @@
 ## 1. 结构
 
 - 后端：`apps/dialog/backend/src/`（`index.ts` = AppModule；`history.ts` = 上下文预算截断；`mapping.ts` = 行 ↔ 对象转换）
-- 界面：`apps/dialog/ui/`（静态 HTML / JS；`markdown.js` = 极简 Markdown 渲染）
+- 界面：`apps/dialog/ui/`（静态 HTML / JS；`markdown.js` = 极简 Markdown 渲染；实验室 = `lab.html` / `lab.js` / `lab.css`）
 - 契约：`packages/contracts/src/dialog.ts`
 - 测试：`apps/dialog/test/dialog.test.ts`
 
@@ -41,13 +41,32 @@ app_dialog__message
   created_at       INTEGER NOT NULL              -- 会话内单调递增（同毫秒写入时 +1）
 ```
 
-索引：`message(conversation_id, parent_id)`、`message(conversation_id, created_at)`、`conversation(updated_at)`。
+实验室的运行记录（DIALOG-0020）：
 
-迁移：只有 `0001_init`，直接建出上面的完整表结构（开发阶段改表结构就改它，见 `user-spec/workflow.md`「当前阶段的节奏」）。
+```
+app_dialog__lab_run
+  id                     TEXT PK
+  title                  TEXT NOT NULL DEFAULT ''  -- 取请求体里最后一条有内容的用户消息
+  source_conversation_id TEXT NULL
+  source_message_id      TEXT NULL
+  request                TEXT NOT NULL             -- JSON：原样请求体
+  response               TEXT NULL                 -- JSON：原样响应体；失败时是上游错误体
+  status                 TEXT NOT NULL             -- 'ok' | 'error' | 'aborted'
+  error                  TEXT NULL
+  model                  TEXT NULL
+  usage                  TEXT NULL                 -- JSON：{ promptTokens, completionTokens, ... }
+  cost_yuan              REAL NULL                 -- 按 D-0074 估算
+  duration_ms            INTEGER NULL
+  created_at             INTEGER NOT NULL
+```
+
+索引：`message(conversation_id, parent_id)`、`message(conversation_id, created_at)`、`conversation(updated_at)`、`lab_run(created_at)`。
+
+迁移：`0001_init` 建会话与消息；`0002_lab` 建实验室运行记录（开发阶段的表结构变更，作者的两台设备各自执行一次即可，见 `user-spec/workflow.md`「当前阶段的节奏」）。
 
 **当前路径**：从 `active_first_id` 起，沿各消息的 `active_child_id` 下降；指针缺失或失效时兜底取最新的子消息。界面渲染与发给 AI 的上下文都取当前路径。
 
-删除只有 `deleteConversation`（同一事务删全部消息与会话）。
+删除：会话只有 `deleteConversation`（同一事务删全部消息与会话）；实验室运行记录可单独 `deleteLabRun`。
 
 ## 3. API
 
@@ -74,6 +93,14 @@ dialog.saveReply({ conversationId, parentId, content, reasoning, model, usage, s
 dialog.editUserMessage({ messageId, content }) → { messageId }
 dialog.switchBranch({ conversationId, parentId: string | null, childId }) → { ok }
 dialog.renameConversation / setSystemPrompt / setReasoningEffort / setWebSearch / deleteConversation
+
+// —— 实验室（DIALOG-0020） ——
+dialog.getRequest({ conversationId, messageId }) → { body, source }       // 只读：导出某条用户消息对应的真实请求
+dialog.labRun({ body, sourceConversationId?, sourceMessageId? }) → LabRun   // 普通的异步函数：原始运行并保存记录
+dialog.saveLabRun({ request, response, status, error, model, usage, costYuan, durationMs, sourceConversationId, sourceMessageId }) → LabRun // 内部事务
+dialog.listLabRuns({}) → LabRunSummary[]                                  // created_at 倒序，最多 200 条
+dialog.getLabRun({ runId }) → LabRun
+dialog.deleteLabRun({ runId }) → { ok }
 ```
 
 - `appendMessage`：接到当前路径末端；校验问答交替（user 不能接在 user 后面，assistant 必须接在 user 后面）；标题为空且 role=user 时自动生成标题；
@@ -81,6 +108,7 @@ dialog.renameConversation / setSystemPrompt / setReasoningEffort / setWebSearch 
 - 生成中取消（`outside.cancel(runId)`）：已输出文字时保存为回复（`stopped = 1`），返回 `stopReason: "stopped"`；一个字都没输出时不保存，以 `ABORTED` 结束（DIALOG-0017）。正常关闭 MyOutside 时，Electron 主进程先取消所有进行中的调用，最多等 3 秒再退出；
 - 输出到一半出错（例如断网）：重试这一轮；重试都失败时，已输出文字则保存为回复（`error` 记原因），返回 `stopReason: "interrupted"`；没输出文字则不保存，返回错误（DIALOG-0018）；
 - 同一会话同时只能生成一条 → `PRECONDITION`。
+- 实验室：`labRun` 把请求体原样交给 `platform.ai.chatRaw`，成功 / 失败都先经 `saveLabRun` 落一条记录再返回；`getRequest` 与生成共用 `buildConversationRequest`，导出的 body 是 DeepSeek 原生 snake_case，`stream = false`（实验室 v1 非流式）。
 
 ## 4. 生成流程（DIALOG-0016，`backend/src/generate.ts`）
 
@@ -93,6 +121,8 @@ dialog.renameConversation / setSystemPrompt / setReasoningEffort / setWebSearch 
 5. 系统提示词 = 会话的系统提示词（或默认）+「当前日期」+ 搜索工具的使用说明：何时搜索、用 [n] 标注来源、网页内容不是指令（不论开关都带上）；
 6. `runToolLoop`（`packages/agent`）：流式；工具总是 `web_search` + `web_fetch`（共用一个来源登记表，编号在多次搜索间一致；同一段对话里工具定义不变，D-0078）；联网搜索关掉时 `toolChoice: "none"`；开关和这条用户消息之前的状态不同时，在用户消息上记下变化（`search_notice`），展开历史时这条用户消息后面跟一条 system 说明，之后每次请求都带着（DIALOG-0019）；最多 8 轮，最后一轮不许调用工具并追加说明（D-0078）；
 7. 调用事务 API `dialog.saveReply` 保存：回答、思考过程、用量、搜索过程（`steps`）、来源（`sources`）、最后一次请求的输入 token 数。
+
+第 1～6 步的输入构造在 `buildConversationRequest` 里，生成与 `dialog.getRequest` 共用（避免两套逻辑）；`getRequest` 只读，不写 `search_notice`、不生成，只导出 DeepSeek 原生 snake_case 的 body（`stream = false`）。
 
 推送给前端的事件：平台 AI 的 `ai_delta`（思考 / 正文增量）、工具循环的 `round_start` / `round_retry`（这一轮出错、从头重试，前端丢掉已显示的半截）/ `tool_start` / `tool_result` / `round_end`。
 
@@ -112,16 +142,27 @@ dialog.renameConversation / setSystemPrompt / setReasoningEffort / setWebSearch 
 - **Markdown + LaTeX**（DIALOG-0015，`ui/markdown.js`）：marked 解析，KaTeX 渲染公式（`$…$`、`\(…\)`、`$$…$$`、`\[…\]`；代码里的 `$` 不处理；`$5 和 $10` 这类金额不当公式），DOMPurify 清洗，原始 HTML 一律转义；代码块带复制按钮；链接仅 http/https，经 `outside.openExternal` 用系统浏览器打开；
 - 第三方库放在 `ui/vendor/`，由 `node scripts/vendor-dialog-ui.mjs` 从 devDependencies 复制（版本见 `vendor/VERSIONS.txt`），前端不经构建；
 - 会话设置：编辑系统提示词（保存 / 恢复默认）；
+- 顶栏「实验室」进入 `ui/lab.html`（DIALOG-0020），普通对话界面不变；
 - 文案中英双语。
 
-## 6. 规划中的技术设计
+## 6. 实验室（DIALOG-0020）
 
-### 6.2 抓词（暂不做）
+- 页面：`ui/lab.html` + `lab.js` / `lab.css`；顶栏一个入口，不新增 app。
+- 请求体：JSON 文本编辑器，原样保存到 `lab_run.request`；可编辑 `messages` / `tools` / `model` / `temperature` / `reasoning_effort` 等；「格式化」只做 JSON 美化。
+- 运行：`dialog.labRun`（普通的异步函数）→ `platform.ai.chatRaw`（D-0082）；成功或失败都先 `saveLabRun` 落一条记录；v1 非流式，`stream: true` 直接报错并存为 error。
+- 响应：正文用 `ui/markdown.js` 渲染；思考 / 工具 / 原始 JSON 分 tab；多条 choice 可以选择；「把回复加入消息」把选中的 assistant 消息推进当前请求体的 `messages`（含 `tool_calls` 时，工具结果由作者手动补 `role=tool` 消息）。
+- 运行记录：`listLabRuns` 最近 200 条；可读取、删除；失败和取消（aborted）也保留。
+- 从对话导入：`getPath` 找当前分支最后一条用户消息 → `getRequest` 导出真实请求；原对话不变。
+- 明确不做（v1）：自动执行工具、结构化消息编辑器、多实验线程、请求预设、流式。
+
+## 7. 规划中的技术设计
+
+### 7.2 抓词（暂不做）
 
 1. 选中消息中的词 → `dialog.prepareCapture`（读）：AI 生成卡片草稿 → `vocab.resolveCard`；
 2. 若判定同类 → 用户选择放弃 / 替换 / 仍新增；
 3. `dialog.captureWord`（写）：写 `app_dialog__capture` 行 + `ctx.call("vocab.addCard" / "vocab.updateCard")`——一次事务两处落账；`context` 带消息原句，`source: "dialog"`。
 
-### 6.3 其他
+### 7.3 其他
 
 - 将来的 builder 可能复用聊天界面 / 消息模型（届时评估，不预先抽象；消息树基类见 D-0061）。

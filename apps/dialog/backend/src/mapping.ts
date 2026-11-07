@@ -1,4 +1,4 @@
-import type { AiUsage, Conversation, Message, ReplySource, ReplyStep } from "@myoutside/contracts";
+import type { AiUsage, Conversation, LabRun, LabRunSummary, Message, ReplySource, ReplyStep } from "@myoutside/contracts";
 
 /** 数据库行（app_dialog__conversation） */
 export interface ConversationRow {
@@ -10,6 +10,23 @@ export interface ConversationRow {
   web_search: number;
   created_at: number;
   updated_at: number;
+}
+
+/** 数据库行（app_dialog__lab_run）：实验室的一次运行（DIALOG-0020） */
+export interface LabRunRow {
+  id: string;
+  title: string;
+  source_conversation_id: string | null;
+  source_message_id: string | null;
+  request: string;
+  response: string | null;
+  status: string;
+  error: string | null;
+  model: string | null;
+  usage: string | null;
+  cost_yuan: number | null;
+  duration_ms: number | null;
+  created_at: number;
 }
 
 /** 数据库行（app_dialog__message） */
@@ -80,5 +97,37 @@ export function rowToMessage(row: MessageRow): Message {
     searchNotice: row.search_notice === "off" || row.search_notice === "on" ? row.search_notice : null,
     activeChildId: row.active_child_id,
     createdAt: row.created_at,
+  };
+}
+
+export function rowToLabRun(row: LabRunRow): LabRun {
+  return {
+    id: row.id,
+    title: row.title,
+    sourceConversationId: row.source_conversation_id,
+    sourceMessageId: row.source_message_id,
+    request: parseJson<Record<string, unknown>>(row.request) ?? {},
+    response: parseJson<unknown>(row.response),
+    status: row.status as LabRun["status"],
+    error: row.error,
+    model: row.model,
+    usage: parseUsage(row.usage),
+    costYuan: row.cost_yuan,
+    durationMs: row.duration_ms,
+    createdAt: row.created_at,
+  };
+}
+
+export function rowToLabRunSummary(row: LabRunRow): LabRunSummary {
+  const run = rowToLabRun(row);
+  return {
+    id: run.id,
+    title: run.title,
+    status: run.status,
+    model: run.model,
+    usage: run.usage,
+    costYuan: run.costYuan,
+    durationMs: run.durationMs,
+    createdAt: run.createdAt,
   };
 }

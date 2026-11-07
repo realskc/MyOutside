@@ -63,8 +63,8 @@ interface AppModule {
   "protocolVersion": 1,
   "ui": "ui/index.html",
   "backend": "backend/src/index.ts",
-  "owns": ["conversation", "message"],
-  "uses": ["platform.ai.chat", "platform.web.search", "platform.web.fetch"]
+  "owns": ["conversation", "message", "lab_run"],
+  "uses": ["platform.ai.chat", "platform.ai.chatRaw", "platform.web.search", "platform.web.fetch"]
 }
 ```
 
@@ -129,7 +129,7 @@ interface AppModule {
 - DataVersion 只在内存中计数（进程重启后从 0 开始），用于刷新比对；
 - 「一次事件多处落账」：发起方的事务 API 内 `ctx.call` 其他应用的事务 API，全部在同一事务中提交，不需要两阶段提交。
 
-示例（规划中的抓词，见 `apps/dialog/docs/README.md` §8）：
+示例（规划中的抓词，见 `apps/dialog/docs/README.md` §7.2）：
 
 ```
 dialog.captureWord（写）
@@ -172,6 +172,7 @@ get(table, where) / all(table, where?, { orderBy?, limit?, offset? }) / count(ta
 | `platform.settings.get` | 只读 | 子应用（需声明） | 平台设置；凭据返回 `{ value: null, isSet }`（D-0053） |
 | `platform.settings.set` | 事务 | 只给外壳 | 修改平台设置 |
 | `platform.ai.chat` | 只读 | 子应用（需声明） | DeepSeek 对话（D-0014） |
+| `platform.ai.chatRaw` | 只读 | 子应用（需声明） | 原始请求体 / 响应原样透传，仅实验用（D-0082） |
 | `platform.web.search` | 只读 | 子应用（需声明） | DeepSeek 网页搜索（D-0050） |
 | `platform.web.fetch` | 只读 | 子应用（需声明） | DeepSeek 网页抓取，返回 Markdown 正文（D-0050） |
 | `platform.usage.summary` | 只读 | 只给外壳 | 用量与估算花费，按调用者汇总（D-0074） |
@@ -185,6 +186,8 @@ get(table, where) / all(table, where?, { orderBy?, limit?, offset? }) / count(ta
 - **流式**（`stream: true`）：经 SSE 接收，增量经推送通道发出 `{ type: "ai_delta", content?, reasoning? }`；工具调用参数分片到达时按 index 拼装；最终仍返回完整结果；
 - **DeepSeek 规则**：请求带 `tools` 时，历史中每一轮的 `reasoning_content` 都必须回传，否则 400（已用真实接口验证两轮工具调用可行）；思考模式下不支持 `tool_choice` 的强制调用（D-0059，不使用）；
 - 默认 base URL `https://api.deepseek.com`，默认模型 `deepseek-flash`。
+
+**原始请求（实验，D-0082）**：`platform.ai.chatRaw` 接受 `{ body }`，把 body 原样 POST 到 `/chat/completions`，返回 `{ body, usage, costYuan }`；`body` 是上游原始 JSON，错误时 `details.body` 是完整的上游错误体；不校验消息结构；v1 不支持流式；key / base URL 仍由平台保管。普通应用仍用 `platform.ai.chat`。
 
 ### 6.2 `platform.web.search` / `platform.web.fetch`
 
@@ -242,7 +245,7 @@ get(table, where) / all(table, where?, { orderBy?, limit?, offset? }) / count(ta
 - 应用文件：`media://<appId>/<相对路径>` 映射到 `<dataDir>/apps/<appId>/`（支持 Range 请求、路径穿越检查，66CCFF-0004）；`host:pickAudioFile` 为子应用打开本地音频选择框（66CCFF-0004）；
 - 菜单：文件 / 编辑 / 视图；「编辑」菜单让 macOS 上的剪贴板快捷键生效；中英文跟随 `ui.language`；
 - 单实例锁（D-0016）；数据目录：`app.getPath("userData")`（应用名 MyOutside）；
-- 冒烟模式（`pnpm smoke`，`MYOUTSIDE_SMOKE=1`）：复制真实数据库到临时目录，自检外壳与各子应用、做演示写入、截图后退出；默认后台运行（窗口不显示、不抢焦点），`MYOUTSIDE_SMOKE_SHOW=1` 时显示；使用独立的临时配置目录、打包到独立的 `dist-smoke/`，可与正在运行的 MyOutside 同时运行、互不影响（D-0046）；
+- 冒烟模式（`pnpm smoke`，`MYOUTSIDE_SMOKE=1`）：复制真实数据库到临时目录，自检外壳与各子应用（含对话实验室页面）、做演示写入、截图后退出；默认后台运行（窗口不显示、不抢焦点），`MYOUTSIDE_SMOKE_SHOW=1` 时显示；使用独立的临时配置目录、打包到独立的 `dist-smoke/`，可与正在运行的 MyOutside 同时运行、互不影响（D-0046）；
 - LAN 预览（`pnpm dev:lan`，D-0072）：主进程额外启动 HTTP 宿主，服务外壳与 `apps/<id>/ui`，并注入浏览器版 `window.outside`（`POST /__myoutside/call` → `kernel.handle`）；默认不启用，无鉴权，仅供可信热点上的临时多设备调试；不是正式多端方案（正式方向见 D-0013）；
 - 构建：`scripts/build.mjs`（esbuild 打包主进程与 preload）、`scripts/run.mjs`（启动 Electron）。
 

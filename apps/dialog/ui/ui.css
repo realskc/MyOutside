@@ -107,6 +107,17 @@ button {
   cursor: default;
 }
 
+/* 实验室入口（DIALOG-0020） */
+a.lab-entry {
+  text-decoration: none;
+  font-size: 13px;
+  padding: 4px 2px;
+}
+
+a.lab-entry:hover {
+  text-decoration: underline;
+}
+
 textarea,
 input[type="text"],
 select {

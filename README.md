@@ -39,5 +39,5 @@ powershell -ExecutionPolicy Bypass -File apps/66CCFF/scripts/setup-midi-engine.p
 
 macOS / Linux：在任意目录输入 `myoutside` 即可后台启动（已在运行时切到已有窗口；`myoutside --lan` 同时开启局域网预览；日志在 `~/Library/Logs/MyOutside/launch.log`）。安装一次：`ln -s "$PWD/scripts/launch/myoutside" ~/.local/bin/myoutside`（`~/.local/bin` 需在 PATH 中）。
 
-当前 v0 已实现：Electron 程序 + 内核（串行队列、事务、硬所有权、迁移、DataVersion、平台设置、平台 AI 代理（思考强度 / 思考过程 / usage 透传））+ 学英语应用（复习（间隔预览 / 完全学会）/ 查词（AI）/ 词库 / 添加（LLM 去重）/ 统计 / 词表分级标注（托福 · 词以类记））+ 对话应用（多会话 / 树形历史与分叉切换 / 思考强度与思考过程 / Markdown 渲染 / 链接外开 / usage 统计显示）+ 围棋应用（9 路特殊规则 / 双人联机 / 聊天 / 悔棋 / 棋谱回放）+ 66CCFF（纯蓝）应用（六轨分离（含钢琴）/ 内建慢放播放器 / AB 循环 / 分轨混音 / 本地 GPU）。
+当前 v0 已实现：Electron 程序 + 内核（串行队列、事务、硬所有权、迁移、DataVersion、平台设置、平台 AI 代理（思考强度 / 思考过程 / usage 透传））+ 学英语应用（复习（间隔预览 / 完全学会）/ 查词（AI）/ 词库 / 添加（LLM 去重）/ 统计 / 词表分级标注（托福 · 词以类记））+ 对话应用（多会话 / 树形历史与分叉切换 / 思考强度与思考过程 / Markdown 渲染 / 链接外开 / usage 统计显示 / 实验室：原始请求与响应）+ 围棋应用（9 路特殊规则 / 双人联机 / 聊天 / 悔棋 / 棋谱回放）+ 66CCFF（纯蓝）应用（六轨分离（含钢琴）/ 内建慢放播放器 / AB 循环 / 分轨混音 / 本地 GPU）。
 未实现：临时函数、builder、哲野、移动端、打包分发。
