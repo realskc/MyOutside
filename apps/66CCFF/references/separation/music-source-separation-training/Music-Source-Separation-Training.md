@@ -22,14 +22,14 @@
   - 对应权重是 `5c90dfd2-34c22ccb.th`，即当前纯蓝使用的 HTDemucs4 6-stem 模型；
   - 因此 MSST **可以运行六轨**；但官方表里的这条六轨路线就是当前 HTDemucs4 6-stem，本身没有更新。
 - 官方预训练表中没有基于 BS-RoFormer / SCNet 的强六轨权重；强 RoFormer / SCNet 预训练模型主要是 2 轨或 4 轨。MSST 可以用这些模型做级联、单轨模型或 ensemble，但不是“一个模型直接六轨”。
-- **社区有例外**：[BS-RoFormer SW 6-stem](<../bs-roformer/BS-RoFormer-SW-6stem.md>) 是 MSST 架构下的社区六轨权重，不在官方表里，但可由 MSST / `bs-roformer-infer` 加载；这是当前最值得实测的六轨候选。
+- **社区有例外**：[BS-RoFormer SW 6-stem](../bs-roformer/BS-RoFormer-SW-6stem.md) 是 MSST 架构下的社区六轨权重，不在官方表里，但可由 MSST / `bs-roformer-infer` 加载；这是当前最值得实测的六轨候选。
 - 如果要从零训练六轨模型，MSST 支持自定义 `instruments` 配置，但需要带六轨标注的数据和训练算力；这不是现成权重。
 - 提供 ensemble 脚本；模型权重托管在 GitHub Releases / HuggingFace 等不同位置。
 
 ## Gemini 线索的核对
 
-- Gemini 提到「MSST 社区的 RoFormer / MDX23C 吉他与钢琴专属单轨模型」。MSST 官方 `pretrained_models.md` 和仓库文件树里没有对应的吉他 / 钢琴单轨权重或配置；但社区确实有 [becruily/mel-band-roformer-guitar](<../becruily/Mel-Band-RoFormer-Guitar.md>)（Guitar / Other，许可证未声明）。钢琴方面 HF 有 [tjpurdy/Piano-Separation-Model-small](https://huggingface.co/tjpurdy/Piano-Separation-Model-small)（CC-BY-NC-4.0，2026）。这些需要单独验证。
-- 另一个重要例外是 [BS-RoFormer SW 6-stem](<../bs-roformer/BS-RoFormer-SW-6stem.md>)：它不是官方 MSST 权重，但确实是社区六轨模型，不能因为官方表没有就判定不存在。
+- Gemini 提到「MSST 社区的 RoFormer / MDX23C 吉他与钢琴专属单轨模型」。MSST 官方 `pretrained_models.md` 和仓库文件树里没有对应的吉他 / 钢琴单轨权重或配置；但社区确实有 [becruily/mel-band-roformer-guitar](../becruily/Mel-Band-RoFormer-Guitar.md)（Guitar / Other，许可证未声明）。钢琴方面 HF 有 [tjpurdy/Piano-Separation-Model-small](https://huggingface.co/tjpurdy/Piano-Separation-Model-small)（CC-BY-NC-4.0，2026）。这些需要单独验证。
+- 另一个重要例外是 [BS-RoFormer SW 6-stem](../bs-roformer/BS-RoFormer-SW-6stem.md)：它不是官方 MSST 权重，但确实是社区六轨模型，不能因为官方表没有就判定不存在。
 - Gemini 的 Stage 3（Transkun、ByteDance Piano、Basic Pitch、YourMT3+、SOME）是**音频转 MIDI 的转录模型**，不是分轨模型；它们不能替代把吉他从混音/伴奏中分离出来。
 
 ## 和纯蓝的关系
