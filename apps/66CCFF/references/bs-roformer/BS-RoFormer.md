@@ -14,10 +14,11 @@ Band-Split RoFormer：按频带拆分音频，再用 RoFormer 做音乐源分离
 - MSST 的 4 轨 BS-RoFormer：Multisong avg 9.38（bass 11.08、drums 11.29、vocals 9.19、other 5.96）。
 - Audio Separator 的默认模型 `model_bs_roformer_ep_317_sdr_12.9755.ckpt` 是 2 轨 vocals / instrumental，模型列表标称 vocals SDR 12.9、instrumental 17.0（来源为 UVR 模型列表，评测口径需核对）。
 - 社区还有大量微调权重（不同发布者、不同训练集），质量与许可证不能一概而论。
+- **六轨变体**：社区的 [BS-RoFormer SW 6-stem](<BS-RoFormer-SW-6stem.md>) 是同一架构下的六轨权重，和这里的 2/4 轨模型不是同一个文件。
 
 ## 和纯蓝的关系
 
-适合作为「先分离人声 / 伴奏」的第一阶段；不直接产出六轨。若六轨是硬要求，需要再级联 4 轨或 6 轨模型。
+普通 BS-RoFormer 适合作为「先分离人声 / 伴奏」的第一阶段；不直接产出六轨。六轨候选见 BS-RoFormer SW。
 
 ## 待核实
 

@@ -17,10 +17,11 @@
 - 支持 ensemble：多个模型可用 `avg_wave`、`median_fft` 等算法组合，也有 preset。
 - 平台：README 写 Windows、macOS、Linux；Windows CUDA 写的是 CUDA 11.8 / 12.2，DirectML 为实验性。
 - 关键模型示例：`model_bs_roformer_ep_317_sdr_12.9755.ckpt` 是默认的 BS-RoFormer 人声 / 伴奏模型；模型列表里还有 Mel-Band RoFormer 的人声、去混响、去延迟等权重。
+- 模型注册表里有 `BS-Roformer-SW.ckpt` / `BS-Roformer-SW.yaml` 条目，说明它支持 BS-RoFormer SW 系列；但 Gemini 说的 `BS-Rofo-SW-Fixed.ckpt` 固定版是否已内置，未确认。`openmirlab/bs-roformer-infer` 明确绑定固定版。
 
 ## 和纯蓝的关系
 
-它是把 UVR 模型无 GUI 地接进后端的候选，适合做多模型实验和 ensemble；六轨本身仍主要依赖 Demucs 6s。
+它是把 UVR 模型无 GUI 地接进后端的候选，适合做多模型实验和 ensemble；六轨优先测试 BS-RoFormer SW，其次才是 Demucs 6s。
 
 ## 待核实
 
