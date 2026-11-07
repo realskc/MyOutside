@@ -29,7 +29,11 @@
 | [SCNet Jazz 4-stem](scnet/SCNet-Jazz-4stem.md) | 社区单轨权重 | 否（drums / bass / piano / other） | 钢琴作为一级 source；适合去人声后的伴奏；许可证待核实 |
 | [Banquet（query-bandit）](query-bandit/Banquet.md) | Query-based 分离 | 否；按 query 提取目标音色 | 论文称 guitar / piano 超过 6-stem HTDemucs；权重 CC-BY-NC-SA |
 | [AudioSep](audiosep/AudioSep.md) | 文本/音频 query 分离 | 否；按文本/音频提取目标 | 32kHz；适合实验，不适合高保真导出 |
-| [YourMT3+](yourmt3/YourMT3.md) | 多轨转录 | 不适用（不做音频分轨） | 直接把伴奏转成带乐器标签的 MIDI；GPL-3.0 |
+| [YourMT3+](yourmt3/YourMT3.md) | 多轨转录 | 不适用（不做音频分轨） | 直接把伴奏转成带乐器标签的 MIDI；许可证存在 GPL/Apache 不一致 |
+| [MuScriptor](muscriptor/MuScriptor.md) | 多轨转录 | 不适用（不做音频分轨） | 2026 新模型；代码 MIT、权重 CC BY-NC 4.0；支持乐器条件 |
+| [mt3-infer](mt3-infer/MT3-Infer.md) | 统一推理工具 | 不适用 | 封装 MR-MT3 / MT3-PyTorch / YourMT3；不含 MuScriptor |
+| [MR-MT3](mr-mt3/MR-MT3.md) | 多轨转录 | 不适用 | 跨窗口记忆，缓解乐器串轨；约 176MB |
+| [MT3-PyTorch](mt3-pytorch/MT3-PyTorch.md) | 多轨转录 | 不适用 | 社区 PyTorch 移植；上游无许可证声明 |
 | Mel-Band RoFormer | 模型架构 | 否（主要 2 轨） | 待建资料；和 BS-RoFormer 同属 RoFormer 路线 |
 | MVSEP | 在线服务 / 模型试验场 | 可能 | 可先在线听不同模型效果；不是本地集成方案 |
 | MSST-WebUI | GUI | 取决于模型 | MSST 的桌面封装；待核实当前状态 |
@@ -40,7 +44,9 @@
 - **NeuralNote**：Basic Pitch 的 GUI / VST 封装，适合快速试听和调阈值，不是后端引擎。
 - **ByteDance Piano Transcription / `piano_transcription_inference`**：钢琴专用，可能比 Basic Pitch 更适合钢琴轨。
 - **Transkun**：[Yujia-Yan/Transkun](https://github.com/Yujia-Yan/Transkun)（MIT），钢琴转录候选。
-- [**YourMT3+**](yourmt3/YourMT3.md)：多乐器端到端转录；GPL-3.0；可以直接尝试「伴奏 → 多轨 MIDI」。
+- [**YourMT3+**](yourmt3/YourMT3.md)：多乐器端到端转录；可以直接尝试「伴奏 → 多轨 MIDI」。
+- [**MuScriptor**](muscriptor/MuScriptor.md)：2026 新模型，支持乐器条件；代码 MIT、权重非商用。
+- [**MT3-Infer**](mt3-infer/MT3-Infer.md)：统一调用 MR-MT3 / MT3-PyTorch / YourMT3，不含 MuScriptor。
 - **SOME / RMVPE**：人声旋律候选。
 - **FretNet / SynthTab / TabCNNx4 / Open-Fret / gtrsnipe**：吉他弦位、指法、六线谱路线；作者不弹吉他，优先级低。
 - **Beat This!**：节拍 / downbeat 检测，可把 MIDI 对齐到小节。
@@ -82,7 +88,8 @@ Gemini 的核心建议是不要指望单个六轨模型全面变强，而是：
    - 钢琴：`SCNet Jazz 4-stem`，或 BS-RoFormer SW 的 piano 轨；
    - 再跑 Basic Pitch / Transkun。
 3. **跳过音频分离，直接符号级转录**：
-   - 把 `Instrumental` / `Other` 交给 YourMT3+，尝试直接得到带乐器标签的多轨 MIDI；
+   - 把 `Instrumental` / `Other` 交给 MuScriptor 或 YourMT3+，尝试直接得到带乐器标签的多轨 MIDI；
+   - MuScriptor 支持 instrument presence conditioning，但权重 CC BY-NC；YourMT3 许可证存在不一致；
    - 这条路避免了二次分离，但依赖转录模型对混音/串音的鲁棒性，尚未验证。
 
 三条路线都还没有在纯蓝的同一批歌曲上做完整 A/B；上面的模型存在性已核对，效果仍需试听/指标验证。
