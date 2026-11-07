@@ -182,7 +182,7 @@ export function createX66CCFFApp({ dataDir, engineDir = join(dataDir, "engine") 
 
   return {
     id: "66CCFF",
-    name: "66CCFF",
+    name: "纯蓝",
     owns: ["track", "job", "stem"],
 
     migrations: [

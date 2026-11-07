@@ -18,6 +18,6 @@
 | [66CCFF-0002](66CCFF-0002-in-app-slow-player.md) | 内建慢放播放器，不依赖 Audacity | 有效 |
 | [66CCFF-0003](66CCFF-0003-engine-setup-script.md) | 首版引擎用仓库脚本安装，应用检测状态 | 有效 |
 | [66CCFF-0004](66CCFF-0004-app-files-and-media-protocol.md) | 应用文件放 `<userData>/apps/66CCFF`，用 `media://` 提供给界面 | 有效 |
-| [66CCFF-0005](66CCFF-0005-identity.md) | 应用标识：id `66CCFF`，中文名「纯蓝」，英文名 66CCFF | 有效 |
+| [66CCFF-0005](66CCFF-0005-identity.md) | 应用标识：id / 英文名 `66CCFF`，显示名「纯蓝」 | 有效 |
 | [66CCFF-0006](66CCFF-0006-separation-job-execution.md) | 分离任务：内部异步 API + runId 事件 / 取消 | 有效 |
 | [66CCFF-0007](66CCFF-0007-basic-pitch-midi.md) | MIDI 转写：Basic Pitch，独立 Python 3.10 + ONNX，单音频输入 | 有效（引擎已安装；界面 / API 待接入） |

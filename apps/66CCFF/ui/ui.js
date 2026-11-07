@@ -8,7 +8,8 @@
 
   const DICT = {
     zh: {
-      appTitle: "66CCFF",
+      appTitle: "纯蓝",
+      appHex: "66CCFF",
       import: "导入音频",
       emptyHint: "导入一首歌，分离成六轨，然后慢放练习。",
       noTracks: "还没有曲目",
@@ -56,6 +57,7 @@
     },
     en: {
       appTitle: "66CCFF",
+      appHex: "纯蓝",
       import: "Import audio",
       emptyHint: "Import a song, split it into six stems, then practise slowly.",
       noTracks: "No tracks yet",
