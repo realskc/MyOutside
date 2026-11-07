@@ -5,6 +5,7 @@
 - 作者预期：[`user-spec/README.md`](user-spec/README.md)
 - 技术文档：[`docs/README.md`](docs/README.md)
 - 决策：[`user-spec/decisions/README.md`](user-spec/decisions/README.md)
+- 外部资料线索：[`references/README.md`](references/README.md)
 
 ## 首次使用（Windows）
 

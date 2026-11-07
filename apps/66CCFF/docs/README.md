@@ -1,6 +1,6 @@
 # 纯蓝（66CCFF）技术文档
 
-> 应用 id `66CCFF`。作者预期见 [`../user-spec/README.md`](../user-spec/README.md)；应用决策见 [`../user-spec/decisions/README.md`](../user-spec/decisions/README.md)。
+> 应用 id `66CCFF`。作者预期见 [`../user-spec/README.md`](../user-spec/README.md)；应用决策见 [`../user-spec/decisions/README.md`](../user-spec/decisions/README.md)；外部资料线索见 [`../references/README.md`](../references/README.md)。
 
 ## 1. 组成
 

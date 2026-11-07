@@ -1,7 +1,7 @@
 # 纯蓝（66CCFF）user spec
 
 > 应用 id：`66CCFF`；中文名：纯蓝；英文名：66CCFF。
-> 这是作者对纯蓝的预期；技术文档见 [`../docs/README.md`](../docs/README.md)；决策见 [`decisions/`](decisions/README.md)。
+> 这是作者对纯蓝的预期；技术文档见 [`../docs/README.md`](../docs/README.md)；决策见 [`decisions/`](decisions/README.md)；外部资料线索见 [`../references/README.md`](../references/README.md)。
 
 ## 1. 是什么
 
@@ -16,6 +16,7 @@
 - 内建播放器：分轨音量 / 静音 / 独奏（同一轨的 M 与 S 互斥），慢放（保持音高），循环与 AB 段；
 - 空格键暂停 / 继续播放；
 - 可选的 MIDI 转写：输入是一条音频，可以是单条 stem，也可以是选定的几条 stem 混合；不把整首歌当输入；输出一个单轨 MIDI；首版先验证引擎，界面接入后续再做；
+- MIDI 转写的目标是作者在钢琴上学习、弹奏；不要求还原吉他的弦位、指法或六线谱；
 - 分离有可见的进度与失败原因；
 - 可删除曲目。
 
@@ -43,6 +44,6 @@
 
 ## 7. 未定
 
-- 六轨引擎的具体模型与质量（首版见决策；不满意再换）。
+- 六轨引擎的具体模型与质量（首版见决策；当前 htdemucs_6s 不满意，计划评估更强的分离 / 组合方案，见 [`../references/README.md`](../references/README.md)）。
 - 是否增加「人声 / 伴奏」两轨快捷预设。
 - 是否在应用内提供引擎安装向导（首版用脚本，后续考虑）。
