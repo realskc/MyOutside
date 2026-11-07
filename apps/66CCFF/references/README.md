@@ -20,7 +20,7 @@
 |---|---|---|---|
 | [Audio Separator](audio-separator/Audio-Separator.md) | 推理工具 / Python 包 | 注册表含 BS-RoFormer SW / Demucs 6s；需确认具体权重 | UVR 模型集合、CLI / Python API、模型下载、ensemble |
 | [Music Source Separation Training](music-source-separation-training/Music-Source-Separation-Training.md) | 训练 + 推理框架 | 官方表里是 HTDemucs4 6s | 包含 BS-RoFormer、Mel-Band RoFormer、SCNet、MDX23C 等；官方表没有强六轨，但社区权重可接 |
-| [BS-RoFormer SW 6-stem](bs-roformer/BS-RoFormer-SW-6stem.md) | 社区权重 | **是**（bass / drums / other / vocals / guitar / piano） | 当前最值得 A/B 的本地六轨候选；权重许可证 unknown；SDR 数字来自下游项目，非官方 |
+| [BS-RoFormer SW 6-stem](bs-roformer/BS-RoFormer-SW-6stem.md) | 社区权重 | **是**（bass / drums / other / vocals / guitar / piano） | 已跑通一首歌；权重许可证 unknown；SDR 数字来自下游项目，非官方；待听感 A/B |
 | [HTDemucs 6-stem](demucs/HTDemucs-6s.md) | 当前权重 | 是（六轨） | Demucs 官方称六源实验性、piano 串音/伪影明显 |
 | [Music-to-MIDI（mason369）](music-to-midi/Music-to-MIDI.md) | 下游整合工具 | 使用 BS-RoFormer SW 六轨 | 其 README 是 9.05 / 7.83 数字的来源之一；不是官方 benchmark |
 | [BS-RoFormer](bs-roformer/BS-RoFormer.md) | 模型架构 | 否（主要 2 轨） | 人声 / 伴奏强；适合作为级联第一阶段 |
@@ -71,10 +71,10 @@ Gemini 的核心建议是不要指望单个六轨模型全面变强，而是：
 
 ## 下一步
 
-先对现有歌曲做 A/B，不直接换引擎：
+本机已经跑通 **BS-RoFormer SW 6-stem** 的一首歌测试（未播放声音）：
 
 - 基线：`htdemucs_6s`
-- 候选 A：直接用 **BS-RoFormer SW 6-stem**（`bs-roformer-infer` 或 audio-separator 的对应权重）
-- 候选 B：Audio Separator 的 BS-RoFormer / Mel-Band RoFormer + SCNet 或 6s 级联
-- 重点听：吉他、钢琴、人声残留、鼓/贝斯干净度
+- 已生成候选：BS-RoFormer SW 六轨，在 `tracks/<id>/roformer-test/`
+- 下一步：试听对比吉他、钢琴、人声残留、鼓/贝斯干净度；再决定是否替换引擎
+- 备选：Audio Separator 的 BS-RoFormer / Mel-Band RoFormer + SCNet 或 6s 级联
 - 同时记录：耗时、显存、模型体积、许可证

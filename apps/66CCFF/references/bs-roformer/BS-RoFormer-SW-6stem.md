@@ -42,6 +42,19 @@ bass, drums, other, vocals, guitar, piano
 - `audio-separator` 的模型列表里有 `BS-Roformer-SW.ckpt` / `BS-Roformer-SW.yaml` 条目，但没有确认它是否等同于 `BS-Rofo-SW-Fixed.ckpt`；Gemini 说的「audio-separator 已内置 Fixed 映射」需要本地验证。
 - 699MB 权重 + PyTorch 的显存/耗时需要实测；GGUF/ONNX 是另一条部署路线。
 
+## 本机验证（2026-11-07）
+
+- 测试曲目：现有 3 分 02 秒歌曲，44.1kHz 立体声。
+- 环境：独立 `roformer-engine` venv（约 59MB），通过 `.pth` 借用 Demucs 引擎的 PyTorch 2.11 / CUDA 12.8；这是测试环境，不是最终集成方式。
+- 模型：`BS-Rofo-SW-Fixed.ckpt` 约 667MB；`bs-roformer-infer` 0.1.6（git 安装）。
+- 推理：RTX 5060，约 **36 秒**；首次运行包含模型下载时总共约 108 秒。
+- 输出：六条 FLAC（bass / drums / other / vocals / guitar / piano）+ 派生 instrumental；所有文件均为 183.537 秒。
+- 六条 stem 相加相对原曲的残差约 **-33.3 dB**；各轨 RMS 非零，说明不是空文件。
+- Basic Pitch 测试（只转写，不播放）：
+  - guitar：771 个音符；当前 htdemucs_6s guitar 为 880 个；
+  - piano：1,436 个音符；当前 htdemucs_6s piano 为 1,131 个。
+  - 音符数量不是质量结论；没有试听，不能据此判断哪边更好。
+
 ## 与纯蓝的关系
 
-目前最值得优先 A/B 的候选：如果它确实明显改善 guitar / piano，就可以直接从当前 `htdemucs_6s` 换成它，或者用它作为级联的 Stage 2。
+已经跑通一首歌。下一步应直接试听它和 `htdemucs_6s` 的 guitar / piano 轨；如果确实更好，再考虑接入。当前没有改应用播放器，也没有自动播放任何声音。
