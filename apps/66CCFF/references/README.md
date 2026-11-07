@@ -26,17 +26,21 @@
 | [BS-RoFormer](bs-roformer/BS-RoFormer.md) | 模型架构 | 否（主要 2 轨） | 人声 / 伴奏强；适合作为级联第一阶段 |
 | [SCNet](scnet/SCNet.md) | 模型架构 | 否（4 轨） | 鼓、贝斯、其他人声之外的分离强 |
 | [Mel-Band RoFormer Guitar](becruily/Mel-Band-RoFormer-Guitar.md) | 社区单轨权重 | 否（Guitar / Other） | 目标提取吉他；许可证和效果待验证 |
+| [SCNet Jazz 4-stem](scnet/SCNet-Jazz-4stem.md) | 社区单轨权重 | 否（drums / bass / piano / other） | 钢琴作为一级 source；适合去人声后的伴奏；许可证待核实 |
+| [Banquet（query-bandit）](query-bandit/Banquet.md) | Query-based 分离 | 否；按 query 提取目标音色 | 论文称 guitar / piano 超过 6-stem HTDemucs；权重 CC-BY-NC-SA |
+| [AudioSep](audiosep/AudioSep.md) | 文本/音频 query 分离 | 否；按文本/音频提取目标 | 32kHz；适合实验，不适合高保真导出 |
+| [YourMT3+](yourmt3/YourMT3.md) | 多轨转录 | 不适用（不做音频分轨） | 直接把伴奏转成带乐器标签的 MIDI；GPL-3.0 |
 | Mel-Band RoFormer | 模型架构 | 否（主要 2 轨） | 待建资料；和 BS-RoFormer 同属 RoFormer 路线 |
 | MVSEP | 在线服务 / 模型试验场 | 可能 | 可先在线听不同模型效果；不是本地集成方案 |
 | MSST-WebUI | GUI | 取决于模型 | MSST 的桌面封装；待核实当前状态 |
 
-## MIDI 候选（先记线索，暂不建独立资料）
+## MIDI 候选（线索，暂不建独立资料）
 
 - [**Basic Pitch**](basic-pitch/Basic-Pitch.md)：当前引擎；轻量、支持 pitch bend、单乐器效果好；混合音频会掉音符。
 - **NeuralNote**：Basic Pitch 的 GUI / VST 封装，适合快速试听和调阈值，不是后端引擎。
 - **ByteDance Piano Transcription / `piano_transcription_inference`**：钢琴专用，可能比 Basic Pitch 更适合钢琴轨。
-- **Transkun v2**：钢琴转录候选。
-- **YourMT3+**：多乐器端到端转录候选。
+- **Transkun**：[Yujia-Yan/Transkun](https://github.com/Yujia-Yan/Transkun)（MIT），钢琴转录候选。
+- [**YourMT3+**](yourmt3/YourMT3.md)：多乐器端到端转录；GPL-3.0；可以直接尝试「伴奏 → 多轨 MIDI」。
 - **SOME / RMVPE**：人声旋律候选。
 - **FretNet / SynthTab / TabCNNx4 / Open-Fret / gtrsnipe**：吉他弦位、指法、六线谱路线；作者不弹吉他，优先级低。
 - **Beat This!**：节拍 / downbeat 检测，可把 MIDI 对齐到小节。
@@ -68,6 +72,20 @@ Gemini 的核心建议是不要指望单个六轨模型全面变强，而是：
 - 多模型组合的显存、耗时、安装体积，以及当前 RTX 5060 / CUDA 环境能否稳定运行；
 - 模型权重许可证各不相同，分发前要核对；
 - 混响、串音和分轨伪影对 MIDI 的影响，需要用实际歌曲 A/B。
+
+### 现在可查证的几条候选路线
+
+1. **直接六轨**：BS-RoFormer SW 6-stem（已跑通一首歌）。
+2. **先净化伴奏，再单轨提取**：
+   - 用 SCNet / RoFormer 去掉 vocals / drums / bass，得到 `Other`；
+   - 吉他：`becruily/mel-band-roformer-guitar`，或 Banquet 用吉他 query；
+   - 钢琴：`SCNet Jazz 4-stem`，或 BS-RoFormer SW 的 piano 轨；
+   - 再跑 Basic Pitch / Transkun。
+3. **跳过音频分离，直接符号级转录**：
+   - 把 `Instrumental` / `Other` 交给 YourMT3+，尝试直接得到带乐器标签的多轨 MIDI；
+   - 这条路避免了二次分离，但依赖转录模型对混音/串音的鲁棒性，尚未验证。
+
+三条路线都还没有在纯蓝的同一批歌曲上做完整 A/B；上面的模型存在性已核对，效果仍需试听/指标验证。
 
 ## 下一步
 
