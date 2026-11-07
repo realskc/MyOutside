@@ -289,7 +289,16 @@ export function createPlatformAiRawDefinition(
         throw new KernelError("PRECONDITION", "实验 API 暂不支持流式（stream: true）");
       }
       const response = await deepseekPost(storage, secrets, "/chat/completions", body, ctx.signal, "AI 实验请求");
-      const text = await response.text();
+      // 非流式请求在等待期间会持续收到空行（DeepSeek 的请求保活），停止多半发生在读响应体时
+      let text: string;
+      try {
+        text = await response.text();
+      } catch (cause) {
+        if (ctx.signal.aborted) throw new KernelError("ABORTED", "调用已取消");
+        throw new KernelError("UPSTREAM", `AI 实验请求读取响应失败：${cause instanceof Error ? cause.message : String(cause)}`, {
+          retryable: true,
+        });
+      }
       let raw: unknown;
       try {
         raw = JSON.parse(text);

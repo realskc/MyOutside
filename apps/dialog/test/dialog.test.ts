@@ -727,6 +727,32 @@ describe("dialog backend", () => {
     expect(run.error).toContain("不支持流式");
   });
 
+  it("labRun：等待响应时停止（上游正在发保活空行）→ 存为 aborted", async () => {
+    const kernel = await setupWithKey();
+    vi.stubGlobal("fetch", async (_url: string, init: { signal: AbortSignal }) => {
+      const body = new ReadableStream<Uint8Array>({
+        start(controller) {
+          controller.enqueue(new TextEncoder().encode("\n"));
+          init.signal.addEventListener("abort", () => controller.error(new DOMException("aborted", "AbortError")));
+        },
+      });
+      return new Response(body, { status: 200, headers: { "content-type": "application/json" } });
+    });
+    const controller = new AbortController();
+    const pending = kernel.handle(
+      { call: "dialog.labRun", payload: { body: { model: "deepseek-flash", messages: [{ role: "user", content: "hi" }] } } },
+      { caller: "dialog", signal: controller.signal },
+    );
+    await new Promise((resolve) => setTimeout(resolve, 10));
+    controller.abort();
+    const res = await pending;
+    expect(res.ok).toBe(true);
+    if (!res.ok) return;
+    expect((res.result as { status: string }).status).toBe("aborted");
+    const runs = await call<Array<{ status: string }>>(kernel, "dialog.listLabRuns", {});
+    expect(runs.map((run) => run.status)).toEqual(["aborted"]);
+  });
+
   it("上下文截断：估算与从最近保留（从 user 开始）", () => {
     expect(estimateTokens("你好")).toBe(2);
     expect(estimateTokens("hello")).toBe(2);
