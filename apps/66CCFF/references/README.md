@@ -13,7 +13,7 @@
 
 ## 当前实现
 
-- 六轨：BS-RoFormer SW 6-stem（`BS-Rofo-SW-Fixed.ckpt`，本机 CUDA；见 [66CCFF-0008](../user-spec/decisions/66CCFF-0008-bs-roformer-engine.md)）。
+- 六轨：BS-RoFormer SW 6-stem（`BS-Rofo-SW-Fixed.ckpt`；Windows CUDA、macOS CPU；见 [66CCFF-0008](../user-spec/decisions/66CCFF-0008-bs-roformer-engine.md)）。
 - MIDI：Basic Pitch，独立 Python 3.10 + ONNX 引擎，单音频输入；作者反馈效果一般，后续再评估替换方案。
 
 ## 分轨 / 源分离候选

@@ -7,9 +7,11 @@
 - 决策：[`user-spec/decisions/README.md`](user-spec/decisions/README.md)
 - 外部资料线索：[`references/README.md`](references/README.md)
 
-## 首次使用（Windows）
+## 首次使用（Windows / macOS）
 
-需要先安装 [uv](https://docs.astral.sh/uv/)、`ffmpeg` 和 `git`，然后运行一次：
+需要先安装 [uv](https://docs.astral.sh/uv/)、`ffmpeg` 和 `git`。
+
+### Windows
 
 ```powershell
 powershell -ExecutionPolicy Bypass -File apps/66CCFF/scripts/setup-engine.ps1
@@ -17,9 +19,18 @@ powershell -ExecutionPolicy Bypass -File apps/66CCFF/scripts/setup-engine.ps1
 
 脚本会创建 Python 3.12 venv，安装 `bs-roformer-infer` + CUDA 版 PyTorch，并预下载 BS-RoFormer SW 六轨模型（首次下载约数 GB；模型约 667MB）。
 
+### macOS
+
+```bash
+brew install uv ffmpeg git
+bash apps/66CCFF/scripts/setup-engine-macos.sh
+```
+
+macOS 没有 CUDA，且 `bs-roformer-infer` 不支持 MPS，因此分离会走 CPU；同一首歌会明显比 Windows + RTX 5060 慢，可能达到几分钟。脚本会安装 CPU 版 PyTorch、`bs-roformer-infer` 和 BS-RoFormer SW 模型。
+
 ### MIDI 转写（可选，单音频）
 
-需要把某条 stem 转成 MIDI 时，再运行一次：
+MIDI 引擎目前只有 Windows 安装脚本：
 
 ```powershell
 powershell -ExecutionPolicy Bypass -File apps/66CCFF/scripts/setup-midi-engine.ps1
@@ -27,7 +38,17 @@ powershell -ExecutionPolicy Bypass -File apps/66CCFF/scripts/setup-midi-engine.p
 
 脚本会创建**独立**的 Python 3.10 venv，安装 Basic Pitch + ONNX Runtime，不安装 TensorFlow，也不影响上面的分离引擎。可以转单条 stem，也可以把选定的几条 stem 混成一条音频再转；不转整首歌。
 
-应用文件（曲目、六轨结果、引擎、MIDI 引擎）位于 `%APPDATA%/MyOutside/apps/66CCFF/`。
+应用文件（曲目、六轨结果、引擎、MIDI 引擎）位于：
+
+- Windows：`%APPDATA%/MyOutside/apps/66CCFF/`
+- macOS：`~/Library/Application Support/MyOutside/apps/66CCFF/`
+
+还需要 Node.js 24+ 和 pnpm（见仓库根 README）。装好引擎后，在仓库根目录运行：
+
+```bash
+pnpm install
+pnpm dev
+```
 
 ## 开发
 

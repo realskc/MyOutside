@@ -12,20 +12,20 @@
 
 ## 决策
 
-- 提供 `apps/66CCFF/scripts/setup-engine.ps1`：用 uv 创建 Python 3.12 venv，安装 `bs-roformer-infer` + CUDA 版 PyTorch，预下载 BS-RoFormer SW 六轨模型（见 [66CCFF-0008](66CCFF-0008-bs-roformer-engine.md)）；
-- 应用只检测 `<userData>/apps/66CCFF/roformer-engine/venv` 是否存在，并在界面提示安装命令；不在应用内执行 pip。
+- 提供 `apps/66CCFF/scripts/setup-engine.ps1`（Windows，CUDA）和 `apps/66CCFF/scripts/setup-engine-macos.sh`（macOS，CPU）：用 uv 创建 Python 3.12 venv，安装 `bs-roformer-infer`、对应平台的 PyTorch，预下载 BS-RoFormer SW 六轨模型（见 [66CCFF-0008](66CCFF-0008-bs-roformer-engine.md)、[66CCFF-0009](66CCFF-0009-macos-source-install.md)）；
+- 应用只检测 `<userData>/apps/66CCFF/roformer-engine/venv` 是否存在，并在界面提示当前平台的安装命令；不在应用内执行 pip。
 
 ## 考虑过、没有采用
 
 - **应用内下载 Python / uv 并安装**：更像成品，但首版复杂、下载失败难恢复。
-- **依赖系统 Python**：版本与 CUDA 轮子不可控。
+- **依赖系统 Python**：版本与平台轮子不可控。
 
 ## 代价
 
 - 首次使用需要手动运行一次脚本；
-- macOS / Linux 暂未提供脚本。
+- Linux 暂未提供脚本；MIDI 安装脚本目前仍只有 Windows。
 
 ## 什么时候应该重新考虑
 
 - 要分发给朋友 / 普通用户 → 必须做成应用内安装向导；
-- 需要 macOS / Linux。
+- 需要 Linux，或需要把 MIDI 安装也做成 macOS 一键脚本。

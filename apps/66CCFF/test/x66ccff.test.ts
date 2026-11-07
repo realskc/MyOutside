@@ -5,6 +5,7 @@ import { createKernel, type Kernel } from "@myoutside/kernel";
 import { createNodeSqliteAdapter } from "@myoutside/kernel-node";
 import { afterEach, describe, expect, it } from "vitest";
 import { createX66CCFFApp } from "../backend/src/index.js";
+import { findMediaTool } from "../backend/src/media.js";
 
 const cleanup: string[] = [];
 
@@ -36,6 +37,20 @@ afterEach(() => {
 });
 
 describe("66CCFF backend", () => {
+  it("FFMPEG_PATH 可以覆盖媒体工具路径", () => {
+    const fake = join(tmpdir(), `66CCFF-ffmpeg-${Date.now()}`);
+    writeFileSync(fake, "");
+    const previous = process.env.FFMPEG_PATH;
+    try {
+      process.env.FFMPEG_PATH = fake;
+      expect(findMediaTool("ffmpeg")).toBe(fake);
+    } finally {
+      if (previous === undefined) delete process.env.FFMPEG_PATH;
+      else process.env.FFMPEG_PATH = previous;
+      rmSync(fake, { force: true });
+    }
+  });
+
   it("引擎未安装时状态为 not ready", async () => {
     const { kernel } = setup();
     const status = await call<{ ready: boolean; pythonPath: string | null; setupCommand: string }>(
@@ -45,7 +60,9 @@ describe("66CCFF backend", () => {
     );
     expect(status.ready).toBe(false);
     expect(status.pythonPath).toBeNull();
-    expect(status.setupCommand).toContain("setup-engine.ps1");
+    expect(status.setupCommand).toContain(
+      process.platform === "darwin" ? "setup-engine-macos.sh" : "setup-engine.ps1",
+    );
   });
 
   it("曲目 CRUD：写入 / 列表 / 详情 / 删除", async () => {

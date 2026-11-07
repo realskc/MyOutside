@@ -57,4 +57,4 @@ bass, drums, other, vocals, guitar, piano
 
 ## 与纯蓝的关系
 
-2026-11-07 作者试听：六轨效果明显好于旧 `htdemucs_6s`，旧的六轨模型可以弃用；已选为纯蓝的分离引擎（见 [66CCFF-0008](../../user-spec/decisions/66CCFF-0008-bs-roformer-engine.md)）。正式安装脚本会创建独立的 `roformer-engine` 环境。
+2026-11-07 作者试听：六轨效果明显好于旧 `htdemucs_6s`，旧的六轨模型可以弃用；已选为纯蓝的分离引擎（见 [66CCFF-0008](../../user-spec/decisions/66CCFF-0008-bs-roformer-engine.md)）。正式安装脚本会创建独立的 `roformer-engine` 环境：Windows CUDA，macOS CPU。

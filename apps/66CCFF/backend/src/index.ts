@@ -26,6 +26,7 @@ import {
   type SqlValue,
 } from "@myoutside/kernel";
 import { z } from "zod";
+import { findMediaTool } from "./media.js";
 import { enginePython, runSeparation } from "./roformer.js";
 
 const STEM_ORDER: StemKind[] = ["vocals", "drums", "bass", "other", "guitar", "piano"];
@@ -102,11 +103,20 @@ export interface X66CCFFAppOptions {
   engineDir?: string;
 }
 
+/** 各平台的引擎安装命令；UI 的“引擎未安装”提示直接展示它。 */
+function engineSetupCommand(): string {
+  if (process.platform === "darwin") return "bash apps/66CCFF/scripts/setup-engine-macos.sh";
+  if (process.platform === "win32") {
+    return "powershell -ExecutionPolicy Bypass -File apps/66CCFF/scripts/setup-engine.ps1";
+  }
+  return "请参考 apps/66CCFF/docs/README.md 手动安装分离引擎";
+}
+
 /** 探测音频时长（秒）；ffprobe 不可用时返回 0 */
 function probeDuration(file: string): number {
   try {
     const result = spawnSync(
-      "ffprobe",
+      findMediaTool("ffprobe"),
       ["-v", "error", "-show_entries", "format=duration", "-of", "default=nw=1:nk=1", file],
       { encoding: "utf8", windowsHide: true, timeout: 15000 },
     );
@@ -274,15 +284,15 @@ export function createX66CCFFApp({
 
       getEngineStatus: defineRead(EngineStatusInput, () => {
         const python = enginePython(engine);
+        const setupCommand = engineSetupCommand();
         const output: z.infer<typeof EngineStatusOutput> = {
           ready: python !== null,
           engineDir: engine,
           pythonPath: python,
-          setupCommand:
-            "powershell -ExecutionPolicy Bypass -File apps/66CCFF/scripts/setup-engine.ps1",
+          setupCommand,
           message: python
             ? "引擎已安装；首次分离会自动下载模型"
-            : "引擎未安装：请运行 apps/66CCFF/scripts/setup-engine.ps1",
+            : `引擎未安装：请运行 ${setupCommand}`,
         };
         return output;
       }),

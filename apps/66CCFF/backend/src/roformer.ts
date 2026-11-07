@@ -3,9 +3,18 @@ import { existsSync, mkdirSync } from "node:fs";
 import { join } from "node:path";
 import { KernelError } from "@myoutside/kernel";
 import type { X66CCFFStemKind } from "@myoutside/contracts";
+import { findMediaTool } from "./media.js";
 
 const STEMS: X66CCFFStemKind[] = ["vocals", "drums", "bass", "other", "guitar", "piano"];
 const MODEL_SLUG = "roformer-model-bs-roformer-sw-by-jarredou";
+
+/**
+ * Windows 使用 CUDA；macOS 没有 CUDA，且 bs-roformer-infer 已移除 MPS，走 CPU。
+ * 可以用 MYOUTSIDE_SEPARATION_DEVICE=cpu / cuda / auto 覆盖。
+ */
+function separationDevice(): string {
+  return process.env.MYOUTSIDE_SEPARATION_DEVICE?.trim() || (process.platform === "darwin" ? "cpu" : "cuda");
+}
 
 /** 应用管理的 venv 中的 Python；未安装返回 null */
 export function enginePython(engineDir: string): string | null {
@@ -109,7 +118,7 @@ export async function runSeparation(
 
   options.onProgress?.(0.01, "准备音频…");
   await runCommand(
-    "ffmpeg",
+    findMediaTool("ffmpeg"),
     [
       "-hide_banner",
       "-loglevel",
@@ -154,7 +163,7 @@ export async function runSeparation(
       "--output_format",
       "flac16",
       "--device",
-      "cuda",
+      separationDevice(),
     ],
     {
       signal: options.signal,

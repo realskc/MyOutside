@@ -6,7 +6,7 @@
 
 - **后端**：`backend/src/index.ts` 的 `createX66CCFFApp({ dataDir, engineDir? })`（宿主在启动时用数据目录构造并注册）；`roformer.ts` 负责引擎探测、音频转 WAV 与分离进程。
 - **界面**：`ui/` 静态 HTML / CSS / JS（零构建）。
-- **引擎**：`scripts/setup-engine.ps1` 安装到 `<userData>/apps/66CCFF/roformer-engine`（Python 3.12 venv + `bs-roformer-infer` + CUDA PyTorch + BS-RoFormer SW 六轨模型；见 [66CCFF-0003](../user-spec/decisions/66CCFF-0003-engine-setup-script.md)、[66CCFF-0008](../user-spec/decisions/66CCFF-0008-bs-roformer-engine.md)）。
+- **引擎**：`scripts/setup-engine.ps1`（Windows）或 `scripts/setup-engine-macos.sh`（macOS）安装到 `<userData>/apps/66CCFF/roformer-engine`（Python 3.12 venv + `bs-roformer-infer` + PyTorch + BS-RoFormer SW 六轨模型；见 [66CCFF-0003](../user-spec/decisions/66CCFF-0003-engine-setup-script.md)、[66CCFF-0008](../user-spec/decisions/66CCFF-0008-bs-roformer-engine.md)、[66CCFF-0009](../user-spec/decisions/66CCFF-0009-macos-source-install.md)）。
 - **MIDI 引擎（可选）**：`scripts/setup-midi-engine.ps1` 安装到 `<userData>/apps/66CCFF/midi-engine`（独立 Python 3.10 venv + Basic Pitch + ONNX Runtime；见 [66CCFF-0007](../user-spec/decisions/66CCFF-0007-basic-pitch-midi.md)）；`scripts/transcribe_midi.py` 负责单音频（单条 stem 或选定 stem 混合）转 MIDI。
 - **媒体**：宿主 `media://<appId>/<相对路径>` 协议读取 `<userData>/apps/<appId>/`（见 [66CCFF-0004](../user-spec/decisions/66CCFF-0004-app-files-and-media-protocol.md)）。
 
@@ -40,7 +40,8 @@ app_66CCFF__stem(id, track_id, job_id, kind, file, size, created_at)
 ## 4. 引擎与分离
 
 - 输入：先用 `ffmpeg` 转成 44.1kHz 立体声 WAV（`bs-roformer-infer` 只接受 WAV）；
-- 命令：`python -m bs_roformer.inference --model roformer-model-bs-roformer-sw-by-jarredou --models_dir <engine>/models --input_folder <jobDir>/input --store_dir <jobDir>/stems --output_format flac16 --device cuda`；
+- 命令：`python -m bs_roformer.inference --model roformer-model-bs-roformer-sw-by-jarredou --models_dir <engine>/models --input_folder <jobDir>/input --store_dir <jobDir>/stems --output_format flac16 --device <cuda|cpu>`；
+- 设备：Windows 默认 `cuda`，macOS 默认 `cpu`（无 CUDA；`bs-roformer-infer` 不支持 MPS）；可用 `MYOUTSIDE_SEPARATION_DEVICE` 覆盖；
 - 环境：模型在 `<userData>/apps/66CCFF/roformer-engine/models`；首次运行会下载模型；
 - 进度：解析 `Estimated total processing time` / `Estimated time remaining` 行估算百分比，节流后写任务记录并推送事件；
 - 取消：终止子进程，任务标记 `cancelled`；
@@ -50,7 +51,7 @@ app_66CCFF__stem(id, track_id, job_id, kind, file, size, created_at)
 ### 模型与体积
 
 - BS-RoFormer SW 六轨权重 `BS-Rofo-SW-Fixed.ckpt`：约 667MB；实际推理在 RTX 5060 上处理 3 分 02 秒歌曲约 36 秒。
-- 引擎体积主要来自 CUDA 版 PyTorch；当前测试环境通过独立 `roformer-engine` venv 安装 `bs-roformer-infer`。
+- 引擎体积主要来自 PyTorch；当前测试环境通过独立 `roformer-engine` venv 安装 `bs-roformer-infer`。Windows 使用 CUDA 版 PyTorch，macOS 使用 CPU 版。
 - Basic Pitch：ONNX 模型 230,444 字节（0.22MB），约 3.6 万个 ONNX 初始化器元素（float32 约 3.57 万个）；独立 MIDI 引擎约 423MB，主要是 ONNX Runtime、scipy、llvmlite、librosa 等依赖。
 
 ## 5. MIDI 转写（验证）
@@ -77,5 +78,6 @@ app_66CCFF__stem(id, track_id, job_id, kind, file, size, created_at)
 - 取消只对当前页面发起的任务有效；刷新后正在运行的任务无法从界面取消（会继续并靠轮询显示）。
 - 没有导出、变调、两轨快捷预设、波形；这些见应用 user spec 的「未定 / 非目标」。
 - `media://` 没有跨应用权限：目前任意子应用理论上能猜到并读取其它应用的 media 路径；builder / 不可信应用出现前必须收紧（66CCFF-0004）。
-- 两个引擎安装脚本都只有 Windows 版本；macOS / Linux 需要另行安装（66CCFF-0003、66CCFF-0007）。
-- 分离依赖系统 `ffmpeg`；BS-RoFormer 需要 CUDA GPU，CPU 回退会很慢且当前未启用。
+- 分离安装脚本覆盖 Windows / macOS；Linux 需要另行安装。MIDI 安装脚本目前只有 Windows 版本（66CCFF-0003、66CCFF-0007、66CCFF-0009）。
+- 分离依赖系统 `ffmpeg` / `ffprobe`；Windows 使用 CUDA，macOS 使用 CPU，Mac 会比 GPU 明显慢。
+- 如果从 Finder 启动 Electron，Homebrew 的 `ffmpeg` 可能不在 PATH 中；后端会补查 `/opt/homebrew/bin`、`/usr/local/bin`、`/opt/local/bin`，也可用 `FFMPEG_PATH` / `FFPROBE_PATH` 指定。
