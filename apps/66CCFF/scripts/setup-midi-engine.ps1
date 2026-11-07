@@ -1,6 +1,6 @@
 ﻿#requires -Version 5.1
 # 纯蓝 MIDI 引擎安装脚本（Windows）：Python 3.10 venv + Basic Pitch + ONNX Runtime
-# 与 Demucs 的 Python 3.12 引擎完全独立。
+# 与分离引擎的 Python 3.12 环境完全独立。
 # 运行：powershell -ExecutionPolicy Bypass -File apps/66CCFF/scripts/setup-midi-engine.ps1
 $ErrorActionPreference = "Stop"
 [Console]::OutputEncoding = [System.Text.Encoding]::UTF8

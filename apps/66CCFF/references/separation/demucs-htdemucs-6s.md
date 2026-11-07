@@ -6,7 +6,7 @@
 
 ## 是什么
 
-Demucs v4 的六源实验模型，输出 `drums / bass / other / vocals / guitar / piano`；当前纯蓝分离引擎使用的就是它。
+Demucs v4 的六源实验模型，输出 `drums / bass / other / vocals / guitar / piano`；曾作为纯蓝的首版分离引擎，现已弃用。
 
 ## 官方事实
 
@@ -18,9 +18,9 @@ Demucs v4 的六源实验模型，输出 `drums / bass / other / vocals / guitar
 
 ## 和纯蓝的关系
 
-当前基线。它的吉他轨可用但钢琴轨质量弱，是作者想换模型的主要原因之一。
+曾经是基线。它的吉他轨可用但钢琴轨质量弱，是作者换模型的主要原因之一；2026-11-07 作者试听 BS-RoFormer SW 后确认旧模型可以弃用（见 [66CCFF-0008](../../user-spec/decisions/66CCFF-0008-bs-roformer-engine.md)）。
 
-## 待核实
+## 与 BS-RoFormer SW 的对比
 
-- 与 BS-RoFormer SW 六轨在同一批歌曲上的听感、耗时、显存对比；
-- 六轨输出是否满足纯蓝的钢琴练习需求。
+- 2026-11-07 作者实际试听：BS-RoFormer SW 的六轨效果明显更好；旧模型不再作为应用引擎。
+- 耗时、显存等工程数据仍可在后续同类歌曲上积累。

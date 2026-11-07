@@ -9,12 +9,12 @@
 ## 作者说过的目标
 
 - 作者弹钢琴，想把**吉他声部**转成自己能在钢琴上学习、弹奏的 MIDI；不需要还原吉他的弦位、指法或六线谱。
-- 当前六轨分离质量不够好，想评估更强的技术；先研究，不急着换。
+- 旧六轨引擎质量不够好；2026-11-07 作者试听 BS-RoFormer SW 后确认明显更好，已切换到新引擎。
 
 ## 当前实现
 
-- 六轨：`htdemucs_6s`（2022 年的 Demucs v4 六轨模型）。
-- MIDI：Basic Pitch，独立 Python 3.10 + ONNX 引擎，单音频输入。
+- 六轨：BS-RoFormer SW 6-stem（`BS-Rofo-SW-Fixed.ckpt`，本机 CUDA；见 [66CCFF-0008](../user-spec/decisions/66CCFF-0008-bs-roformer-engine.md)）。
+- MIDI：Basic Pitch，独立 Python 3.10 + ONNX 引擎，单音频输入；作者反馈效果一般，后续再评估替换方案。
 
 ## 分轨 / 源分离候选
 
@@ -22,8 +22,8 @@
 |---|---|---|---|
 | [Audio Separator](separation/audio-separator.md) | 推理工具 / Python 包 | 注册表含 BS-RoFormer SW / Demucs 6s；需确认具体权重 | UVR 模型集合、CLI / Python API、模型下载、ensemble |
 | [Music Source Separation Training](separation/music-source-separation-training.md) | 训练 + 推理框架 | 官方表里是 HTDemucs4 6s | 包含 BS-RoFormer、Mel-Band RoFormer、SCNet、MDX23C 等；社区权重可接 |
-| [BS-RoFormer SW 6-stem](separation/bs-roformer-sw-6stem.md) | 社区权重 | **是**（bass / drums / other / vocals / guitar / piano） | 已跑通一首歌；权重许可证 unknown；SDR 数字来自下游项目，非官方；待听感 A/B |
-| [HTDemucs 6-stem](separation/demucs-htdemucs-6s.md) | 当前权重 | 是（六轨） | Demucs 官方称六源实验性、piano 串音/伪影明显 |
+| [BS-RoFormer SW 6-stem](separation/bs-roformer-sw-6stem.md) | 社区权重 | **是**（bass / drums / other / vocals / guitar / piano） | 作者试听确认明显优于旧模型；已选为应用分离引擎（66CCFF-0008）；权重许可证 unknown |
+| [HTDemucs 6-stem](separation/demucs-htdemucs-6s.md) | 旧权重（已弃用） | 是（六轨） | Demucs 官方称六源实验性、piano 串音/伪影明显；已被 BS-RoFormer SW 取代 |
 | [BS-RoFormer](separation/bs-roformer.md) | 模型架构 | 否（主要 2 轨） | 人声 / 伴奏强；适合作为级联第一阶段 |
 | [SCNet](separation/scnet.md) | 模型架构 | 否（4 轨） | 鼓、贝斯、其他人声之外的分离强 |
 | [Mel-Band RoFormer Guitar](separation/becruily-mel-band-roformer-guitar.md) | 社区单轨权重 | 否（Guitar / Other） | 目标提取吉他；许可证和效果待验证 |
@@ -35,7 +35,7 @@
 
 | 资料 | 类型 | 备注 |
 |---|---|---|
-| [Basic Pitch](midi/basic-pitch.md) | 单音频转 MIDI | 当前引擎；轻量、支持 pitch bend；混合音频会掉音符 |
+| [Basic Pitch](midi/basic-pitch.md) | 单音频转 MIDI | 当前引擎；轻量、支持 pitch bend；混合音频会掉音符；作者反馈转写效果一般，后续评估替代方案 |
 | [MuScriptor](midi/muscriptor.md) | 多轨转录 | 2026 新模型；代码 MIT、权重 CC BY-NC 4.0；支持乐器条件 |
 | [YourMT3+](midi/yourmt3.md) | 多轨转录 | 约 536MB；直接输出多乐器 MIDI；许可证存在 GPL/Apache 不一致 |
 | [mt3-infer](midi/mt3-infer.md) | 统一推理工具 | 封装 MR-MT3 / MT3-PyTorch / YourMT3；不含 MuScriptor |
@@ -99,10 +99,9 @@ Gemini 的核心建议是不要指望单个六轨模型全面变强，而是：
 
 ## 下一步
 
-本机已经跑通 **BS-RoFormer SW 6-stem** 的一首歌测试（未播放声音）：
+作者已经试听 **BS-RoFormer SW 6-stem**，确认六轨效果明显好于旧 `htdemucs_6s`，应用已切换到新引擎（见 66CCFF-0008）：
 
-- 基线：`htdemucs_6s`
-- 已生成候选：BS-RoFormer SW 六轨，在 `tracks/<id>/roformer-test/`
-- 下一步：试听对比吉他、钢琴、人声残留、鼓/贝斯干净度；再决定是否替换引擎
-- 备选：Audio Separator 的 BS-RoFormer / Mel-Band RoFormer + SCNet 或 6s 级联
-- 同时记录：耗时、显存、模型体积、许可证
+- 旧引擎 `htdemucs_6s` 不再使用；
+- 继续观察新引擎在不同歌曲上的吉他 / 钢琴稳定性；
+- MIDI 转写仍是 Basic Pitch，作者认为效果一般，后续另行评估专用钢琴转写、多轨转录等方案；
+- 备选分轨路线（Audio Separator、SCNet、Mel-Band RoFormer 等）保留作后续研究，不急于接入。

@@ -26,7 +26,7 @@ import {
   type SqlValue,
 } from "@myoutside/kernel";
 import { z } from "zod";
-import { enginePython, runDemucs } from "./demucs.js";
+import { enginePython, runSeparation } from "./roformer.js";
 
 const STEM_ORDER: StemKind[] = ["vocals", "drums", "bass", "other", "guitar", "piano"];
 const AUDIO_EXTENSIONS = new Set([".mp3", ".wav", ".flac", ".m4a", ".ogg", ".aac"]);
@@ -98,7 +98,7 @@ interface StemRow {
 export interface X66CCFFAppOptions {
   /** 应用私有文件根（<userData>/apps/66CCFF） */
   dataDir: string;
-  /** 分离引擎目录；默认 dataDir/engine */
+  /** BS-RoFormer 分离引擎目录；默认 dataDir/roformer-engine */
   engineDir?: string;
 }
 
@@ -117,7 +117,10 @@ function probeDuration(file: string): number {
   }
 }
 
-export function createX66CCFFApp({ dataDir, engineDir = join(dataDir, "engine") }: X66CCFFAppOptions): AppModule {
+export function createX66CCFFApp({
+  dataDir,
+  engineDir = join(dataDir, "roformer-engine"),
+}: X66CCFFAppOptions): AppModule {
   const base = resolve(dataDir);
   const engine = resolve(engineDir);
 
@@ -324,7 +327,7 @@ export function createX66CCFFApp({ dataDir, engineDir = join(dataDir, "engine") 
       }),
 
       /**
-       * 六轨分离（普通异步函数）：创建任务 → 运行 Demucs → 进度事件 → 事务写六轨。
+       * 六轨分离（普通异步函数）：创建任务 → 运行 BS-RoFormer → 进度事件 → 事务写六轨。
        * 前端用 runId 订阅事件、用 cancel(runId) 取消。
        */
       startSeparation: defineAsync(StartSeparationInput, async (ctx, input) => {
@@ -359,7 +362,7 @@ export function createX66CCFFApp({ dataDir, engineDir = join(dataDir, "engine") 
 
         try {
           mkdirSync(workDir, { recursive: true });
-          const files = await runDemucs({
+          const files = await runSeparation({
             engineDir: engine,
             input: abs(track.file),
             outputDir: workDir,
@@ -372,7 +375,7 @@ export function createX66CCFFApp({ dataDir, engineDir = join(dataDir, "engine") 
           for (const kind of STEM_ORDER) {
             const sourceFile = files[kind];
             if (!sourceFile) continue;
-            const dest = join(jobStemsDir, `${kind}.mp3`);
+            const dest = join(jobStemsDir, `${kind}.flac`);
             copyFileSync(sourceFile, dest);
             stems.push({ kind, file: rel(dest), size: statSync(dest).size });
           }

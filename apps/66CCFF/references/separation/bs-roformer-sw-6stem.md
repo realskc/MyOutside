@@ -45,16 +45,16 @@ bass, drums, other, vocals, guitar, piano
 ## 本机验证（2026-11-07）
 
 - 测试曲目：现有 3 分 02 秒歌曲，44.1kHz 立体声。
-- 环境：独立 `roformer-engine` venv（约 59MB），通过 `.pth` 借用 Demucs 引擎的 PyTorch 2.11 / CUDA 12.8；这是测试环境，不是最终集成方式。
+- 环境：独立 `roformer-engine` venv（约 59MB），通过 `.pth` 借用旧 Demucs 引擎的 PyTorch 2.11 / CUDA 12.8；这是测试环境，正式的安装脚本会安装独立的 CUDA PyTorch。
 - 模型：`BS-Rofo-SW-Fixed.ckpt` 约 667MB；`bs-roformer-infer` 0.1.6（git 安装）。
 - 推理：RTX 5060，约 **36 秒**；首次运行包含模型下载时总共约 108 秒。
 - 输出：六条 FLAC（bass / drums / other / vocals / guitar / piano）+ 派生 instrumental；所有文件均为 183.537 秒。
 - 六条 stem 相加相对原曲的残差约 **-33.3 dB**；各轨 RMS 非零，说明不是空文件。
 - Basic Pitch 测试（只转写，不播放）：
-  - guitar：771 个音符；当前 htdemucs_6s guitar 为 880 个；
-  - piano：1,436 个音符；当前 htdemucs_6s piano 为 1,131 个。
-  - 音符数量不是质量结论；没有试听，不能据此判断哪边更好。
+  - guitar：771 个音符；旧 htdemucs_6s guitar 为 880 个；
+  - piano：1,436 个音符；旧 htdemucs_6s piano 为 1,131 个。
+  - 当时只记录数量，不能据此判断哪边更好；后续作者试听后确认新引擎的六轨效果明显更好。
 
 ## 与纯蓝的关系
 
-已经跑通一首歌。下一步应直接试听它和 `htdemucs_6s` 的 guitar / piano 轨；如果确实更好，再考虑接入。当前没有改应用播放器，也没有自动播放任何声音。
+2026-11-07 作者试听：六轨效果明显好于旧 `htdemucs_6s`，旧的六轨模型可以弃用；已选为纯蓝的分离引擎（见 [66CCFF-0008](../../user-spec/decisions/66CCFF-0008-bs-roformer-engine.md)）。正式安装脚本会创建独立的 `roformer-engine` 环境。

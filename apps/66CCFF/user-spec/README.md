@@ -44,6 +44,6 @@
 
 ## 7. 未定
 
-- 六轨引擎的具体模型与质量（首版见决策；当前 htdemucs_6s 不满意，计划评估更强的分离 / 组合方案，见 [`../references/README.md`](../references/README.md)）。
+- 是否继续评估更强的六轨分离 / 组合方案（当前使用 BS-RoFormer SW 6-stem；旧 `htdemucs_6s` 已弃用，见 [66CCFF-0008](decisions/66CCFF-0008-bs-roformer-engine.md) 和 [`../references/README.md`](../references/README.md)）。
 - 是否增加「人声 / 伴奏」两轨快捷预设。
 - 是否在应用内提供引擎安装向导（首版用脚本，后续考虑）。

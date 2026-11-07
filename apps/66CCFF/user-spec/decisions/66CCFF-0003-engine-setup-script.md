@@ -1,7 +1,7 @@
 # 66CCFF-0003 首版引擎用仓库脚本安装，应用检测状态
 
 - 状态：有效
-- 日期：2026-11-04
+- 日期：2026-11-04（2026-11-07 随 66CCFF-0008 更新安装内容）
 - 决策者：agent
 - 服务于：
   - 作者预期：[`../README.md`](../README.md)「工具与平台」允许应用管理引擎；「界面」先做一版能用
@@ -12,8 +12,8 @@
 
 ## 决策
 
-- 提供 `apps/66CCFF/scripts/setup-engine.ps1`：用 uv 创建 Python 3.12 venv，安装 Demucs + CUDA 版 PyTorch，预下载 `htdemucs_6s` 模型；
-- 应用只检测 `<userData>/apps/66CCFF/engine/venv` 是否存在，并在界面提示安装命令；不在应用内执行 pip。
+- 提供 `apps/66CCFF/scripts/setup-engine.ps1`：用 uv 创建 Python 3.12 venv，安装 `bs-roformer-infer` + CUDA 版 PyTorch，预下载 BS-RoFormer SW 六轨模型（见 [66CCFF-0008](66CCFF-0008-bs-roformer-engine.md)）；
+- 应用只检测 `<userData>/apps/66CCFF/roformer-engine/venv` 是否存在，并在界面提示安装命令；不在应用内执行 pip。
 
 ## 考虑过、没有采用
 

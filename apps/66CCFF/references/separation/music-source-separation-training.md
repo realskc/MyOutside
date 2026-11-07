@@ -19,7 +19,7 @@
   - BS-RoFormer 人声模型 SDR vocals 10.87（不同评测集，数字不能直接横比）。
 - **6 轨是模型目标，不是框架自动能力**：
   - `config_htdemucs_6stems.yaml` 的 `instruments` 是 `drums / bass / other / vocals / guitar / piano`；
-  - 对应权重是 `5c90dfd2-34c22ccb.th`，即当前纯蓝使用的 HTDemucs4 6-stem 模型；
+  - 对应权重是 `5c90dfd2-34c22ccb.th`，即旧纯蓝使用的 HTDemucs4 6-stem 模型；
   - 因此 MSST **可以运行六轨**；但官方表里的这条六轨路线就是当前 HTDemucs4 6-stem，本身没有更新。
 - 官方预训练表中没有基于 BS-RoFormer / SCNet 的强六轨权重；强 RoFormer / SCNet 预训练模型主要是 2 轨或 4 轨。MSST 可以用这些模型做级联、单轨模型或 ensemble，但不是“一个模型直接六轨”。
 - **社区有例外**：[BS-RoFormer SW 6-stem](bs-roformer-sw-6stem.md) 是 MSST 架构下的社区六轨权重，不在官方表里，但可由 MSST / `bs-roformer-infer` 加载；这是当前最值得实测的六轨候选。
