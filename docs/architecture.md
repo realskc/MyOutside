@@ -154,7 +154,7 @@ get(table, where) / all(table, where?, { orderBy?, limit?, offset? }) / count(ta
 
 ### 5.2 迁移
 
-- 每个应用携带有序的迁移列表，只操作自己的表。开发阶段每个应用只有一个 `0001_init`，直接建出完整的表结构；改表结构就改它，作者的两台设备上的数据库各做一次一次性迁移，不留增量迁移（`user-spec/workflow.md`「当前阶段的节奏」）；
+- 每个应用携带有序的迁移列表，只操作自己的表。开发阶段改表结构就照常新加一步；发行之前或作者提出时，再把各步统一压缩进 `0001_init`（`user-spec/workflow.md`「当前阶段的节奏」）。压缩后，作者每台设备的 `platform_migration` 里被压掉的步骤记录要一次性删掉；
 - `kernel.start()` 时在**一个事务**内执行全部未执行过的迁移，记录到 `platform_migration(app_id, migration_id, applied_at)`；失败整体回滚；
 - `MigrationCtx`：`createTable`、`createIndex`（自动加前缀）、`insert`（种子 / 参考数据，例：vocab 的托福词表，VOCAB-0005）、`exec`（逃生口，不加前缀，谨慎使用）。
 

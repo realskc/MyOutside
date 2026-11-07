@@ -41,7 +41,7 @@ level  TEXT       -- 'A' | 'B' | 'C' | 'D'
 
 ### 迁移
 
-- `0001_init`：建 `card` 表与索引，建 `word_level` 表并种入参考词表。开发阶段改表结构就改它（见 `user-spec/workflow.md`「当前阶段的节奏」）；
+- `0001_init`：建 `card` 表与索引，建 `word_level` 表并种入参考词表；
 
 ## 3. API
 
