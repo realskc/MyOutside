@@ -10,6 +10,8 @@
   }
 
   const DRAFT_KEY = "dialog.lab.request";
+  /** 请求体用「块」还是「JSON」编辑（DIALOG-0021） */
+  const MODE_KEY = "dialog.lab.mode";
 
   const DICT = {
     zh: {
@@ -50,7 +52,6 @@
       labNoUserMessage: "这个对话里还没有用户消息。",
       labInvalidJson: "JSON 无效",
       labNotObject: "请求体必须是 JSON 对象",
-      labNoMessages: "请求体里没有 messages 数组",
       labFormatted: "已格式化",
       labAppended: "已加入请求体",
       labNoReply: "响应里没有可加入的 assistant 消息。",
@@ -70,6 +71,49 @@
       labLoad: "载入",
       labImportFailed: "导入失败",
       labRunFailed: "运行失败",
+      labModeBlocks: "块",
+      labModeJson: "JSON",
+      labParams: "参数",
+      labMessages: "消息",
+      labNoParams: "没有参数。",
+      labNoMessagesYet: "还没有消息。",
+      labNoToolsYet: "没有工具。",
+      labAddMessages: "messages",
+      labAddTool: "工具",
+      labAddToolCall: "工具调用",
+      labAddField: "字段",
+      labAdd: "添加",
+      labFieldKey: "字段名",
+      labFieldValue: "值（按 JSON 解析，解析不了就当文本）",
+      labFieldKeyEmpty: "先填字段名",
+      labFieldExists: "已经有这个字段了",
+      labNotNumber: "不是数字",
+      labInvalidFields: (n) => `有 ${n} 处写得不对（标红的地方），改好再继续`,
+      labEditJson: "以 JSON 编辑",
+      labEditForm: "回到表单",
+      labFormShort: "表单",
+      labToText: "改为文本",
+      labMoveUp: "上移",
+      labMoveDown: "下移",
+      labDuplicate: "复制一份",
+      labCollapse: "折叠",
+      labExpand: "展开",
+      labCollapseAll: "全部折叠",
+      labExpandAll: "全部展开",
+      labInsert: "在这里插入",
+      labUndo: "撤销",
+      labNoRole: "（无 role）",
+      labContentLabel: "内容",
+      labReasoningLabel: "思考",
+      labToolCallsLabel: "工具调用",
+      labToolCallIdLabel: "调用 ID",
+      labCallsCount: (n) => `${n} 个工具调用`,
+      labCallName: "函数名",
+      labCallArgs: "参数（JSON 字符串）",
+      labUnnamedTool: "未命名工具",
+      labToolName: "名称",
+      labToolDescription: "说明",
+      labToolParameters: "参数（JSON Schema）",
     },
     en: {
       labTitle: "Lab",
@@ -109,7 +153,6 @@
       labNoUserMessage: "This conversation has no user message.",
       labInvalidJson: "Invalid JSON",
       labNotObject: "The request body must be a JSON object",
-      labNoMessages: "The request body has no messages array",
       labFormatted: "Formatted",
       labAppended: "Appended to the request",
       labNoReply: "The response has no assistant message to append.",
@@ -129,6 +172,49 @@
       labLoad: "Load",
       labImportFailed: "Import failed",
       labRunFailed: "Run failed",
+      labModeBlocks: "Blocks",
+      labModeJson: "JSON",
+      labParams: "Parameters",
+      labMessages: "Messages",
+      labNoParams: "No parameters.",
+      labNoMessagesYet: "No messages yet.",
+      labNoToolsYet: "No tools.",
+      labAddMessages: "messages",
+      labAddTool: "Tool",
+      labAddToolCall: "Tool call",
+      labAddField: "Field",
+      labAdd: "Add",
+      labFieldKey: "Field name",
+      labFieldValue: "Value (parsed as JSON, otherwise kept as text)",
+      labFieldKeyEmpty: "Enter a field name first",
+      labFieldExists: "This field already exists",
+      labNotNumber: "Not a number",
+      labInvalidFields: (n) => `${n} place(s) are invalid (marked red); fix them first`,
+      labEditJson: "Edit as JSON",
+      labEditForm: "Back to form",
+      labFormShort: "Form",
+      labToText: "Make text",
+      labMoveUp: "Move up",
+      labMoveDown: "Move down",
+      labDuplicate: "Duplicate",
+      labCollapse: "Collapse",
+      labExpand: "Expand",
+      labCollapseAll: "Collapse all",
+      labExpandAll: "Expand all",
+      labInsert: "Insert here",
+      labUndo: "Undo",
+      labNoRole: "(no role)",
+      labContentLabel: "Content",
+      labReasoningLabel: "Reasoning",
+      labToolCallsLabel: "Tool calls",
+      labToolCallIdLabel: "Call ID",
+      labCallsCount: (n) => `${n} tool call(s)`,
+      labCallName: "Function name",
+      labCallArgs: "Arguments (JSON string)",
+      labUnnamedTool: "Unnamed tool",
+      labToolName: "Name",
+      labToolDescription: "Description",
+      labToolParameters: "Parameters (JSON Schema)",
     },
   };
 
@@ -176,6 +262,8 @@
   const copyResponseBtn = document.getElementById("btn-copy-response");
   const refreshBtn = document.getElementById("btn-refresh-history");
   const tabButtons = [...document.querySelectorAll("[data-tab]")];
+  const blocksEl = document.getElementById("lab-blocks");
+  const modeButtons = [...document.querySelectorAll("[data-mode]")];
 
   // ---- 状态 ----
   let currentRun = null;
@@ -185,13 +273,37 @@
   let running = null;
   let activeTab = "content";
   let runs = [];
+  /** "blocks"：块编辑器里的对象是请求体；"json"：文本框里的文字是请求体 */
+  let mode = "blocks";
 
-  function toast(text) {
-    toastEl.textContent = text;
+  /** 提示条；带 action 时多一个按钮（例如删除后的「撤销」），停留久一点 */
+  function toast(text, action) {
+    toastEl.innerHTML = "";
+    toastEl.appendChild(document.createTextNode(text));
+    if (action) {
+      const undo = document.createElement("button");
+      undo.type = "button";
+      undo.className = "toast-action";
+      undo.textContent = action.label;
+      undo.addEventListener("click", () => {
+        toastEl.classList.add("hidden");
+        action.run();
+      });
+      toastEl.appendChild(undo);
+    }
     toastEl.classList.remove("hidden");
     clearTimeout(toast._timer);
-    toast._timer = setTimeout(() => toastEl.classList.add("hidden"), 2200);
+    toast._timer = setTimeout(() => toastEl.classList.add("hidden"), action ? 5000 : 2200);
   }
+
+  const editor = window.createLabBlockEditor(blocksEl, {
+    t: (key, ...args) => t(key, ...args),
+    onChange: () => {
+      saveDraft();
+      clearError();
+    },
+    onToast: toast,
+  });
 
   function setStatus(text) {
     statusEl.textContent = text || "";
@@ -206,12 +318,16 @@
     setError("");
   }
 
+  /** 草稿存进 localStorage；块编辑时每次按键都会改，稍等一下再存（长请求体序列化不便宜） */
   function saveDraft() {
-    try {
-      localStorage.setItem(DRAFT_KEY, requestEl.value);
-    } catch {
-      /* localStorage 不可用时忽略 */
-    }
+    clearTimeout(saveDraft._timer);
+    saveDraft._timer = setTimeout(() => {
+      try {
+        localStorage.setItem(DRAFT_KEY, mode === "blocks" ? JSON.stringify(editor.getBody(), null, 2) : requestEl.value);
+      } catch {
+        /* localStorage 不可用时忽略 */
+      }
+    }, 300);
   }
 
   function template() {
@@ -227,11 +343,15 @@
   }
 
   function setRequest(body) {
-    requestEl.value = JSON.stringify(body, null, 2);
+    // 换了请求体，之前删除留下的「撤销」已经没有意义
+    if (toastEl.querySelector(".toast-action")) toastEl.classList.add("hidden");
+    if (mode === "blocks") editor.setBody(body);
+    else requestEl.value = JSON.stringify(body, null, 2);
     saveDraft();
   }
 
-  function parseRequest() {
+  /** 解析 JSON 文本框里的请求体 */
+  function parseRequestText() {
     const text = requestEl.value.trim();
     if (!text) throw new Error(t("labInvalidJson"));
     let body;
@@ -241,8 +361,45 @@
       throw new Error(`${t("labInvalidJson")}: ${cause.message}`);
     }
     if (!body || typeof body !== "object" || Array.isArray(body)) throw new Error(t("labNotObject"));
-    if (!Array.isArray(body.messages)) throw new Error(t("labNoMessages"));
     return body;
+  }
+
+  /** 当前请求体。块编辑时返回的就是正在编辑的对象；有标红的地方时不给 */
+  function parseRequest() {
+    if (mode === "json") return parseRequestText();
+    const count = editor.invalidCount();
+    if (count > 0) throw new Error(t("labInvalidFields", count));
+    return editor.getBody();
+  }
+
+  // ---- 块 / JSON 切换 ----
+
+  function applyMode() {
+    for (const button of modeButtons) button.classList.toggle("active", button.dataset.mode === mode);
+    blocksEl.classList.toggle("hidden", mode !== "blocks");
+    requestEl.classList.toggle("hidden", mode !== "json");
+    formatBtn.classList.toggle("hidden", mode !== "json");
+  }
+
+  function setMode(next) {
+    if (next === mode) return;
+    let body;
+    try {
+      body = parseRequest();
+    } catch (cause) {
+      setError(cause.message);
+      toast(cause.message);
+      return;
+    }
+    mode = next;
+    try {
+      localStorage.setItem(MODE_KEY, mode);
+    } catch {
+      /* ignore */
+    }
+    clearError();
+    setRequest(body);
+    applyMode();
   }
 
   // ---- 语言 ----
@@ -270,6 +427,7 @@
     for (const el of document.querySelectorAll("[data-i18n-title]")) el.title = t(el.dataset.i18nTitle);
     requestEl.placeholder = t("labPaste");
     choiceEl.title = t("labChoice");
+    editor.refresh();
     renderResponse();
     renderRuns();
     syncState();
@@ -512,7 +670,9 @@
       toast(cause.message);
       return;
     }
-    body.messages.push(message);
+    if (!Array.isArray(body.messages)) body.messages = [];
+    // 复制一份：块编辑器直接改请求体对象，不能和运行记录里的响应共用
+    body.messages.push(JSON.parse(JSON.stringify(message)));
     setRequest(body);
     clearError();
     const hasTools = Array.isArray(message.tool_calls) && message.tool_calls.length > 0;
@@ -604,7 +764,7 @@
               messageId: run.sourceMessageId || "",
             }
           : null;
-      setRequest(run.request);
+      setRequest(JSON.parse(JSON.stringify(run.request)));
       clearError();
       renderResponse();
       renderRuns();
@@ -723,6 +883,7 @@
   blankBtn.addEventListener("click", blank);
   importBtn.addEventListener("click", () => void openImport());
   formatBtn.addEventListener("click", formatRequest);
+  for (const button of modeButtons) button.addEventListener("click", () => setMode(button.dataset.mode));
   runBtn.addEventListener("click", () => void run());
   stopBtn.addEventListener("click", stop);
   appendBtn.addEventListener("click", appendReply);
@@ -770,18 +931,27 @@
   // ---- 启动 ----
 
   async function init() {
-    await initLanguage();
     let saved = null;
     try {
       saved = localStorage.getItem(DRAFT_KEY);
+      mode = localStorage.getItem(MODE_KEY) === "json" ? "json" : "blocks";
     } catch {
       /* ignore */
     }
+    let body = template();
     if (saved) {
-      requestEl.value = saved;
-    } else {
-      setRequest(template());
+      try {
+        requestEl.value = saved;
+        body = parseRequestText();
+      } catch {
+        // 上次留下的草稿不是合法的 JSON 对象：照原样留在 JSON 文本框里
+        mode = "json";
+        body = null;
+      }
     }
+    if (body) setRequest(body);
+    applyMode();
+    await initLanguage();
     renderResponse();
     await loadRuns();
   }

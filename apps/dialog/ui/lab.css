@@ -1,4 +1,4 @@
-/* 实验室（DIALOG-0020）：原始请求 / 响应工作台。 */
+/* 实验室（DIALOG-0020）：原始请求 / 响应工作台；请求体的块编辑器见 DIALOG-0021。 */
 
 .lab-body {
   overflow: hidden;
@@ -72,7 +72,7 @@
   white-space: nowrap;
 }
 
-.lab-request textarea {
+#lab-request {
   flex: 1;
   min-height: 0;
   width: 100%;
@@ -415,6 +415,366 @@
 #btn-stop.stop {
   background: var(--danger);
   border-color: var(--danger);
+}
+
+.toast-action {
+  border: 0;
+  background: none;
+  color: #9ec1ff;
+  font-weight: 600;
+  margin-left: 12px;
+  padding: 0;
+  cursor: pointer;
+}
+
+/* ---- 块编辑器（DIALOG-0021） ---- */
+
+.lab-blocks {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 10px 12px 16px;
+  background: #f8f9fb;
+}
+
+.lab-section {
+  margin-bottom: 14px;
+}
+
+.lab-section-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0 2px 6px;
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.lab-section-title {
+  font-weight: 600;
+  color: var(--fg);
+}
+
+.lab-section-count {
+  font-variant-numeric: tabular-nums;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  padding: 0 6px;
+  font-size: 11px;
+  background: #fff;
+}
+
+.lab-block {
+  background: #fff;
+  border: 1px solid var(--border);
+  border-left: 3px solid #9ca3af;
+  border-radius: 8px;
+}
+
+.lab-msg[data-role="system"] {
+  border-left-color: #8b5cf6;
+}
+
+.lab-msg[data-role="user"] {
+  border-left-color: var(--accent);
+}
+
+.lab-msg[data-role="assistant"] {
+  border-left-color: var(--ok);
+}
+
+.lab-msg[data-role="tool"] {
+  border-left-color: #f59e0b;
+}
+
+.lab-tool-def {
+  border-left-color: #0ea5e9;
+  margin-bottom: 6px;
+}
+
+.lab-params {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 8px 10px;
+}
+
+.lab-block-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 5px 8px;
+  min-height: 32px;
+  font-size: 12px;
+}
+
+.lab-block-index {
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+  min-width: 22px;
+}
+
+.lab-block-kind {
+  font-family: ui-monospace, Consolas, "Courier New", monospace;
+  color: var(--muted);
+}
+
+.lab-block-title {
+  font-weight: 600;
+  font-size: 13px;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.lab-block-preview {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--muted);
+}
+
+.lab-block-preview + .spacer {
+  flex: 0;
+}
+
+.lab-role {
+  padding: 2px 6px;
+  font-size: 12px;
+  font-weight: 600;
+  border-radius: 6px;
+}
+
+.lab-block-actions {
+  display: inline-flex;
+  gap: 1px;
+  opacity: 0.45;
+}
+
+.lab-block:hover > .lab-block-head .lab-block-actions,
+.lab-block-actions:focus-within {
+  opacity: 1;
+}
+
+.lab-icon {
+  border: 0;
+  background: none;
+  color: var(--muted);
+  cursor: pointer;
+  padding: 1px 5px;
+  border-radius: 5px;
+  font-size: 12px;
+  white-space: nowrap;
+}
+
+.lab-icon:hover {
+  background: #f3f4f6;
+  color: var(--fg);
+}
+
+.lab-icon.lab-fold {
+  font-size: 10px;
+}
+
+.lab-blocks .link-btn {
+  align-self: flex-start;
+}
+
+.lab-blocks .lab-add-field .link-btn {
+  align-self: center;
+}
+
+.lab-block-body {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 2px 10px 10px;
+}
+
+.lab-block.as-json > .lab-text {
+  display: block;
+  margin: 0 10px 10px;
+  width: calc(100% - 20px);
+}
+
+.lab-field {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  min-width: 0;
+}
+
+.lab-field.inline {
+  display: grid;
+  grid-template-columns: minmax(110px, 170px) 1fr;
+  align-items: start;
+  gap: 8px;
+}
+
+.lab-field.inline > .lab-field-head {
+  padding-top: 5px;
+}
+
+.lab-field-head {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+
+.lab-field-key {
+  font-size: 12px;
+  color: var(--muted);
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.lab-field-raw {
+  margin-left: 6px;
+  font-family: ui-monospace, Consolas, "Courier New", monospace;
+  font-size: 11px;
+  color: #9ca3af;
+}
+
+.lab-field-actions {
+  margin-left: auto;
+  display: inline-flex;
+  gap: 1px;
+  visibility: hidden;
+}
+
+.lab-field:hover > .lab-field-head .lab-field-actions,
+.lab-field-actions:focus-within {
+  visibility: visible;
+}
+
+.lab-blocks textarea.lab-text {
+  width: 100%;
+  field-sizing: content;
+  min-height: 32px;
+  max-height: 360px;
+  overflow: auto;
+  resize: vertical;
+  padding: 6px 8px;
+  border-radius: 6px;
+  font-size: 13.5px;
+  line-height: 1.55;
+}
+
+.lab-blocks textarea.lab-text.big {
+  min-height: 54px;
+  max-height: 420px;
+}
+
+.lab-blocks textarea.lab-text.mono {
+  font-family: ui-monospace, Consolas, "Courier New", monospace;
+  font-size: 12.5px;
+  tab-size: 2;
+}
+
+.lab-blocks .lab-line {
+  width: 100%;
+  padding: 4px 8px;
+  border-radius: 6px;
+  font-size: 13px;
+}
+
+.lab-line-wrap {
+  display: block;
+  min-width: 0;
+}
+
+.lab-blocks .invalid {
+  border-color: var(--danger);
+  background: #fff5f5;
+}
+
+.lab-insert {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  height: 8px;
+  padding: 0 10px;
+  overflow: hidden;
+  opacity: 0;
+  font-size: 11px;
+  transition:
+    height 0.12s,
+    opacity 0.12s;
+}
+
+.lab-insert:hover {
+  height: 24px;
+  opacity: 1;
+}
+
+.lab-insert-label {
+  color: var(--muted);
+}
+
+.lab-add-row {
+  display: flex;
+  gap: 14px;
+  padding: 8px 2px 0;
+}
+
+.lab-block-more {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 14px;
+}
+
+.lab-field-adder {
+  display: contents;
+}
+
+.lab-add-field {
+  display: grid;
+  grid-template-columns: minmax(110px, 170px) 1fr auto;
+  align-items: center;
+  gap: 8px;
+  flex-basis: 100%;
+}
+
+.lab-call {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  border: 1px dashed var(--border);
+  border-radius: 6px;
+  padding: 6px;
+  margin-bottom: 4px;
+}
+
+.lab-call-head {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.lab-call-head > .lab-line,
+.lab-call-head > .lab-line-wrap {
+  flex: 1;
+}
+
+.lab-call-head .lab-call-name {
+  font-weight: 600;
+}
+
+.lab-call-head .lab-call-id {
+  font-family: ui-monospace, Consolas, "Courier New", monospace;
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.lab-blocks .lab-empty {
+  padding: 6px 2px;
 }
 
 @media (max-width: 800px) {

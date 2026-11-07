@@ -25,10 +25,15 @@
       <section class="lab-pane lab-request">
         <div class="lab-pane-head">
           <span data-i18n="labRequest">请求体</span>
+          <div class="lab-tabs">
+            <button type="button" data-mode="blocks" data-i18n="labModeBlocks">块</button>
+            <button type="button" data-mode="json" data-i18n="labModeJson">JSON</button>
+          </div>
           <span id="lab-source" class="lab-source"></span>
           <span id="lab-error" class="lab-error"></span>
         </div>
-        <textarea id="lab-request" spellcheck="false" autocomplete="off" autocapitalize="off"></textarea>
+        <div id="lab-blocks" class="lab-blocks"></div>
+        <textarea id="lab-request" class="hidden" spellcheck="false" autocomplete="off" autocapitalize="off"></textarea>
       </section>
 
       <section class="lab-pane lab-response">
@@ -68,6 +73,7 @@
     <script src="vendor/purify.min.js"></script>
     <script src="vendor/katex.min.js"></script>
     <script src="markdown.js"></script>
+    <script src="lab-blocks.js"></script>
     <script src="lab.js"></script>
   </body>
 </html>

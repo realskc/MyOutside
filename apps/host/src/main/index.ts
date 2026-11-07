@@ -698,12 +698,42 @@ async function runSmoke(win: BrowserWindow): Promise<void> {
               : { ok: false, code: r.error.code };
           }
         }
+        // 块编辑器（DIALOG-0021）：在块里改内容，切到 JSON 能看到；再从对话导入，消息逐条变成块
+        const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+        document.querySelector('[data-mode="blocks"]').click();
+        document.getElementById("btn-blank").click();
+        const blocksBefore = document.querySelectorAll("#lab-blocks .lab-msg").length;
+        const userText = document.querySelector('#lab-blocks .lab-msg[data-role="user"] textarea');
+        let synced = false;
+        if (userText) {
+          userText.value = "smoke-hello";
+          userText.dispatchEvent(new Event("input"));
+          document.querySelector('[data-mode="json"]').click();
+          const json = JSON.parse(document.getElementById("lab-request").value);
+          synced = json.messages.some((message) => message.content === "smoke-hello");
+          document.querySelector('[data-mode="blocks"]').click();
+        }
+        let imported = null;
+        if (id) {
+          document.getElementById("btn-import").click();
+          for (let i = 0; i < 20 && !document.querySelector(".lab-import-item"); i += 1) await sleep(100);
+          const item = document.querySelector(".lab-import-item");
+          if (item) {
+            item.click();
+            for (let i = 0; i < 20 && document.querySelectorAll("#lab-blocks .lab-msg").length <= 2; i += 1) await sleep(100);
+            imported = {
+              messages: document.querySelectorAll("#lab-blocks .lab-msg").length,
+              tools: document.querySelectorAll("#lab-blocks .lab-tool-def").length,
+            };
+          }
+        }
         return {
           title: document.title,
           hasRequest: !!document.getElementById("lab-request"),
           hasRun: !!document.getElementById("btn-run"),
           hasHistory: !!document.getElementById("lab-runs"),
           request,
+          blocks: { before: blocksBefore, synced, imported },
         };
       })()`,
     );

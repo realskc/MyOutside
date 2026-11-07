@@ -16,6 +16,7 @@
 ## 实验对话（实验室）
 
 - 对话应用里另有一个**实验室**页面，用于做实验：直接编辑发给模型的完整请求体（system prompt、任意消息、工具、参数），原样运行并查看原始响应。
+- 请求体**不能只是纯文本编辑 JSON**（作者：虽说要做实验，但这个纯文本也太离谱了）：要有一个界面，例如一块一块地编辑，也可以删除某个块；只要确保仍然能调整 JSON 中的一切。变成块会让人类更易用一点（实现见 [DIALOG-0021](decisions/DIALOG-0021-lab-block-editor.md)）。
 - 每次运行都保存完整记录（请求、响应、用量、状态），失败的运行也保留；可以从对话导入某个用户消息对应的真实请求，原对话不受影响。
 - 普通对话的消息仍然永久保留；实验室的运行记录是实验草稿，可以单独删除。
 - 第一版**不自动执行工具**：模型返回的工具调用只展示，工具结果由作者手动填写。
@@ -41,7 +42,7 @@
 - 搜索结果的呈现：[DIALOG-0010](decisions/DIALOG-0010-search-results-presentation.md)
 - 模型：固定使用 deepseek-flash，[DIALOG-0013](decisions/DIALOG-0013-flash-only.md)
 - 界面细节：[DIALOG-0007](decisions/DIALOG-0007-dialog-ui-details.md)；Markdown 与 LaTeX 渲染：[DIALOG-0015](decisions/DIALOG-0015-markdown-and-latex.md)
-- 实验室：[DIALOG-0020](decisions/DIALOG-0020-laboratory.md)
+- 实验室：[DIALOG-0020](decisions/DIALOG-0020-laboratory.md)；请求体的块编辑：[DIALOG-0021](decisions/DIALOG-0021-lab-block-editor.md)
 
 ## 未定
 

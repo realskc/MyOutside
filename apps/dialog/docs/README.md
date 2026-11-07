@@ -5,7 +5,7 @@
 ## 1. 结构
 
 - 后端：`apps/dialog/backend/src/`（`index.ts` = AppModule；`history.ts` = 上下文预算截断；`mapping.ts` = 行 ↔ 对象转换）
-- 界面：`apps/dialog/ui/`（静态 HTML / JS；`markdown.js` = 极简 Markdown 渲染；实验室 = `lab.html` / `lab.js` / `lab.css`）
+- 界面：`apps/dialog/ui/`（静态 HTML / JS；`markdown.js` = 极简 Markdown 渲染；实验室 = `lab.html` / `lab.js` / `lab-blocks.js` / `lab.css`）
 - 契约：`packages/contracts/src/dialog.ts`
 - 测试：`apps/dialog/test/dialog.test.ts`
 
@@ -148,12 +148,12 @@ dialog.deleteLabRun({ runId }) → { ok }
 ## 6. 实验室（DIALOG-0020）
 
 - 页面：`ui/lab.html` + `lab.js` / `lab.css`；顶栏一个入口，不新增 app。
-- 请求体：JSON 文本编辑器，原样保存到 `lab_run.request`；可编辑 `messages` / `tools` / `model` / `temperature` / `reasoning_effort` 等；「格式化」只做 JSON 美化。
+- 请求体（DIALOG-0021）：默认用块编辑（`ui/lab-blocks.js`：参数 / 消息 / 工具三段，每条消息、每个工具一块；认不得的字段与不常规的形状用 JSON 文本框；任何字段、任何块都可以切到 JSON 编辑），也可以切到整份 JSON 文本（「格式化」只在这里，只做 JSON 美化）；两种视图编辑的是同一个请求体，原样保存到 `lab_run.request`。写错的 JSON / 数字标红，有标红时不能运行、不能切换视图；删除可撤销。草稿与视图选择存在 localStorage（`dialog.lab.request`、`dialog.lab.mode`）。前端只要求请求体是 JSON 对象，其余交给 DeepSeek 报错。
 - 运行：`dialog.labRun`（普通的异步函数）→ `platform.ai.chatRaw`（D-0082）；成功或失败都先 `saveLabRun` 落一条记录；v1 非流式，`stream: true` 直接报错并存为 error。
 - 响应：正文用 `ui/markdown.js` 渲染；思考 / 工具 / 原始 JSON 分 tab；多条 choice 可以选择；「把回复加入消息」把选中的 assistant 消息推进当前请求体的 `messages`（含 `tool_calls` 时，工具结果由作者手动补 `role=tool` 消息）。
 - 运行记录：`listLabRuns` 最近 200 条；可读取、删除；失败和取消（aborted）也保留。
 - 从对话导入：`getPath` 找当前分支最后一条用户消息 → `getRequest` 导出真实请求；原对话不变。
-- 明确不做（v1）：自动执行工具、结构化消息编辑器、多实验线程、请求预设、流式。
+- 明确不做（v1）：自动执行工具、多实验线程、请求预设、流式。
 
 ## 7. 规划中的技术设计
 
