@@ -28,9 +28,16 @@ bass, drums, other, vocals, guitar, piano
 - `elicwhite/bs-roformer-web` 提供浏览器 ONNX 版本：fp16 约 336MB、fp32 约 669MB，使用 WebGPU。
 - 原 `jarredou` Hugging Face 账号已删除；当前镜像用于恢复可下载性。
 
+## SDR 数字的来源核查（2026-11-07）
+
+- 权重模型卡没有评测数字；`enerjazzer` 的 README 只有一句「Edited version... allow use with UVR and MSST」。
+- `guitar 9.05 / piano 7.83 / other 8.71` 出现在下游项目 [mason369/music-to-midi](https://github.com/mason369/music-to-midi) 的 README 里；该文档把口径归到「MVSEP Algorithms #77」，并注明这些是分离 SDR、不是最终 MIDI F1。它不是模型官方卡或 MSST 官方表。
+- 另有 MVSEP Quality Checker 条目 #10847（2026-10 提交）的记录采用 **4 轨合并评测**：instrum 17.57、bass 14.56、drums 14.04、vocals 11.27、other（含 guitar + piano）8.66；没有单独列出 guitar / piano SDR。
+- `htdemucs_6s` 的 `guitar 5.22 / piano 2.23` 不是 Demucs 官方基准。Demucs 官方 README 只说六源是实验性的、piano 有大量串音和伪影，并未给出这两个数字。
+- 因此 `9.05 / 7.83` 只能作为「社区/下游引用」线索，不能写成官方 MVSEP 或 MSST 跑分；实际选型必须以本机 A/B 为准。
+
 ## 未核实 / 风险
 
-- Gemini 给出的 SDR（guitar 9.05、piano 7.83；htdemucs_6s 5.22 / 2.23）我还没有找到原始 MVSEP 表格或模型卡出处，先不作为事实。
 - 权重没有明确许可证；代码 MIT 不等于权重可分发，正式分发前必须确认。
 - `audio-separator` 的模型列表里有 `BS-Roformer-SW.ckpt` / `BS-Roformer-SW.yaml` 条目，但没有确认它是否等同于 `BS-Rofo-SW-Fixed.ckpt`；Gemini 说的「audio-separator 已内置 Fixed 映射」需要本地验证。
 - 699MB 权重 + PyTorch 的显存/耗时需要实测；GGUF/ONNX 是另一条部署路线。

@@ -20,7 +20,9 @@
 |---|---|---|---|
 | [Audio Separator](audio-separator/Audio-Separator.md) | 推理工具 / Python 包 | 注册表含 BS-RoFormer SW / Demucs 6s；需确认具体权重 | UVR 模型集合、CLI / Python API、模型下载、ensemble |
 | [Music Source Separation Training](music-source-separation-training/Music-Source-Separation-Training.md) | 训练 + 推理框架 | 官方表里是 HTDemucs4 6s | 包含 BS-RoFormer、Mel-Band RoFormer、SCNet、MDX23C 等；官方表没有强六轨，但社区权重可接 |
-| [BS-RoFormer SW 6-stem](bs-roformer/BS-RoFormer-SW-6stem.md) | 社区权重 | **是**（bass / drums / other / vocals / guitar / piano） | 当前最值得 A/B 的本地六轨候选；权重许可证 unknown |
+| [BS-RoFormer SW 6-stem](bs-roformer/BS-RoFormer-SW-6stem.md) | 社区权重 | **是**（bass / drums / other / vocals / guitar / piano） | 当前最值得 A/B 的本地六轨候选；权重许可证 unknown；SDR 数字来自下游项目，非官方 |
+| [HTDemucs 6-stem](demucs/HTDemucs-6s.md) | 当前权重 | 是（六轨） | Demucs 官方称六源实验性、piano 串音/伪影明显 |
+| [Music-to-MIDI（mason369）](music-to-midi/Music-to-MIDI.md) | 下游整合工具 | 使用 BS-RoFormer SW 六轨 | 其 README 是 9.05 / 7.83 数字的来源之一；不是官方 benchmark |
 | [BS-RoFormer](bs-roformer/BS-RoFormer.md) | 模型架构 | 否（主要 2 轨） | 人声 / 伴奏强；适合作为级联第一阶段 |
 | [SCNet](scnet/SCNet.md) | 模型架构 | 否（4 轨） | 鼓、贝斯、其他人声之外的分离强 |
 | [Mel-Band RoFormer Guitar](becruily/Mel-Band-RoFormer-Guitar.md) | 社区单轨权重 | 否（Guitar / Other） | 目标提取吉他；许可证和效果待验证 |
@@ -45,7 +47,8 @@
 - Gemini 说的 **BS-RoFormer SW 六轨**确实存在：`enerjazzer/BS-ROFO-SW-Fixed` / `FractalSurfer/BS-RoFormer-SW-6stem` 提供权重，`openmirlab/bs-roformer-infer` 把它作为默认模型之一；它不在 MSST 官方预训练表里，属于社区权重。
 - Gemini 说的 **MSST 社区 RoFormer / MDX23C 吉他与钢琴专属单轨模型**：MSST 官方表和文件树里没有；目前能确认的开放候选是 `becruily/mel-band-roformer-guitar`（Guitar / Other，许可证未声明），钢琴有 HF 上的非商用模型。不能把「有专精转录模型」误当成「有六轨分离模型」。
 - Gemini 的 Transkun / ByteDance Piano / Basic Pitch / YourMT3+ / SOME 属于**转 MIDI**，不是分轨。
-- Gemini 给的 guitar 9.05 / piano 7.83 SDR 数字尚未找到原始出处；先不作为事实。
+- `guitar 9.05 / piano 7.83` 来自下游 [Music-to-MIDI](music-to-midi/Music-to-MIDI.md) README，不是 BS-RoFormer SW 模型卡或 MSST 官方表；MVSEP 另一条记录采用 4 轨合并口径，没有单独 guitar/piano SDR。
+- `htdemucs_6s` 的 `5.22 / 2.23` 不是 Demucs 官方基准；官方只说六源实验性、piano 串音/伪影明显。
 - `audio-separator` 的模型列表里有 `BS-Roformer-SW.ckpt`，但没有确认它等同于 `BS-Rofo-SW-Fixed.ckpt`；`bs-roformer-infer` 才是明确绑定 Fixed 版的工具。
 - 因此「强六轨」不是完全不存在：**BS-RoFormer SW 6-stem**是目前最值得实测的候选；只是它不在 MSST 官方仓库里。
 
