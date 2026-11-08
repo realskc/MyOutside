@@ -173,6 +173,7 @@
   const midiAddBtn = document.getElementById("btn-midi-add");
   const midiClearBtn = document.getElementById("btn-midi-clear");
   const midiCloseBtn = document.getElementById("btn-midi-close");
+  const midiPlayBtn = document.getElementById("btn-midi-play");
   const midiZoomInBtn = document.getElementById("btn-midi-zoom-in");
   const midiZoomOutBtn = document.getElementById("btn-midi-zoom-out");
   const midiFitBtn = document.getElementById("btn-midi-fit");
@@ -210,6 +211,17 @@
   let midiDragging = null;
   let midiHover = null;
   let midiNeedsFit = true;
+  let midiPlaying = false;
+  let midiPausedAt = 0;
+  let midiAudioContext = null;
+  let midiPlayStart = 0;
+  let midiPlayFrom = 0;
+  let midiPlayEnd = 0;
+  let midiMasterGain = null;
+  let midiScheduledIndex = 0;
+  let midiNoteEvents = [];
+  let midiScheduleTimer = null;
+  let midiAnimationFrame = null;
 
   const STEM_ORDER = ["vocals", "drums", "bass", "other", "guitar", "piano"];
   const STEM_LABEL_KEY = {
@@ -273,6 +285,7 @@
     renderTrackList();
     renderDetail();
     updatePlayButton();
+    updateMidiPlayButton();
   }
 
   // ---- MIDI 钢琴卷帘 ----
@@ -350,6 +363,7 @@
         chip.appendChild(dot);
         chip.appendChild(label);
         chip.addEventListener("click", () => {
+          stopMidiPlayback(true);
           track.visible = !track.visible;
           chip.classList.toggle("off", !track.visible);
           updateMidiHover(null);
@@ -472,6 +486,26 @@
       ctx.strokeRect(rect.x, rect.y, rect.w, rect.h);
     }
 
+    const currentTime = midiCurrentTime();
+    if (midiPlaying || midiPausedAt > 0) {
+      const playheadX = plot.left + (currentTime - start) * midiView.pps;
+      if (playheadX >= plot.left && playheadX <= plot.left + plot.plotW) {
+        ctx.strokeStyle = "#e04b4b";
+        ctx.lineWidth = 1.5;
+        ctx.beginPath();
+        ctx.moveTo(playheadX, plot.top);
+        ctx.lineTo(playheadX, plot.top + plot.plotH);
+        ctx.stroke();
+        ctx.fillStyle = "#e04b4b";
+        ctx.beginPath();
+        ctx.moveTo(playheadX - 4, plot.top);
+        ctx.lineTo(playheadX + 4, plot.top);
+        ctx.lineTo(playheadX, plot.top + 7);
+        ctx.closePath();
+        ctx.fill();
+      }
+    }
+
     ctx.strokeStyle = "rgba(100, 116, 139, 0.35)";
     ctx.lineWidth = 1;
     ctx.strokeRect(plot.left, plot.top, plot.plotW, plot.plotH);
@@ -537,6 +571,132 @@
     else drawMidi();
   }
 
+  function midiNoteFrequency(note) {
+    return 440 * 2 ** ((note - 69) / 12);
+  }
+
+  function midiCurrentTime() {
+    if (midiPlaying && midiAudioContext) {
+      return midiPlayFrom + Math.max(0, midiAudioContext.currentTime - midiPlayStart);
+    }
+    return midiPausedAt;
+  }
+
+  function updateMidiPlayButton() {
+    midiPlayBtn.textContent = midiPlaying ? "❚❚" : "▶";
+    midiPlayBtn.setAttribute("aria-label", midiPlaying ? t("pause") : t("play"));
+    midiPlayBtn.title = midiPlaying ? t("pause") : t("play");
+  }
+
+  function scheduleMidiNote(item, at) {
+    const ctx = midiAudioContext;
+    if (!ctx || !midiMasterGain) return;
+    const note = item.note;
+    const duration = Math.max(0.06, Math.min(note.duration, 8));
+    const velocity = Math.max(0.05, Math.min(1, note.velocity));
+    const oscillator = ctx.createOscillator();
+    const gain = ctx.createGain();
+    oscillator.type = "triangle";
+    oscillator.frequency.setValueAtTime(midiNoteFrequency(note.midi), at);
+    const peak = 0.06 * (0.35 + 0.65 * velocity);
+    gain.gain.setValueAtTime(0.0001, at);
+    gain.gain.exponentialRampToValueAtTime(peak, at + 0.012);
+    gain.gain.exponentialRampToValueAtTime(0.0001, at + duration);
+    oscillator.connect(gain);
+    gain.connect(midiMasterGain);
+    oscillator.start(at);
+    oscillator.stop(at + duration + 0.03);
+    oscillator.addEventListener("ended", () => {
+      oscillator.disconnect();
+      gain.disconnect();
+    });
+  }
+
+  function scheduleMidiNotes() {
+    if (!midiPlaying || !midiAudioContext) return;
+    const now = midiCurrentTime();
+    while (midiScheduledIndex < midiNoteEvents.length) {
+      const item = midiNoteEvents[midiScheduledIndex];
+      if (item.note.time > now + 0.35) break;
+      midiScheduledIndex += 1;
+      const at = midiPlayStart + (item.note.time - midiPlayFrom);
+      if (at < midiAudioContext.currentTime - 0.1) continue;
+      scheduleMidiNote(item, at);
+    }
+    if (now > midiPlayEnd + 0.15) stopMidiPlayback(true);
+  }
+
+  function midiAnimationLoop() {
+    if (!midiPlaying) return;
+    drawMidi();
+    midiAnimationFrame = requestAnimationFrame(midiAnimationLoop);
+  }
+
+  async function startMidiPlayback(from) {
+    if (!midiLayers.length || midiPlaying) return;
+    const startAt = Math.max(0, Number.isFinite(from) ? from : 0);
+    const events = allMidiNotes(true)
+      .filter(({ note }) => note.time >= startAt - 0.02)
+      .sort((a, b) => a.note.time - b.note.time);
+    if (events.length === 0) return;
+    const end = Math.max(...events.map(({ note }) => note.time + note.duration), startAt);
+    const context = new AudioContext({ latencyHint: "interactive" });
+    if (context.state === "suspended") await context.resume();
+    midiAudioContext = context;
+    midiPlayFrom = startAt;
+    midiPlayStart = context.currentTime + 0.08;
+    midiPlayEnd = end;
+    midiNoteEvents = events;
+    midiScheduledIndex = 0;
+    midiMasterGain = context.createGain();
+    midiMasterGain.gain.value = 0.18;
+    const compressor = context.createDynamicsCompressor();
+    compressor.threshold.value = -18;
+    compressor.knee.value = 20;
+    compressor.ratio.value = 4;
+    midiMasterGain.connect(compressor);
+    compressor.connect(context.destination);
+    midiPlaying = true;
+    updateMidiPlayButton();
+    midiScheduleTimer = setInterval(scheduleMidiNotes, 30);
+    scheduleMidiNotes();
+    midiAnimationLoop();
+  }
+
+  function stopMidiPlayback(reset) {
+    const current = midiCurrentTime();
+    if (midiScheduleTimer) {
+      clearInterval(midiScheduleTimer);
+      midiScheduleTimer = null;
+    }
+    if (midiAnimationFrame) {
+      cancelAnimationFrame(midiAnimationFrame);
+      midiAnimationFrame = null;
+    }
+    const wasPlaying = midiPlaying;
+    midiPlaying = false;
+    midiPausedAt = reset ? 0 : Math.max(0, Math.min(current, midiPlayEnd || current));
+    if (midiAudioContext) {
+      const context = midiAudioContext;
+      midiAudioContext = null;
+      void context.close();
+    }
+    midiMasterGain = null;
+    midiNoteEvents = [];
+    midiScheduledIndex = 0;
+    if (wasPlaying) updateMidiPlayButton();
+    drawMidi();
+  }
+
+  function toggleMidiPlayback() {
+    if (midiPlaying) {
+      stopMidiPlayback(false);
+      return;
+    }
+    const from = midiPausedAt >= midiPlayEnd - 0.05 ? 0 : midiPausedAt;
+    void startMidiPlayback(from);
+  }
+
   function openMidiModal() {
     midiModal.classList.remove("hidden");
     midiNeedsFit = true;
@@ -544,6 +704,7 @@
   }
 
   function closeMidiModal() {
+    stopMidiPlayback(true);
     midiModal.classList.add("hidden");
     midiDragging = null;
     midiCanvas.classList.remove("dragging");
@@ -564,6 +725,7 @@
     }
     if (!Array.isArray(paths) || paths.length === 0) return;
 
+    stopMidiPlayback(true);
     midiAddBtn.disabled = true;
     try {
       for (const path of paths) {
@@ -589,6 +751,7 @@
   }
 
   function clearMidiLayers() {
+    stopMidiPlayback(true);
     midiLayers = [];
     midiNeedsFit = true;
     midiView = { start: 0, pps: 80, pitchMin: 21, pitchMax: 108 };
@@ -607,6 +770,7 @@
     });
     midiAddBtn.addEventListener("click", () => void addMidiFiles());
     midiClearBtn.addEventListener("click", clearMidiLayers);
+    midiPlayBtn.addEventListener("click", toggleMidiPlayback);
     midiFitBtn.addEventListener("click", () => {
       midiNeedsFit = true;
       fitMidiView();

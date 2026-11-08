@@ -645,6 +645,12 @@ button {
   padding: 6px 10px;
 }
 
+.midi-controls .midi-play {
+  min-width: 44px;
+  font-size: 15px;
+  font-weight: 600;
+}
+
 .midi-zoom-label {
   min-width: 44px;
   color: var(--muted);
