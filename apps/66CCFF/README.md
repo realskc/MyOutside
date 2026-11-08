@@ -1,6 +1,6 @@
 # 纯蓝（66CCFF）
 
-六轨分离 + 内建慢放播放器，用于学音乐时听清、放慢、循环练习。
+六轨分离 + 内建慢放播放器，用于学音乐时听清、放慢、循环练习；另有只读 MIDI 卷帘，用于对比不同转写结果。
 
 - 作者预期：[`user-spec/README.md`](user-spec/README.md)
 - 技术文档：[`docs/README.md`](docs/README.md)

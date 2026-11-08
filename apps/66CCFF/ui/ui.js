@@ -54,6 +54,13 @@
       stemOther: "其他",
       stemGuitar: "吉他",
       stemPiano: "钢琴",
+      midiRoll: "MIDI 卷帘",
+      addMidi: "添加 MIDI",
+      clearMidi: "清空",
+      midiEmpty: "添加 MIDI 文件查看钢琴卷帘",
+      fit: "适应",
+      pickerUnavailable: "文件选择器不可用",
+      midiLoadFailed: "MIDI 加载失败：",
     },
     en: {
       appTitle: "66CCFF",
@@ -102,6 +109,13 @@
       stemOther: "Other",
       stemGuitar: "Guitar",
       stemPiano: "Piano",
+      midiRoll: "MIDI roll",
+      addMidi: "Add MIDI",
+      clearMidi: "Clear",
+      midiEmpty: "Add MIDI files to view the piano roll",
+      fit: "Fit",
+      pickerUnavailable: "File picker unavailable",
+      midiLoadFailed: "Failed to load MIDI: ",
     },
   };
 
@@ -149,6 +163,19 @@
   const clearLoopBtn = document.getElementById("btn-clear-loop");
   const loopLabel = document.getElementById("loop-label");
   const mixerEl = document.getElementById("mixer");
+  const midiBtn = document.getElementById("btn-midi");
+  const midiModal = document.getElementById("midi-modal");
+  const midiCanvas = document.getElementById("midi-canvas");
+  const midiEmptyEl = document.getElementById("midi-empty");
+  const midiLegendEl = document.getElementById("midi-legend");
+  const midiNoteInfoEl = document.getElementById("midi-note-info");
+  const midiZoomLabel = document.getElementById("midi-zoom-label");
+  const midiAddBtn = document.getElementById("btn-midi-add");
+  const midiClearBtn = document.getElementById("btn-midi-clear");
+  const midiCloseBtn = document.getElementById("btn-midi-close");
+  const midiZoomInBtn = document.getElementById("btn-midi-zoom-in");
+  const midiZoomOutBtn = document.getElementById("btn-midi-zoom-out");
+  const midiFitBtn = document.getElementById("btn-midi-fit");
   const toastEl = document.getElementById("toast");
   const audioHolder = document.getElementById("audio-holder");
 
@@ -168,6 +195,21 @@
   let master = null;
   let playing = false;
   let loop = { enabled: false, a: null, b: null };
+
+  const MIDI_PAD = { left: 46, right: 14, top: 26, bottom: 20 };
+  const MIDI_COLORS = [
+    ["#1596cc", "#56b4df", "#0b6d93", "#8bd8f4"],
+    ["#d97706", "#efa24b", "#a84f05", "#ffc98c"],
+    ["#7c3aed", "#a78bfa", "#5b21b6", "#c4b5fd"],
+    ["#0f766e", "#2dd4bf", "#115e59", "#99f6e4"],
+  ];
+  let midiLayers = [];
+  let midiView = { start: 0, pps: 80, pitchMin: 21, pitchMax: 108 };
+  let midiFitPps = 80;
+  let midiCanvasSize = { w: 0, h: 0 };
+  let midiDragging = null;
+  let midiHover = null;
+  let midiNeedsFit = true;
 
   const STEM_ORDER = ["vocals", "drums", "bass", "other", "guitar", "piano"];
   const STEM_LABEL_KEY = {
@@ -231,6 +273,413 @@
     renderTrackList();
     renderDetail();
     updatePlayButton();
+  }
+
+  // ---- MIDI 钢琴卷帘 ----
+
+  function midiNoteName(value) {
+    const names = ["C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"];
+    const note = Math.round(value);
+    return `${names[((note % 12) + 12) % 12]}${Math.floor(note / 12) - 1}`;
+  }
+
+  function midiColor(layerIndex, trackIndex) {
+    const palette = MIDI_COLORS[layerIndex % MIDI_COLORS.length];
+    return palette[trackIndex % palette.length];
+  }
+
+  function allMidiNotes(visibleOnly) {
+    const notes = [];
+    midiLayers.forEach((layer, layerIndex) => {
+      layer.tracks.forEach((track, trackIndex) => {
+        if (visibleOnly && !track.visible) return;
+        for (const note of track.notes) notes.push({ note, layer, layerIndex, track, trackIndex });
+      });
+    });
+    return notes;
+  }
+
+  function midiPlot() {
+    const left = MIDI_PAD.left;
+    const top = MIDI_PAD.top;
+    const plotW = Math.max(1, midiCanvasSize.w - left - MIDI_PAD.right);
+    const plotH = Math.max(1, midiCanvasSize.h - top - MIDI_PAD.bottom);
+    const pitchCount = Math.max(1, midiView.pitchMax - midiView.pitchMin + 1);
+    return { left, top, plotW, plotH, pitchCount, rowH: plotH / pitchCount };
+  }
+
+  function midiNoteRect(note, plot) {
+    const x = plot.left + (note.time - midiView.start) * midiView.pps;
+    const y = plot.top + (midiView.pitchMax - note.midi) * plot.rowH;
+    return {
+      x,
+      y,
+      w: Math.max(2, note.duration * midiView.pps),
+      h: Math.max(2, plot.rowH - 1),
+    };
+  }
+
+  function chooseTimeStep(pps) {
+    const steps = [0.25, 0.5, 1, 2, 5, 10, 15, 30, 60, 120, 300, 600];
+    const minimumPixels = 74;
+    return steps.find((step) => step * pps >= minimumPixels) ?? steps[steps.length - 1];
+  }
+
+  function updateMidiEmpty() {
+    midiEmptyEl.classList.toggle("hidden", midiLayers.length > 0);
+  }
+
+  function updateMidiZoomLabel() {
+    const percent = midiFitPps > 0 ? Math.round((midiView.pps / midiFitPps) * 100) : 100;
+    midiZoomLabel.textContent = `${percent}%`;
+  }
+
+  function renderMidiLegend() {
+    midiLegendEl.innerHTML = "";
+    midiLayers.forEach((layer, layerIndex) => {
+      layer.tracks.forEach((track, trackIndex) => {
+        const chip = document.createElement("button");
+        chip.type = "button";
+        chip.className = "midi-track-chip" + (track.visible ? "" : " off");
+        chip.title = `${layer.name} · ${track.name}`;
+        const dot = document.createElement("span");
+        dot.className = "midi-color-dot";
+        dot.style.background = midiColor(layerIndex, trackIndex);
+        const label = document.createElement("span");
+        label.textContent = `${layer.name} · ${track.name} (${track.notes.length})`;
+        chip.appendChild(dot);
+        chip.appendChild(label);
+        chip.addEventListener("click", () => {
+          track.visible = !track.visible;
+          chip.classList.toggle("off", !track.visible);
+          updateMidiHover(null);
+          drawMidi();
+        });
+        midiLegendEl.appendChild(chip);
+      });
+    });
+  }
+
+  function fitMidiView() {
+    if (!midiCanvasSize.w || !midiCanvasSize.h) return;
+    const notes = allMidiNotes(false);
+    if (notes.length === 0) {
+      midiView = { start: 0, pps: 80, pitchMin: 21, pitchMax: 108 };
+      midiFitPps = 80;
+      midiNeedsFit = false;
+      updateMidiZoomLabel();
+      drawMidi();
+      return;
+    }
+    let end = 1;
+    let minPitch = 127;
+    let maxPitch = 0;
+    for (const { note, layer } of notes) {
+      end = Math.max(end, note.time + note.duration, layer.duration || 0);
+      minPitch = Math.min(minPitch, note.midi);
+      maxPitch = Math.max(maxPitch, note.midi);
+    }
+    midiView.start = 0;
+    midiView.pitchMin = Math.max(0, minPitch - 2);
+    midiView.pitchMax = Math.min(127, maxPitch + 2);
+    midiView.pps = Math.max(1, (midiCanvasSize.w - MIDI_PAD.left - MIDI_PAD.right) / end);
+    midiFitPps = midiView.pps;
+    midiNeedsFit = false;
+    updateMidiZoomLabel();
+    drawMidi();
+  }
+
+  function zoomMidi(factor, clientX) {
+    if (midiLayers.length === 0) return;
+    const rect = midiCanvas.getBoundingClientRect();
+    const anchorX = clientX == null ? rect.left + rect.width / 2 : clientX;
+    const plotLeft = rect.left + MIDI_PAD.left;
+    const anchorTime = midiView.start + (anchorX - plotLeft) / midiView.pps;
+    const minPps = Math.max(1, midiFitPps * 0.15);
+    const maxPps = Math.max(1, midiFitPps * 25);
+    midiView.pps = Math.min(maxPps, Math.max(minPps, midiView.pps * factor));
+    midiView.start = Math.max(0, anchorTime - (anchorX - plotLeft) / midiView.pps);
+    updateMidiZoomLabel();
+    drawMidi();
+  }
+
+  function drawMidi() {
+    if (!midiCanvasSize.w || !midiCanvasSize.h) return;
+    const ctx = midiCanvas.getContext("2d");
+    const { w, h } = midiCanvasSize;
+    ctx.clearRect(0, 0, w, h);
+    ctx.fillStyle = "#fbfdff";
+    ctx.fillRect(0, 0, w, h);
+    if (midiLayers.length === 0) return;
+
+    const plot = midiPlot();
+    const start = midiView.start;
+    const end = start + plot.plotW / midiView.pps;
+
+    ctx.save();
+    ctx.font = '11px "Segoe UI", "Microsoft YaHei", system-ui, sans-serif';
+    ctx.textBaseline = "top";
+
+    const step = chooseTimeStep(midiView.pps);
+    for (let time = Math.ceil(start / step) * step; time <= end; time += step) {
+      const x = plot.left + (time - start) * midiView.pps;
+      ctx.strokeStyle = "rgba(100, 116, 139, 0.18)";
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      ctx.moveTo(x, plot.top);
+      ctx.lineTo(x, plot.top + plot.plotH);
+      ctx.stroke();
+      ctx.fillStyle = "#94a3b8";
+      ctx.textAlign = "left";
+      ctx.fillText(formatTime(time), x + 3, 5);
+    }
+
+    for (let pitch = midiView.pitchMin; pitch <= midiView.pitchMax; pitch += 1) {
+      const y = plot.top + (midiView.pitchMax - pitch) * plot.rowH;
+      const octave = pitch % 12 === 0;
+      ctx.strokeStyle = octave ? "rgba(100, 116, 139, 0.24)" : "rgba(148, 163, 184, 0.11)";
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      ctx.moveTo(plot.left, y);
+      ctx.lineTo(plot.left + plot.plotW, y);
+      ctx.stroke();
+      if (octave) {
+        ctx.fillStyle = "#94a3b8";
+        ctx.textAlign = "right";
+        ctx.fillText(midiNoteName(pitch), plot.left - 6, y - 6);
+      }
+    }
+
+    ctx.globalAlpha = 0.82;
+    for (const layer of midiLayers) {
+      const layerIndex = midiLayers.indexOf(layer);
+      layer.tracks.forEach((track, trackIndex) => {
+        if (!track.visible) return;
+        ctx.fillStyle = midiColor(layerIndex, trackIndex);
+        for (const note of track.notes) {
+          if (note.time + note.duration < start || note.time > end) continue;
+          const rect = midiNoteRect(note, plot);
+          ctx.fillRect(rect.x, rect.y, rect.w, rect.h);
+        }
+      });
+    }
+    ctx.globalAlpha = 1;
+
+    if (midiHover) {
+      const rect = midiNoteRect(midiHover.note, plot);
+      ctx.strokeStyle = "#0f172a";
+      ctx.lineWidth = 1.5;
+      ctx.strokeRect(rect.x, rect.y, rect.w, rect.h);
+    }
+
+    ctx.strokeStyle = "rgba(100, 116, 139, 0.35)";
+    ctx.lineWidth = 1;
+    ctx.strokeRect(plot.left, plot.top, plot.plotW, plot.plotH);
+    ctx.restore();
+  }
+
+  function noteAt(clientX, clientY) {
+    if (midiLayers.length === 0) return null;
+    const rect = midiCanvas.getBoundingClientRect();
+    const x = clientX - rect.left;
+    const y = clientY - rect.top;
+    const plot = midiPlot();
+    if (x < plot.left || x > plot.left + plot.plotW || y < plot.top || y > plot.top + plot.plotH) {
+      return null;
+    }
+    for (let layerIndex = midiLayers.length - 1; layerIndex >= 0; layerIndex -= 1) {
+      const layer = midiLayers[layerIndex];
+      for (let trackIndex = layer.tracks.length - 1; trackIndex >= 0; trackIndex -= 1) {
+        const track = layer.tracks[trackIndex];
+        if (!track.visible) continue;
+        for (let i = track.notes.length - 1; i >= 0; i -= 1) {
+          const note = track.notes[i];
+          const noteRect = midiNoteRect(note, plot);
+          if (
+            x >= noteRect.x &&
+            x <= noteRect.x + noteRect.w &&
+            y >= noteRect.y &&
+            y <= noteRect.y + noteRect.h
+          ) {
+            return { note, layer, layerIndex, track, trackIndex };
+          }
+        }
+      }
+    }
+    return null;
+  }
+
+  function updateMidiHover(hit) {
+    midiHover = hit;
+    if (!hit) {
+      midiNoteInfoEl.textContent = "";
+      return;
+    }
+    const { note, layer, track } = hit;
+    midiNoteInfoEl.textContent =
+      `${layer.name} · ${track.name} · ${midiNoteName(note.midi)} · ` +
+      `${note.time.toFixed(2)}s + ${note.duration.toFixed(2)}s · ` +
+      `vel ${Math.round(note.velocity * 127)}`;
+  }
+
+  function resizeMidiCanvas() {
+    if (!midiCanvas) return;
+    const rect = midiCanvas.getBoundingClientRect();
+    const dpr = window.devicePixelRatio || 1;
+    const w = Math.max(1, rect.width);
+    const h = Math.max(1, rect.height);
+    midiCanvas.width = Math.round(w * dpr);
+    midiCanvas.height = Math.round(h * dpr);
+    const ctx = midiCanvas.getContext("2d");
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    midiCanvasSize = { w, h };
+    if (midiNeedsFit) fitMidiView();
+    else drawMidi();
+  }
+
+  function openMidiModal() {
+    midiModal.classList.remove("hidden");
+    midiNeedsFit = true;
+    requestAnimationFrame(resizeMidiCanvas);
+  }
+
+  function closeMidiModal() {
+    midiModal.classList.add("hidden");
+    midiDragging = null;
+    midiCanvas.classList.remove("dragging");
+    updateMidiHover(null);
+  }
+
+  async function addMidiFiles() {
+    if (typeof bridge.pickMidiFiles !== "function") {
+      toast(t("pickerUnavailable"), true);
+      return;
+    }
+    let paths = [];
+    try {
+      paths = await bridge.pickMidiFiles();
+    } catch (error) {
+      toast(String(error), true);
+      return;
+    }
+    if (!Array.isArray(paths) || paths.length === 0) return;
+
+    midiAddBtn.disabled = true;
+    try {
+      for (const path of paths) {
+        try {
+          const data = await callOrThrow("66CCFF.readMidi", { path });
+          midiLayers.push({
+            name: data.name,
+            path,
+            duration: data.duration,
+            tracks: data.tracks.map((track) => ({ ...track, visible: true })),
+          });
+        } catch (error) {
+          toast(`${t("midiLoadFailed")}${error.message}`, true);
+        }
+      }
+      midiNeedsFit = true;
+      renderMidiLegend();
+      updateMidiEmpty();
+      resizeMidiCanvas();
+    } finally {
+      midiAddBtn.disabled = false;
+    }
+  }
+
+  function clearMidiLayers() {
+    midiLayers = [];
+    midiNeedsFit = true;
+    midiView = { start: 0, pps: 80, pitchMin: 21, pitchMax: 108 };
+    midiFitPps = 80;
+    renderMidiLegend();
+    updateMidiEmpty();
+    updateMidiZoomLabel();
+    drawMidi();
+  }
+
+  function initMidi() {
+    midiBtn.addEventListener("click", openMidiModal);
+    midiCloseBtn.addEventListener("click", closeMidiModal);
+    midiModal.addEventListener("click", (event) => {
+      if (event.target === midiModal) closeMidiModal();
+    });
+    midiAddBtn.addEventListener("click", () => void addMidiFiles());
+    midiClearBtn.addEventListener("click", clearMidiLayers);
+    midiFitBtn.addEventListener("click", () => {
+      midiNeedsFit = true;
+      fitMidiView();
+    });
+    midiZoomInBtn.addEventListener("click", () => zoomMidi(1.25));
+    midiZoomOutBtn.addEventListener("click", () => zoomMidi(0.8));
+
+    midiCanvas.addEventListener("mousedown", (event) => {
+      if (midiLayers.length === 0) return;
+      midiDragging = { clientX: event.clientX, start: midiView.start };
+      midiCanvas.classList.add("dragging");
+      event.preventDefault();
+    });
+
+    window.addEventListener("mousemove", (event) => {
+      if (!midiDragging) return;
+      const dx = event.clientX - midiDragging.clientX;
+      midiView.start = Math.max(0, midiDragging.start - dx / midiView.pps);
+      drawMidi();
+    });
+
+    window.addEventListener("mouseup", () => {
+      if (!midiDragging) return;
+      midiDragging = null;
+      midiCanvas.classList.remove("dragging");
+      drawMidi();
+    });
+
+    midiCanvas.addEventListener("mousemove", (event) => {
+      if (midiDragging) return;
+      updateMidiHover(noteAt(event.clientX, event.clientY));
+      drawMidi();
+    });
+
+    midiCanvas.addEventListener("mouseleave", () => {
+      if (!midiDragging) {
+        updateMidiHover(null);
+        drawMidi();
+      }
+    });
+
+    midiCanvas.addEventListener(
+      "wheel",
+      (event) => {
+        if (midiLayers.length === 0) return;
+        event.preventDefault();
+        if (event.shiftKey) {
+          midiView.start = Math.max(
+            0,
+            midiView.start + (event.deltaY || event.deltaX) / midiView.pps,
+          );
+          drawMidi();
+        } else {
+          zoomMidi(event.deltaY < 0 ? 1.15 : 0.87, event.clientX);
+        }
+      },
+      { passive: false },
+    );
+
+    window.addEventListener("resize", () => {
+      if (midiModal.classList.contains("hidden")) return;
+      midiNeedsFit = true;
+      resizeMidiCanvas();
+    });
+
+    window.addEventListener(
+      "keydown",
+      (event) => {
+        if (event.key !== "Escape" || midiModal.classList.contains("hidden")) return;
+        closeMidiModal();
+      },
+      true,
+    );
   }
 
   // ---- 引擎 ----
@@ -667,6 +1116,7 @@
     "keydown",
     (event) => {
       if (event.code !== "Space" || event.repeat || event.defaultPrevented) return;
+      if (!midiModal.classList.contains("hidden")) return;
       if (event.ctrlKey || event.metaKey || event.altKey || event.isComposing) return;
       const target = event.target;
       if (target instanceof HTMLElement) {
@@ -842,6 +1292,7 @@
   // ---- 启动 ----
 
   async function init() {
+    initMidi();
     await initLanguage();
     await loadEngine();
     try {

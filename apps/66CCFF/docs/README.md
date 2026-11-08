@@ -29,6 +29,7 @@ app_66CCFF__stem(id, track_id, job_id, kind, file, size, created_at)
 | `66CCFF.listTracks` | 只读 | 曲目列表 + 最新任务状态 / 轨数 |
 | `66CCFF.getTrack` | 只读 | 曲目详情 + stems + 最新任务 |
 | `66CCFF.getEngineStatus` | 只读 | 引擎目录 / Python / 安装提示 |
+| `66CCFF.readMidi` | 只读 | 读取本地 `.mid` / `.midi`，返回秒制音符和轨道；供 MIDI 卷帘使用 |
 | `66CCFF.importTrack` | 内部异步 | 校验并复制音频、ffprobe 时长，事务写入 |
 | `66CCFF.startSeparation` | 内部异步 | 创建任务、运行 BS-RoFormer、进度事件、事务写六轨 |
 | `66CCFF.deleteTrack` | 内部异步 | 事务删除记录 + 删除文件目录 |
@@ -71,10 +72,12 @@ app_66CCFF__stem(id, track_id, job_id, kind, file, size, created_at)
 - 六轨混音：每轨静音 / 独奏 / 音量；同一轨的 M 与 S 互斥（开启一个自动关闭另一个）；
 - 播放 / 暂停按钮用图标切换（播放三角 / 暂停条），播放中按钮颜色加深；进度条、速度 50%–100%（保持音高）、循环与 AB 段、清除；空格键暂停 / 继续（文字输入框聚焦时除外）；
 - 播放用多个 `<audio>` 元素同步，主轨 `timeupdate` 定期校正其它轨；无波形（v1）。
+- MIDI 卷帘：从曲目详情打开；通过系统文件选择器加载一个或多个 MIDI，Canvas 叠加显示多文件/多轨；支持缩放、拖动、悬停查看音符信息和轨道开关；第一版不播放、不编辑、不写入数据库（66CCFF-0010）。
 
 ## 7. 已知限制
 
-- MIDI 转写目前只有命令行验证，没有界面 / API；输出单轨 MIDI，未做 MIDI 播放或多轨合并。
+- MIDI 转写目前只有命令行验证，没有转写界面 / API；已有只读 MIDI 卷帘，但未做 MIDI 播放、多轨合并或编辑。
+- MIDI 卷帘的文件选择器只在 Electron 宿主可用；LAN / 浏览器版暂不支持。
 - 取消只对当前页面发起的任务有效；刷新后正在运行的任务无法从界面取消（会继续并靠轮询显示）。
 - 没有导出、变调、两轨快捷预设、波形；这些见应用 user spec 的「未定 / 非目标」。
 - `media://` 没有跨应用权限：目前任意子应用理论上能猜到并读取其它应用的 media 路径；builder / 不可信应用出现前必须收紧（66CCFF-0004）。

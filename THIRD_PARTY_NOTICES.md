@@ -47,6 +47,7 @@ MyOutside 自己的代码按 [Apache-2.0](LICENSE) 发布。这个文件记录�
 
 - 依赖清单见各 `package.json` 和 `pnpm-lock.yaml`。
 - Electron 使用 MIT；其他直接/间接依赖各有自己的许可证。
+- `@tonejs/midi`：MIT，用于纯蓝 MIDI 卷帘解析 MIDI 文件。
 - 正式分发前应生成完整的第三方许可证清单，而不是只依赖本文件。
 
 ## 研究过但尚未集成的 MIDI 候选

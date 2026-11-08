@@ -975,6 +975,18 @@ app.whenReady().then(async () => {
     return result.canceled ? null : (result.filePaths[0] ?? null);
   });
 
+  // 子应用请求选择本地 MIDI 文件；返回绝对路径数组
+  ipcMain.handle("host:pickMidiFiles", async (event) => {
+    const caller = callerOf(event.senderFrame);
+    if (!caller || caller === SHELL_CALLER) return [];
+    const result = await dialog.showOpenDialog({
+      title: "选择 MIDI",
+      properties: ["openFile", "multiSelections"],
+      filters: [{ name: "MIDI", extensions: ["mid", "midi"] }],
+    });
+    return result.canceled ? [] : result.filePaths;
+  });
+
   // 用系统默认程序打开子应用自己目录下的一个文本文件（例如哲野试验台的「在编辑器里打开」，D-0077）
   ipcMain.handle("host:openAppFile", async (event, path: unknown) => {
     const caller = callerOf(event.senderFrame);

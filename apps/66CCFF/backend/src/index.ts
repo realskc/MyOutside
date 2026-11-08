@@ -1,6 +1,6 @@
 import { spawnSync } from "node:child_process";
 import { randomUUID } from "node:crypto";
-import { copyFileSync, existsSync, mkdirSync, readdirSync, rmSync, statSync } from "node:fs";
+import { copyFileSync, existsSync, mkdirSync, readFileSync, readdirSync, rmSync, statSync } from "node:fs";
 import { basename, extname, join, relative, resolve, sep } from "node:path";
 import {
   DeleteTrackInput,
@@ -25,6 +25,7 @@ import {
   type AsyncContext,
   type SqlValue,
 } from "@myoutside/kernel";
+import { Midi } from "@tonejs/midi";
 import { z } from "zod";
 import { findMediaTool } from "./media.js";
 import { enginePython, runSeparation } from "./roformer.js";
@@ -64,6 +65,8 @@ const FinishJobInput = z.object({
 });
 
 const DeleteTrackTxInput = z.object({ trackId: z.string() });
+const ReadMidiInput = z.object({ path: z.string() });
+const MAX_MIDI_BYTES = 10 * 1024 * 1024;
 
 interface TrackRow {
   id: string;
@@ -280,6 +283,45 @@ export function createX66CCFFApp({
       getTrack: defineRead(GetTrackInput, (ctx, input) => {
         const track = getTrackOrThrow(ctx.db, input.trackId);
         return toDetail(ctx.db, track);
+      }),
+
+      /** 读取一个本地 MIDI 文件，转成钢琴卷帘需要的秒制音符数据。 */
+      readMidi: defineRead(ReadMidiInput, (_ctx, input) => {
+        const file = resolve(input.path);
+        const ext = extname(file).toLowerCase();
+        if (ext !== ".mid" && ext !== ".midi") {
+          throw new KernelError("VALIDATION", "只支持 .mid / .midi 文件");
+        }
+        if (!existsSync(file) || !statSync(file).isFile()) {
+          throw new KernelError("VALIDATION", "MIDI 文件不存在");
+        }
+        const size = statSync(file).size;
+        if (size > MAX_MIDI_BYTES) {
+          throw new KernelError("VALIDATION", "MIDI 文件过大（上限 10MB）");
+        }
+        let midi: Midi;
+        try {
+          midi = new Midi(readFileSync(file));
+        } catch {
+          throw new KernelError("VALIDATION", "无法解析 MIDI 文件");
+        }
+        return {
+          name: basename(file),
+          duration: midi.duration,
+          tracks: midi.tracks
+            .map((track, index) => ({
+              index,
+              name: track.name || track.instrument?.name || `Track ${index + 1}`,
+              instrument: track.instrument?.name ?? null,
+              notes: track.notes.map((note) => ({
+                time: note.time,
+                duration: note.duration,
+                midi: note.midi,
+                velocity: note.velocity,
+              })),
+            }))
+            .filter((track) => track.notes.length > 0),
+        };
       }),
 
       getEngineStatus: defineRead(EngineStatusInput, () => {

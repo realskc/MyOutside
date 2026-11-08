@@ -1,6 +1,7 @@
 import { existsSync, mkdtempSync, statSync, writeFileSync, mkdirSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { Midi } from "@tonejs/midi";
 import { createKernel, type Kernel } from "@myoutside/kernel";
 import { createNodeSqliteAdapter } from "@myoutside/kernel-node";
 import { afterEach, describe, expect, it } from "vitest";
@@ -49,6 +50,22 @@ describe("66CCFF backend", () => {
       else process.env.FFMPEG_PATH = previous;
       rmSync(fake, { force: true });
     }
+  });
+
+  it("readMidi 返回秒制音符和轨道", async () => {
+    const { kernel, dataDir } = setup();
+    const midi = new Midi();
+    midi.addTrack().addNote({ midi: 60, time: 1, duration: 0.5, velocity: 0.8 });
+    const file = join(dataDir, "test.mid");
+    writeFileSync(file, Buffer.from(midi.toArray()));
+    const result = await call<{
+      name: string;
+      duration: number;
+      tracks: Array<{ name: string; notes: Array<{ midi: number }> }>;
+    }>(kernel, "66CCFF.readMidi", { path: file });
+    expect(result.name).toBe("test.mid");
+    expect(result.tracks).toHaveLength(1);
+    expect(result.tracks[0]?.notes[0]?.midi).toBe(60);
   });
 
   it("引擎未安装时状态为 not ready", async () => {

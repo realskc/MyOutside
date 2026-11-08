@@ -472,3 +472,211 @@ button {
     padding: 18px;
   }
 }
+
+/* ---- MIDI 卷帘 ---- */
+
+.detail-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.midi-modal-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  background: rgba(15, 23, 42, 0.45);
+}
+
+.midi-modal {
+  display: flex;
+  flex-direction: column;
+  width: min(1400px, calc(100vw - 48px));
+  height: min(820px, calc(100vh - 48px));
+  overflow: hidden;
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  box-shadow: 0 24px 70px rgba(15, 23, 42, 0.25);
+}
+
+.midi-modal-head,
+.midi-modal-foot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--border);
+}
+
+.midi-modal-foot {
+  border-top: 1px solid var(--border);
+  border-bottom: 0;
+}
+
+.midi-modal-head h2 {
+  margin: 0;
+  font-size: 18px;
+}
+
+.midi-modal-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.icon-btn {
+  width: 34px;
+  height: 34px;
+  padding: 0;
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  color: var(--muted);
+  font-size: 24px;
+  line-height: 1;
+}
+
+.icon-btn:hover {
+  color: var(--fg);
+  background: #f1f5f9;
+}
+
+.midi-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  min-height: 33px;
+  padding: 6px 16px;
+  border-bottom: 1px solid var(--border);
+}
+
+.midi-legend:empty {
+  display: none;
+}
+
+.midi-track-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 8px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: #fff;
+  color: var(--fg);
+  font-size: 12px;
+}
+
+.midi-track-chip.off {
+  opacity: 0.4;
+}
+
+.midi-color-dot {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+}
+
+.midi-track-chip span:last-child {
+  max-width: 360px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.midi-stage {
+  position: relative;
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+  background: #fbfdff;
+}
+
+#midi-canvas {
+  display: block;
+  width: 100%;
+  height: 100%;
+  cursor: grab;
+  touch-action: none;
+}
+
+#midi-canvas.dragging {
+  cursor: grabbing;
+}
+
+.midi-empty {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--muted);
+  font-size: 14px;
+  pointer-events: none;
+}
+
+.midi-modal-foot {
+  min-height: 52px;
+}
+
+.midi-note-info {
+  min-width: 0;
+  overflow: hidden;
+  color: var(--muted);
+  font-size: 12px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.midi-controls {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
+}
+
+.midi-controls button {
+  min-width: 34px;
+  padding: 6px 10px;
+}
+
+.midi-zoom-label {
+  min-width: 44px;
+  color: var(--muted);
+  font-size: 12px;
+  text-align: center;
+}
+
+@media (max-width: 720px) {
+  .midi-modal-backdrop {
+    padding: 8px;
+  }
+
+  .midi-modal {
+    width: calc(100vw - 16px);
+    height: calc(100vh - 16px);
+  }
+
+  .midi-modal-head {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .midi-modal-actions {
+    width: 100%;
+  }
+
+  .midi-modal-actions .primary,
+  .midi-modal-actions .ghost {
+    flex: 1;
+  }
+
+  .midi-note-info {
+    display: none;
+  }
+}
