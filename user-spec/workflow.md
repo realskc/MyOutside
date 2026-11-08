@@ -77,6 +77,7 @@
 
 - **提交（commit）**：agent 可以自己提交，推荐在完成一项工作后自动提交。
 - **推送（push）**：只有作者提出时才推送，agent 不能擅自推送。
+- **修 bug 必须记决策**：所有的「修 bug」都必须为这次修改记录决策，决策里要记录这个 bug。这样以后修改的时候才能知道这次修改的原因、为什么不这样改会有 bug，重构的时候也知道不能采取有 bug 的方式（写法见 [decisions/README.md](decisions/README.md)「修 bug」）。
 - 其他没有特别的要求。当前的规范见 [D-0044](decisions/0044-docs-sync-with-features.md)、[D-0045](decisions/0045-commit-and-test-conventions.md)。
 
 ## 冲突处理

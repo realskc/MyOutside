@@ -33,4 +33,5 @@
 
 - 基于作者需求做出的实现决定：全局/跨应用的记进 `user-spec/decisions/`（`D-NNNN`）；应用专属的记进 `apps/<app>/user-spec/decisions/`（如 `apps/go/user-spec/decisions/`，`GO-0001`）。写法见对应目录的 `README.md`，决策者填 `agent`；
 - 作者亲自规定的细节，决策者填 `作者`，并把背后的高层次考量写进 spec 文档（子应用的写进 `apps/<app>/user-spec/`）；
+- **修 bug 必须新建一条决策**，写上「修复的 bug」一节：现象、原因、为什么原来的做法会出 bug（重构时不能再用）、怎么验证修好了（见 `user-spec/workflow.md`「工程规范」、`user-spec/decisions/README.md`）；
 - 技术文档与代码注释说明设计依据时，引用对应的决策（全局 `D-NNNN`，应用 `GO-0001` 等）。
