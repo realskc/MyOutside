@@ -22,5 +22,5 @@
 | [66CCFF-0006](66CCFF-0006-separation-job-execution.md) | 分离任务：内部异步 API + runId 事件 / 取消 | 有效 |
 | [66CCFF-0007](66CCFF-0007-basic-pitch-midi.md) | MIDI 转写：Basic Pitch，独立 Python 3.10 + ONNX，单音频输入 | 有效（引擎已安装；界面 / API 待接入） |
 | [66CCFF-0008](66CCFF-0008-bs-roformer-engine.md) | 六轨分离引擎：BS-RoFormer SW 6-stem，Windows CUDA / macOS CPU | 有效 |
-| [66CCFF-0009](66CCFF-0009-macos-source-install.md) | macOS 源码安装：分离走 CPU | 有效（待实机验证） |
+| [66CCFF-0009](66CCFF-0009-macos-source-install.md) | macOS 源码安装：分离走 CPU | 有效 |
 | [66CCFF-0010](66CCFF-0010-midi-roll-viewer.md) | MIDI 卷帘：只读对比 + 基础播放 | 有效 |

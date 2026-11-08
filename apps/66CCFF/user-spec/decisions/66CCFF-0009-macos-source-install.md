@@ -1,6 +1,6 @@
 # 66CCFF-0009 macOS 源码安装：分离走 CPU
 
-- 状态：有效（代码和安装脚本已补；待在实际 Mac 上验证）
+- 状态：有效（2026-11-08 已在作者的 Mac 上实测通过，见「验证」）
 - 日期：2026-11-07
 - 决策者：作者
 - 服务于：
@@ -34,7 +34,14 @@ Mac 没有 NVIDIA CUDA；`bs-roformer-infer` 也已经明确移除 MPS，所以�
 
 - Mac 上只能 CPU 推理，耗时会明显高于 GPU；具体性能需要在目标 Mac 上实测。
 - 首次安装需要下载 PyTorch 和约 667MB 的模型；磁盘和内存占用不小。
-- 当前没有 Mac 实机验证，安装脚本先按标准 macOS + Apple Silicon / Intel 的 Python/PyTorch 路径编写。
+- 只在 Apple Silicon（M4 Pro）上验证过；Intel Mac 未验证。
+
+## 验证
+
+2026-11-08，作者的 Mac（Apple M4 Pro，14 核，24GB 内存）：
+
+- `brew install uv ffmpeg` 后运行 `setup-engine-macos.sh`，一次成功；装好的 PyTorch 为 2.15.0（CPU），venv 约 690MB，模型约 670MB（SHA256 校验通过）。
+- 经纯蓝自己的分离代码（`runSeparation`）跑一段 15 秒的合成音频：用时约 29 秒（含加载模型），六轨（vocals / drums / bass / other / guitar / piano）都输出了，时长都是 15 秒。粗算约为音频时长的 2 倍，一首 4 分钟的歌大约 8 分钟。
 
 ## 什么时候应该重新考虑
 
