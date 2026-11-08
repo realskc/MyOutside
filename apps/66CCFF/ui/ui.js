@@ -193,6 +193,12 @@
 
   const audioMap = new Map();
   const stemParams = new Map();
+  /**
+   * 各轨的静音 / 独奏 / 音量都走 Web Audio 的音量节点，<audio> 本身永远不静音（66CCFF-0011）：
+   * Chromium 会在窗口隐藏时暂停「从开始播放起就静音」的 <audio>，主播放器一停，切回来时各轨会被拉回到隐藏那一刻。
+   */
+  let mixContext = null;
+  const gainMap = new Map();
   let master = null;
   let playing = false;
   let loop = { enabled: false, a: null, b: null };
@@ -1050,17 +1056,23 @@
       audio.pause();
       audio.src = "";
     }
+    for (const gain of gainMap.values()) gain.disconnect();
+    gainMap.clear();
     audioMap.clear();
     stemParams.clear();
     audioHolder.innerHTML = "";
     master = null;
     loop = { enabled: false, a: null, b: null };
 
+    if (!mixContext) mixContext = new AudioContext({ latencyHint: "playback" });
     for (const stem of nextDetail.stems) {
       stemParams.set(stem.kind, { muted: false, solo: false, volume: 1 });
       const audio = document.createElement("audio");
       audio.preload = "auto";
       audio.src = `media://66ccff/${stem.file}`;
+      const gain = mixContext.createGain();
+      mixContext.createMediaElementSource(audio).connect(gain).connect(mixContext.destination);
+      gainMap.set(stem.kind, gain);
       audio.preservesPitch = true;
       audio.webkitPreservesPitch = true;
       audio.addEventListener("loadedmetadata", () => updateTransport());
@@ -1151,12 +1163,22 @@
     }
   }
 
+  /** 静音 / 独奏 / 音量 → 音量节点；不碰 <audio> 的 muted / volume（66CCFF-0011） */
   function applyStemParams() {
     const anySolo = [...stemParams.values()].some((params) => params.solo);
-    for (const [kind, audio] of audioMap) {
+    for (const [kind, gain] of gainMap) {
       const params = stemParams.get(kind) ?? { muted: false, solo: false, volume: 1 };
-      audio.muted = params.muted || (anySolo && !params.solo);
-      audio.volume = Math.max(0, Math.min(1, params.volume));
+      const silent = params.muted || (anySolo && !params.solo);
+      const target = silent ? 0 : Math.max(0, Math.min(1, params.volume));
+      const now = mixContext.currentTime;
+      gain.gain.cancelScheduledValues(now);
+      if (mixContext.state === "running") {
+        // 约 15 毫秒的渐变，静音 / 取消静音不会有咔哒声
+        gain.gain.setValueAtTime(gain.gain.value, now);
+        gain.gain.setTargetAtTime(target, now, 0.015);
+      } else {
+        gain.gain.value = target;
+      }
     }
   }
 
@@ -1171,6 +1193,8 @@
 
   async function playAll() {
     if (!master) return;
+    // 音频上下文要在用户操作（点播放 / 空格）时启动；没启动时各轨没有声音
+    if (mixContext && mixContext.state !== "running") await mixContext.resume().catch(() => undefined);
     const time = master.currentTime;
     for (const audio of audioMap.values()) {
       try {
@@ -1217,6 +1241,7 @@
 
   function onTimeUpdate() {
     if (!master) return;
+    // 其余各轨跟着主播放器对齐：主播放器绝不能被浏览器暂停，否则会把各轨拉回去（66CCFF-0011）
     if (playing) {
       for (const audio of audioMap.values()) {
         if (audio !== master && Math.abs(audio.currentTime - master.currentTime) > 0.12) {

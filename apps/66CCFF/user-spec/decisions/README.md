@@ -15,7 +15,7 @@
 | 编号 | 标题 | 状态 |
 |---|---|---|
 | [66CCFF-0001](66CCFF-0001-six-stem-engine.md) | 六轨分离引擎：Demucs v4 `htdemucs_6s`，本地 CUDA | 已取代（→ 66CCFF-0008） |
-| [66CCFF-0002](66CCFF-0002-in-app-slow-player.md) | 内建慢放播放器，不依赖 Audacity | 有效 |
+| [66CCFF-0002](66CCFF-0002-in-app-slow-player.md) | 内建慢放播放器，不依赖 Audacity | 部分被取代（→ 66CCFF-0011） |
 | [66CCFF-0003](66CCFF-0003-engine-setup-script.md) | 首版引擎用仓库脚本安装，应用检测状态 | 有效 |
 | [66CCFF-0004](66CCFF-0004-app-files-and-media-protocol.md) | 应用文件放 `<userData>/apps/66CCFF`，用 `media://` 提供给界面 | 有效 |
 | [66CCFF-0005](66CCFF-0005-identity.md) | 应用标识：id / 英文名 `66CCFF`，显示名「纯蓝」 | 有效 |
@@ -24,3 +24,4 @@
 | [66CCFF-0008](66CCFF-0008-bs-roformer-engine.md) | 六轨分离引擎：BS-RoFormer SW 6-stem，Windows CUDA / macOS CPU | 有效 |
 | [66CCFF-0009](66CCFF-0009-macos-source-install.md) | macOS 源码安装：分离走 CPU | 有效 |
 | [66CCFF-0010](66CCFF-0010-midi-roll-viewer.md) | MIDI 卷帘：只读对比 + 基础播放 | 有效 |
+| [66CCFF-0011](66CCFF-0011-mute-with-gain-nodes.md) | 分轨静音 / 独奏 / 音量用 Web Audio 音量节点，`<audio>` 本身永远不静音（修复切回窗口进度回退） | 有效 |

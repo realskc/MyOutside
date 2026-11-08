@@ -1,6 +1,6 @@
 # 66CCFF-0002 内建慢放播放器，不依赖 Audacity
 
-- 状态：有效
+- 状态：部分被取代：分轨音量 / 静音 / 独奏的实现（直接设 `<audio>` 的 `muted` / `volume`）被 [66CCFF-0011](66CCFF-0011-mute-with-gain-nodes.md) 取代
 - 日期：2026-11-04
 - 决策者：agent
 - 服务于：

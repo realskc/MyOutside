@@ -10,6 +10,7 @@ import {
   type MenuItemConstructorOptions,
   type WebFrameMain,
 } from "electron";
+import { randomUUID } from "node:crypto";
 import { copyFileSync, createReadStream, existsSync, mkdirSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { extname, join, normalize, resolve, sep } from "node:path";
 import { Readable } from "node:stream";
@@ -500,7 +501,107 @@ async function smokeZheye(win: BrowserWindow): Promise<void> {
   writeFileSync(join(app.getPath("temp"), "myoutside-zheye-final.png"), await captureWindow(win, 6, 300));
 }
 
-async function runSmoke(win: BrowserWindow): Promise<void> {
+/**
+ * 纯蓝的回归检查（66CCFF-0011）：独奏一条非主轨（主轨因此被静音）后播放，窗口真的隐藏几秒再显示，
+ * 各轨不能回退到隐藏那一刻。主冒烟窗口关了后台节流、页面始终算「可见」，所以另开一个看不见、不抢焦点的小窗口。
+ */
+async function smokeX66ccffBackground(kernel: Kernel, appDir: string, trackId: string | null): Promise<void> {
+  if (!trackId) {
+    console.log("[smoke] 66CCFF background: skipped (import failed)");
+    return;
+  }
+  const kinds = ["vocals", "drums", "bass", "other", "guitar", "piano"] as const;
+  const wav = makeSilentWav(20);
+  mkdirSync(join(appDir, "tracks", trackId, "stems"), { recursive: true });
+  const stems = kinds.map((kind) => {
+    const file = `tracks/${trackId}/stems/${kind}.wav`;
+    writeFileSync(join(appDir, file), wav);
+    return { kind, file, size: wav.length };
+  });
+  const jobId = randomUUID();
+  for (const [call, payload] of [
+    ["66CCFF.insertJob", { id: jobId, trackId }],
+    ["66CCFF.finishJob", { jobId, trackId, stems }],
+  ] as const) {
+    const result = await kernel.handle({ call, payload }, { caller: "66CCFF" });
+    if (!result.ok) throw new Error(`${call}: ${result.error.message}`);
+  }
+
+  const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+  const probe = new BrowserWindow({
+    show: false,
+    frame: false,
+    transparent: true,
+    opacity: 0,
+    width: 480,
+    height: 360,
+    focusable: false,
+    skipTaskbar: true,
+    hasShadow: false,
+    webPreferences: { preload: join(__dirname, "preload.cjs"), contextIsolation: true, sandbox: false, nodeIntegration: false },
+  });
+  probe.setIgnoreMouseEvents(true);
+  try {
+    await probe.loadURL("app://66ccff/index.html");
+    probe.showInactive();
+    const audios = 'document.querySelectorAll("#audio-holder audio")';
+    await waitFor(probe, `[...document.querySelectorAll(".track-item .title")].some((el) => el.textContent === "smoke")`);
+    await probe.webContents.executeJavaScript(
+      `[...document.querySelectorAll(".track-item")].find((item) => item.querySelector(".title").textContent === "smoke").click(); true`,
+    );
+    const loaded = await waitFor(probe, `${audios}.length === 6 && [...${audios}].every((audio) => audio.readyState >= 2)`);
+    // 独奏第二轨（鼓）：第一轨人声就是主播放器，因此从开始播放起就是静音的
+    await probe.webContents.executeJavaScript(
+      `document.querySelectorAll("#mixer .stem-row")[1].querySelector(".stem-toggle.solo").click();
+       document.getElementById("btn-play").click(); true`,
+      true,
+    );
+    await sleep(1500);
+    probe.hide();
+    await sleep(3000);
+    const hidden = await probe.webContents.executeJavaScript("document.visibilityState");
+    probe.showInactive();
+    await sleep(1200);
+    const times = (await probe.webContents.executeJavaScript(
+      `[...${audios}].map((audio) => Math.round(audio.currentTime * 100) / 100)`,
+    )) as number[];
+    await probe.webContents.executeJavaScript(`document.getElementById("btn-play").click(); true`);
+    // 显示了约 1.5 + 3 + 1.2 秒：没有回退时各轨都在 4.5 秒以后，并且彼此对齐
+    const ok = loaded && times.length === 6 && Math.min(...times) > 4.5 && Math.max(...times) - Math.min(...times) < 0.3;
+    console.log("[smoke] 66CCFF background:", JSON.stringify({ ok, hidden, times }));
+
+    // 接进 Web Audio 的 media:// 音频真的有数据（将来 Electron 若按跨源处理、只给静音，这里会失败）；只分析、不接扬声器
+    const tone = makeSilentWav(1);
+    for (let i = 0; i < (tone.length - 44) / 4; i += 1) {
+      const sample = Math.round(Math.sin((2 * Math.PI * 440 * i) / 44100) * 0.2 * 32767);
+      tone.writeInt16LE(sample, 44 + i * 4);
+      tone.writeInt16LE(sample, 46 + i * 4);
+    }
+    writeFileSync(join(appDir, "tracks", trackId, "tone.wav"), tone);
+    const peak = (await probe.webContents.executeJavaScript(
+      `(async () => {
+        const context = new AudioContext();
+        const audio = new Audio("media://66ccff/tracks/${trackId}/tone.wav");
+        const analyser = context.createAnalyser();
+        context.createMediaElementSource(audio).connect(analyser);
+        await context.resume();
+        await audio.play();
+        await new Promise((resolve) => setTimeout(resolve, 400));
+        const data = new Float32Array(analyser.fftSize);
+        analyser.getFloatTimeDomainData(data);
+        audio.pause();
+        await context.close();
+        return Math.max(...data.map(Math.abs));
+      })()`,
+      true,
+    )) as number;
+    console.log("[smoke] 66CCFF web audio:", JSON.stringify({ ok: peak > 0.05, peak: Math.round(peak * 1000) / 1000 }));
+  } finally {
+    probe.destroy();
+  }
+}
+
+async function runSmoke(win: BrowserWindow, kernel: Kernel): Promise<void> {
   const guard = setTimeout(
     () => {
       console.error("[smoke] 超时，强制退出");
@@ -843,6 +944,7 @@ async function runSmoke(win: BrowserWindow): Promise<void> {
       x66ccffTrackShotPath,
       `(${x66ccffTrackPng.length} bytes)`,
     );
+    await smokeX66ccffBackground(kernel, smokeAppDir, x66ccffImport.ok ? x66ccffImport.id : null);
 
     await smokeZheye(win);
   } catch (error) {
@@ -1035,7 +1137,7 @@ app.whenReady().then(async () => {
   win.setTitle(STRINGS[currentLang].appName);
 
   if (process.env.MYOUTSIDE_SMOKE === "1") {
-    await runSmoke(win);
+    await runSmoke(win, kernel);
   }
 });
 

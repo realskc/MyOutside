@@ -72,6 +72,7 @@ app_66CCFF__stem(id, track_id, job_id, kind, file, size, created_at)
 - 六轨混音：每轨静音 / 独奏 / 音量；同一轨的 M 与 S 互斥（开启一个自动关闭另一个）；
 - 播放 / 暂停按钮用图标切换（播放三角 / 暂停条），播放中按钮颜色加深；进度条、速度 50%–100%（保持音高）、循环与 AB 段、清除；空格键暂停 / 继续（文字输入框聚焦时除外）；
 - 播放用多个 `<audio>` 元素同步，主轨 `timeupdate` 定期校正其它轨；无波形（v1）。
+- 每个 `<audio>` 经 `createMediaElementSource` 接进同一个 `AudioContext` + `GainNode`；静音 / 独奏 / 音量只改音量节点，`<audio>` 本身永远不静音（66CCFF-0011：浏览器会在窗口隐藏时暂停一直静音的 `<audio>`，主轨一停，切回来进度会回退）。冒烟检查 `66CCFF background` / `66CCFF web audio` 守着这两点。
 - MIDI 卷帘：从曲目详情打开；通过系统文件选择器加载一个或多个 MIDI，Canvas 叠加显示多文件/多轨；支持缩放、拖动、悬停查看音符信息和轨道开关；可用简单 Web Audio 合成器播放可见轨道，带播放头；不编辑、不写入数据库（66CCFF-0010）。
 
 ## 7. 已知限制
