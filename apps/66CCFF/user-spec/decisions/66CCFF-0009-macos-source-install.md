@@ -41,7 +41,8 @@ Mac 没有 NVIDIA CUDA；`bs-roformer-infer` 也已经明确移除 MPS，所以�
 2026-11-08，作者的 Mac（Apple M4 Pro，14 核，24GB 内存）：
 
 - `brew install uv ffmpeg` 后运行 `setup-engine-macos.sh`，一次成功；装好的 PyTorch 为 2.15.0（CPU），venv 约 690MB，模型约 670MB（SHA256 校验通过）。
-- 经纯蓝自己的分离代码（`runSeparation`）跑一段 15 秒的合成音频：用时约 29 秒（含加载模型），六轨（vocals / drums / bass / other / guitar / piano）都输出了，时长都是 15 秒。粗算约为音频时长的 2 倍，一首 4 分钟的歌大约 8 分钟。
+- 经纯蓝自己的分离代码（`runSeparation`）跑一段 15 秒的合成音频：用时约 29 秒（含加载模型），六轨（vocals / drums / bass / other / guitar / piano）都输出了，时长都是 15 秒。这段太短，用时主要花在加载模型上。
+- 2026-11-09，同一台 Mac：整首《白石溪》（5 分 34 秒，320 kbps MP3）经纯蓝的 `startSeparation` 分离，用时 4 分 15 秒，六轨都写入成功；约为音频时长的 0.76 倍。
 
 ## 什么时候应该重新考虑
 
