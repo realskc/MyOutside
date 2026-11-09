@@ -1,6 +1,6 @@
 # MuScriptor
 
-- 最近核对：2026-11-07
+- 最近核对：2026-11-09
 - 代码：[muscriptor/muscriptor](https://github.com/muscriptor/muscriptor)（MIT）
 - 论文：[arXiv:2607.08168](https://arxiv.org/abs/2607.08168)（ISMIR 2026）
 - 权重：[HuggingFace MuScriptor](https://huggingface.co/MuScriptor)（**CC BY-NC 4.0**）
@@ -43,6 +43,16 @@ Kyutai 与 Mirelo 的多乐器音乐转录模型：输入音频，输出 MIDI / 
 - 发现一个具体误判：00:23–00:25 的快速吉他音在 guitar 输出里属于 `clean electric guitar`；instrumental 输出没有单独的吉他轨，但同一串音被放进了 `acoustic piano` 轨。
 - 用 `--instruments acoustic_guitar,clean_electric_guitar,distorted_electric_guitar` 重新转 instrumental 时，这串音被识别为 `acoustic guitar`，说明它确实是吉他；不限制乐器时是**标注错误**，不是“instrumental 里没有吉他”。
 - 结论（作者听感，2026-11-08）：分轨转写和直接转 instrumental 的效果都非常好，目前没有明确证据表明直接转有明显缺陷；乐器标签误判本身不影响这个判断。更精细的对比等应用有钢琴卷帘显示功能后再做。
+
+## 本机验证（Mac，2026-11-09）
+
+- 环境：`muscriptor 0.4.0`（纯蓝的转 MIDI 引擎，Python 3.12 venv），medium 权重（1.23GB），Apple M4 Pro，Metal（MPS），PyTorch 2.15。
+- 《白石溪》（5 分 34 秒），BS-RoFormer SW 分轨后：
+  - vocals + `--instruments voice`：MIDI 里 538 个音符，1 轨（choir aahs），音高 47–97；用时 211 秒（含第一次下载权重）；检测到的 BPM 约 99；
+  - bass + other + guitar + piano 混合 + `--instruments acoustic_piano`：MIDI 里 4,317 个音符，1 轨，音高 18–126（超出钢琴 21–108 的范围）；用时 142 秒；BPM 约 86；
+  - 同样的混合、不限制乐器：11 轨（钢琴 2,647 个音符、音高 21–106；另有 bassoon 853 个、french horn、trumpet、弦乐、piccolo、贝斯、鼓等）；用时 115 秒。
+- MuScriptor 的「音符开始」事件比最终 MIDI 里的音符多（上面两次分别是 652 / 13,625 个事件）：按 5 秒分块解码时，每块开头会重新声明上一块还在响的音符；数音符要以写出的 MIDI 为准。
+- 同一首歌，人声和伴奏检测出的 BPM 不同（约 99 和 86），写进 MIDI 的都是跟着演奏走的 tempo map（上百个速度变化），没有拍号。
 
 ## 与纯蓝的关系
 
