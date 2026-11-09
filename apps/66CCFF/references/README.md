@@ -43,6 +43,22 @@
 | [MT3-PyTorch](midi/mt3-pytorch.md) | 多轨转录 | 社区 PyTorch 移植；上游无许可证声明 |
 | [Music-to-MIDI（mason369）](midi/music-to-midi.md) | 下游整合工具 | 使用 BS-RoFormer SW 六轨；其 README 是 9.05 / 7.83 数字的来源之一 |
 
+## 人声转 MIDI 候选（单旋律）
+
+| 资料 | 备注 |
+|---|---|
+| [GAME](midi/game.md) | openvpi（中文虚拟歌手社区），SOME 的下一代；对分离出的人声稳；原生支持普通话 / 日语；权重 CC BY-NC-SA |
+| [ROSVOT](midi/rosvot.md) | ACL 2024；权重用普通话训练；能处理带伴奏的人声 |
+| [VocalParse](midi/vocalparse.md) | 2026，音频大模型，同时出歌词和音符；普通话；不预测音符时长 |
+
+## 多人歌声分离（合唱拆成各自一条）
+
+| 资料 | 备注 |
+|---|---|
+| [UNMIXX](separation/unmixx.md) | ICASSP 2026，盲分离两位歌手；仓库带权重；未声明许可证 |
+| [按参考录音提取指定歌手](separation/singer-informed-separation.md) | 给一段目标歌手的独唱参考，提取这位歌手 |
+| [MedleyVox 与合唱分离模型](separation/medleyvox.md) | 评测集 + 社区模型（Cyru5 权重、MVSEP duet 模型、karaoke 模型） |
+
 ## 钢琴卷帘 / MIDI 查看工具
 
 | 资料 | 形式 | 我们的想法 | 备注 |
