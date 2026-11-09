@@ -2,7 +2,7 @@
 
 > 这里记录 **66CCFF（纯蓝）领域**的外部工具、模型和资料线索；不是 spec，也不是决策。
 >
-> 外部项目分两类：`separation/` 是分轨 / 音频源分离，`midi/` 是音频转 MIDI / 多轨转录。分类目录下，一个项目直接一个 `.md`；需要多个文件时用 `<项目名>-<主题>.md`，不再建项目目录。
+> 外部项目分三类：`separation/` 是分轨 / 音频源分离，`midi/` 是音频转 MIDI / 多轨转录，`piano-roll/` 是钢琴卷帘 / MIDI 查看与学琴工具（给纯蓝的卷帘设计做参考）。分类目录下，一个项目直接一个 `.md`；需要多个文件时用 `<项目名>-<主题>.md`，不再建项目目录。
 >
 > Gemini 对话（2026-11-07）只作为推荐来源之一；能核对的事实以官方仓库、论文或模型页面为准，未核对的标为「待核实」。不把 Gemini 原文复制进来。
 
@@ -42,6 +42,15 @@
 | [MR-MT3](midi/mr-mt3.md) | 多轨转录 | 跨窗口记忆，缓解乐器串轨；约 176MB |
 | [MT3-PyTorch](midi/mt3-pytorch.md) | 多轨转录 | 社区 PyTorch 移植；上游无许可证声明 |
 | [Music-to-MIDI（mason369）](midi/music-to-midi.md) | 下游整合工具 | 使用 BS-RoFormer SW 六轨；其 README 是 9.05 / 7.83 数字的来源之一 |
+
+## 钢琴卷帘 / MIDI 查看工具
+
+| 资料 | 形式 | 我们的想法 | 备注 |
+|---|---|---|---|
+| [GarageBand（库乐队）](piano-roll/GarageBand.md) | macOS 免费 DAW | [有](piano-roll/GarageBand-thoughts.md) | 横向卷帘，左边有琴键；作者试过，感觉挺好 |
+| [Signal](piano-roll/Signal.md) | 开源网页 MIDI 编辑器 | 无 | 多轨横向卷帘 |
+| [Midiano](piano-roll/Midiano.md) | 网页学琴工具 | 无 | 音符从上往下落到琴键上，同时显示五线谱 |
+| [Neothesia](piano-roll/Neothesia.md) | 开源桌面学琴软件 | 无 | 音符从上往下落到琴键上 |
 
 ## 其他 MIDI 线索
 
