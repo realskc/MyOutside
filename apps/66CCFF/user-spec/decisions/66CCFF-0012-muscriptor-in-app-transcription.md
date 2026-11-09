@@ -43,6 +43,10 @@ ThinkBook 上试过 MuScriptor（[资料](../../references/midi/muscriptor.md)�
 - MuScriptor 出了明显更好的版本，或有更好的转写模型；
 - 想在应用里调节拍、量化等参数（`--bpm`、`--quantize` 等）。
 
+## 作者反馈
+
+- 2026-11-10：《白石溪》人声（vocals → `voice`）转出的 MIDI 效果不太理想，有很多错音和瑕疵；之后要找更厉害的转人声 MIDI 的模型（[想法](../../references/midi/muscriptor-thoughts.md)）。
+
 ## 修订记录
 
 - 2026-11-09：删除旧的 Basic Pitch 安装与转写脚本（`setup-midi-engine.ps1`、`transcribe_midi.py`）；应用已不再使用，留着只会让人以为还有两套转写（agent 决定）。已经装在 ThinkBook 上的 `midi-engine` 目录不再被用到，可以手动删。
