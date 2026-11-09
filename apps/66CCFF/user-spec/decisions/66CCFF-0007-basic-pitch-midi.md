@@ -1,6 +1,6 @@
 # 66CCFF-0007 MIDI 转写：Basic Pitch，独立 Python 3.10 + ONNX，单音频输入
 
-- 状态：有效（引擎已安装；界面 / API 待接入）
+- 状态：部分被取代：转写引擎改用 MuScriptor 并接进应用，见 [66CCFF-0012](66CCFF-0012-muscriptor-in-app-transcription.md)；「输入是单条 stem 或选定 stem 的混合、输出单轨 MIDI」仍然有效
 - 日期：2026-11-06
 - 决策者：讨论
 - 服务于：

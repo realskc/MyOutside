@@ -1,4 +1,4 @@
-import { existsSync, mkdtempSync, statSync, writeFileSync, mkdirSync, rmSync } from "node:fs";
+import { chmodSync, existsSync, mkdtempSync, readFileSync, statSync, writeFileSync, mkdirSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { Midi } from "@tonejs/midi";
@@ -144,6 +144,169 @@ describe("66CCFF backend", () => {
     const result = await raw(kernel, "66CCFF.importTrack", { path: source });
     expect(result.ok).toBe(false);
     if (!result.ok) expect(result.error.code).toBe("VALIDATION");
+  });
+
+  // —— 转 MIDI（66CCFF-0012） ——
+
+  /** 一段合法的静音 WAV，ffmpeg 混合两条轨时要读得懂 */
+  function silentWav(seconds: number): Buffer {
+    const dataSize = 44100 * 2 * 2 * seconds;
+    const buffer = Buffer.alloc(44 + dataSize);
+    buffer.write("RIFF", 0);
+    buffer.writeUInt32LE(36 + dataSize, 4);
+    buffer.write("WAVEfmt ", 8);
+    buffer.writeUInt32LE(16, 16);
+    buffer.writeUInt16LE(1, 20);
+    buffer.writeUInt16LE(2, 22);
+    buffer.writeUInt32LE(44100, 24);
+    buffer.writeUInt32LE(44100 * 4, 28);
+    buffer.writeUInt16LE(4, 32);
+    buffer.writeUInt16LE(16, 34);
+    buffer.write("data", 36);
+    buffer.writeUInt32LE(dataSize, 40);
+    return buffer;
+  }
+
+  /** 一首已分离的曲目 + 假的转写引擎：假 python 打印进度、把准备好的 MIDI 写到输出、记下收到的参数 */
+  async function setupTranscription() {
+    const dataDir = mkdtempSync(join(tmpdir(), "66CCFF-test-"));
+    cleanup.push(dataDir);
+    const engineDir = join(dataDir, "muscriptor-engine");
+    const scriptsDir = join(dataDir, "scripts");
+    mkdirSync(join(engineDir, "venv", "bin"), { recursive: true });
+    mkdirSync(scriptsDir, { recursive: true });
+    writeFileSync(join(scriptsDir, "transcribe_muscriptor.py"), "");
+    const midi = new Midi();
+    const track = midi.addTrack();
+    track.addNote({ midi: 60, time: 0, duration: 0.5, velocity: 0.8 });
+    track.addNote({ midi: 64, time: 0.5, duration: 0.5, velocity: 0.7 });
+    const fixture = join(dataDir, "fixture.mid");
+    writeFileSync(fixture, Buffer.from(midi.toArray()));
+    const argsLog = join(dataDir, "args.txt");
+    const python = join(engineDir, "venv", "bin", "python");
+    writeFileSync(
+      python,
+      [
+        "#!/bin/sh",
+        `printf '%s\\n' "$@" > '${argsLog}'`,
+        `echo '{"stage": "loading"}'`,
+        `echo '{"stage": "transcribing", "completed": 1, "total": 2}'`,
+        `cp '${fixture}' "$3"`,
+        // 像真的 MuScriptor 那样多报音符数（跨分块延续的音符会被重复计数）：纯蓝必须以 MIDI 里的为准（66CCFF-0014）
+        `echo '{"stage": "done", "notes": 99, "bpm": 96.0}'`,
+      ].join("\n"),
+    );
+    chmodSync(python, 0o755);
+
+    const kernel = createKernel({ storage: createNodeSqliteAdapter({ path: ":memory:" }) });
+    kernel.registerApp(createX66CCFFApp({ dataDir, transcriptionEngineDir: engineDir, scriptsDir }));
+    kernel.start();
+    const stemsDir = join(dataDir, "tracks", "t1", "stems-j1");
+    mkdirSync(stemsDir, { recursive: true });
+    await call(kernel, "66CCFF.insertTrack", { id: "t1", title: "白石溪", file: "tracks/t1/source.wav", ext: "wav", size: 4, duration: 1 });
+    await call(kernel, "66CCFF.insertJob", { id: "j1", trackId: "t1" });
+    const stems = (["piano", "guitar"] as const).map((kind) => {
+      writeFileSync(join(stemsDir, `${kind}.wav`), silentWav(1));
+      return { kind, file: `tracks/t1/stems-j1/${kind}.wav`, size: 1 };
+    });
+    await call(kernel, "66CCFF.finishJob", { jobId: "j1", trackId: "t1", stems });
+    return { kernel, dataDir, argsLog };
+  }
+
+  const withHfToken = async (work: () => Promise<void>) => {
+    const before = process.env.HF_TOKEN;
+    process.env.HF_TOKEN = "test-token";
+    try {
+      await work();
+    } finally {
+      if (before === undefined) delete process.env.HF_TOKEN;
+      else process.env.HF_TOKEN = before;
+    }
+  };
+
+  it.skipIf(process.platform === "win32")(
+    "转 MIDI：两条 stem 先混成一条，结果存进曲目、能读出音符、能删除",
+    async () => {
+      const { kernel, dataDir, argsLog } = await setupTranscription();
+      await withHfToken(async () => {
+        const status = await call<{ ready: boolean; instruments: string[] }>(kernel, "66CCFF.getTranscriptionEngineStatus", {});
+        expect(status.ready).toBe(true);
+        expect(status.instruments).toContain("acoustic_piano");
+
+        const result = await call<{ transcriptionId: string; noteCount: number }>(kernel, "66CCFF.startTranscription", {
+          trackId: "t1",
+          stems: ["guitar", "piano"],
+          instrument: "acoustic_piano",
+        });
+        expect(result.noteCount).toBe(2);
+        // 两条轨：引擎收到的是混好的 input.wav，乐器只有一个
+        const args = readFileSync(argsLog, "utf8").trim().split("\n");
+        expect(args[1]).toMatch(/input\.wav$/);
+        expect(args.slice(3, 5)).toEqual(["--instrument", "acoustic_piano"]);
+
+        const detail = await call<{ transcriptions: Array<Record<string, unknown>> }>(kernel, "66CCFF.getTrack", { trackId: "t1" });
+        expect(detail.transcriptions).toHaveLength(1);
+        expect(detail.transcriptions[0]).toMatchObject({
+          status: "succeeded",
+          stems: ["guitar", "piano"],
+          instrument: "acoustic_piano",
+          noteCount: 2,
+          bpm: 96,
+          file: `tracks/t1/midi/${result.transcriptionId}.mid`,
+        });
+
+        const data = await call<{ name: string; tracks: Array<{ notes: Array<{ midi: number }> }> }>(
+          kernel,
+          "66CCFF.readTranscription",
+          { transcriptionId: result.transcriptionId },
+        );
+        expect(data.name).toBe("白石溪 · acoustic_piano");
+        expect(data.tracks[0]!.notes.map((note) => note.midi)).toEqual([60, 64]);
+
+        await call(kernel, "66CCFF.deleteTranscription", { transcriptionId: result.transcriptionId });
+        expect(existsSync(join(dataDir, "tracks", "t1", "midi", `${result.transcriptionId}.mid`))).toBe(false);
+        const after = await call<{ transcriptions: unknown[] }>(kernel, "66CCFF.getTrack", { trackId: "t1" });
+        expect(after.transcriptions).toEqual([]);
+      });
+    },
+  );
+
+  it.skipIf(process.platform === "win32")("转 MIDI：没登录 HuggingFace、乐器不认识、没有这条轨时拒绝", async () => {
+    const { kernel } = await setupTranscription();
+    const before = process.env.HF_TOKEN;
+    delete process.env.HF_TOKEN;
+    const hfHome = process.env.HF_HOME;
+    process.env.HF_HOME = join(tmpdir(), `66CCFF-no-hf-${Date.now()}`);
+    try {
+      const notLoggedIn = await raw(kernel, "66CCFF.startTranscription", { trackId: "t1", stems: ["piano"], instrument: "acoustic_piano" });
+      expect(notLoggedIn.ok).toBe(false);
+      if (!notLoggedIn.ok) expect(notLoggedIn.error.message).toContain("HuggingFace");
+    } finally {
+      if (before !== undefined) process.env.HF_TOKEN = before;
+      if (hfHome === undefined) delete process.env.HF_HOME;
+      else process.env.HF_HOME = hfHome;
+    }
+    await withHfToken(async () => {
+      const unknown = await raw(kernel, "66CCFF.startTranscription", { trackId: "t1", stems: ["piano"], instrument: "kazoo" });
+      expect(unknown.ok).toBe(false);
+      const missing = await raw(kernel, "66CCFF.startTranscription", { trackId: "t1", stems: ["vocals"], instrument: "voice" });
+      expect(missing.ok).toBe(false);
+      if (!missing.ok) expect(missing.error.message).toContain("没有 vocals 轨");
+    });
+  });
+
+  it("正在转 MIDI 时不能重新分离（分轨文件会被换掉）", async () => {
+    const { kernel } = await setupTranscription();
+    await call(kernel, "66CCFF.insertTranscription", {
+      id: "m1",
+      trackId: "t1",
+      stems: ["piano"],
+      instrument: "acoustic_piano",
+      model: "medium",
+    });
+    const result = await raw(kernel, "66CCFF.startSeparation", { trackId: "t1" });
+    expect(result.ok).toBe(false);
+    if (!result.ok) expect(result.error.message).toContain("正在转 MIDI");
   });
 
   it("引擎缺失时拒绝分离", async () => {

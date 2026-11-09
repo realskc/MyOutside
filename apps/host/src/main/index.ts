@@ -596,6 +596,33 @@ async function smokeX66ccffBackground(kernel: Kernel, appDir: string, trackId: s
       true,
     )) as number;
     console.log("[smoke] 66CCFF web audio:", JSON.stringify({ ok: peak > 0.05, peak: Math.round(peak * 1000) / 1000 }));
+
+    // 转 MIDI 面板（66CCFF-0012）：有分轨时出现；冒烟的临时数据里没装 MuScriptor，应显示安装提示、按钮不可点
+    const transcribe = await probe.webContents.executeJavaScript(
+      `(() => {
+        const panel = document.getElementById("transcribe-panel");
+        return {
+          visible: !!panel && !panel.classList.contains("hidden"),
+          stems: document.querySelectorAll("#transcribe-stems input[type=checkbox]").length,
+          checked: [...document.querySelectorAll("#transcribe-stems .stem-check.on")].map((el) => el.textContent),
+          instrument: document.getElementById("transcribe-instrument").value,
+          instruments: document.getElementById("transcribe-instrument").options.length,
+          buttonDisabled: document.getElementById("btn-transcribe").disabled,
+          help: document.getElementById("transcribe-help-command").textContent,
+          separationHelp: document.getElementById("engine-help-command").textContent,
+        };
+      })()`,
+    );
+    // 分离引擎的安装命令要按平台显示（66CCFF-0013：以前页面里写死了 Windows 的命令）
+    const expectedSetup = process.platform === "darwin" ? "setup-engine-macos.sh" : process.platform === "win32" ? "setup-engine.ps1" : "";
+    console.log(
+      "[smoke] 66CCFF separation help:",
+      JSON.stringify({ ok: !!expectedSetup && transcribe.separationHelp.includes(expectedSetup), command: transcribe.separationHelp }),
+    );
+    console.log(
+      "[smoke] 66CCFF transcribe panel:",
+      JSON.stringify({ ok: transcribe.visible && transcribe.stems === 6 && transcribe.instruments > 30, ...transcribe }),
+    );
   } finally {
     probe.destroy();
   }
@@ -983,7 +1010,11 @@ app.whenReady().then(async () => {
   kernel.registerApp(vocabApp, vocabManifest);
   kernel.registerApp(dialogApp, dialogManifest);
   kernel.registerApp(goApp, goManifest);
-  kernel.registerApp(createX66CCFFApp({ dataDir: join(dataDir, "apps", "66CCFF") }), x66ccffManifest);
+  kernel.registerApp(
+    // 转 MIDI 的包装脚本从仓库里的 apps/66CCFF/scripts 读（66CCFF-0012）
+    createX66CCFFApp({ dataDir: join(dataDir, "apps", "66CCFF"), scriptsDir: join(appDir("66CCFF"), "scripts") }),
+    x66ccffManifest,
+  );
   // 哲野的配方从仓库里的 apps/zheye/recipes 读：改了提示词，下一次试跑就生效（ZHEYE-0021）
   kernel.registerApp(createZheyeApp({ recipesDir: join(appDir("zheye"), "recipes") }), zheyeManifest);
   kernel.start();

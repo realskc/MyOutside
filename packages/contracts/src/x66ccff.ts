@@ -42,9 +42,32 @@ export const X66CCFFTrackSchema = z.object({
 });
 export type X66CCFFTrack = z.infer<typeof X66CCFFTrackSchema>;
 
+/** 一次转 MIDI（66CCFF-0012）：所选的 stem → MuScriptor（只允许一个乐器）→ 一个单轨 MIDI */
+export const X66CCFFTranscriptionSchema = z.object({
+  id: z.string(),
+  trackId: z.string(),
+  stems: z.array(X66CCFFStemKind),
+  /** MuScriptor 的乐器组名，例如 acoustic_piano */
+  instrument: z.string(),
+  model: z.string(),
+  status: X66CCFFJobStatus,
+  progress: z.number(),
+  message: z.string(),
+  error: z.string().nullable(),
+  /** 相对应用文件根；成功后才有 */
+  file: z.string().nullable(),
+  noteCount: z.number().int().nullable(),
+  bpm: z.number().nullable(),
+  createdAt: z.number().int(),
+  updatedAt: z.number().int(),
+});
+export type X66CCFFTranscription = z.infer<typeof X66CCFFTranscriptionSchema>;
+
 export const X66CCFFTrackDetailSchema = X66CCFFTrackSchema.extend({
   stems: z.array(X66CCFFStemSchema),
   job: X66CCFFJobSchema.nullable(),
+  /** 新的在前 */
+  transcriptions: z.array(X66CCFFTranscriptionSchema),
 });
 export type X66CCFFTrackDetail = z.infer<typeof X66CCFFTrackDetailSchema>;
 
@@ -69,6 +92,34 @@ export type StartSeparationOutput = z.infer<typeof StartSeparationOutput>;
 export const DeleteTrackInput = z.object({ trackId: z.string() });
 export type DeleteTrackInput = z.infer<typeof DeleteTrackInput>;
 
+export const StartTranscriptionInput = z.object({
+  trackId: z.string(),
+  stems: z.array(X66CCFFStemKind).min(1),
+  instrument: z.string().min(1),
+});
+export type StartTranscriptionInput = z.infer<typeof StartTranscriptionInput>;
+
+export const StartTranscriptionOutput = z.object({ transcriptionId: z.string(), noteCount: z.number().int() });
+export type StartTranscriptionOutput = z.infer<typeof StartTranscriptionOutput>;
+
+export const TranscriptionIdInput = z.object({ transcriptionId: z.string() });
+export type TranscriptionIdInput = z.infer<typeof TranscriptionIdInput>;
+
+/** 钢琴卷帘用的秒制音符数据（readMidi / readTranscription） */
+export const X66CCFFMidiDataSchema = z.object({
+  name: z.string(),
+  duration: z.number(),
+  tracks: z.array(
+    z.object({
+      index: z.number().int(),
+      name: z.string(),
+      instrument: z.string().nullable(),
+      notes: z.array(z.object({ time: z.number(), duration: z.number(), midi: z.number().int(), velocity: z.number() })),
+    }),
+  ),
+});
+export type X66CCFFMidiData = z.infer<typeof X66CCFFMidiDataSchema>;
+
 export const EngineStatusInput = z.object({});
 export type EngineStatusInput = z.infer<typeof EngineStatusInput>;
 
@@ -81,6 +132,20 @@ export const EngineStatusOutput = z.object({
 });
 export type EngineStatusOutput = z.infer<typeof EngineStatusOutput>;
 
+export const TranscriptionEngineStatusOutput = z.object({
+  /** 已安装且已登录 HuggingFace */
+  ready: z.boolean(),
+  installed: z.boolean(),
+  loggedIn: z.boolean(),
+  engineDir: z.string(),
+  setupCommand: z.string(),
+  /** 在终端里运行；token 只在终端里输入，不经过 MyOutside */
+  loginCommand: z.string(),
+  instruments: z.array(z.string()),
+  message: z.string(),
+});
+export type TranscriptionEngineStatusOutput = z.infer<typeof TranscriptionEngineStatusOutput>;
+
 export interface X66CCFFApi {
   "66CCFF.listTracks": { input: ListTracksInput; output: X66CCFFTrack[] };
   "66CCFF.getTrack": { input: GetTrackInput; output: X66CCFFTrackDetail };
@@ -88,4 +153,8 @@ export interface X66CCFFApi {
   "66CCFF.startSeparation": { input: StartSeparationInput; output: StartSeparationOutput };
   "66CCFF.deleteTrack": { input: DeleteTrackInput; output: { ok: true } };
   "66CCFF.getEngineStatus": { input: EngineStatusInput; output: EngineStatusOutput };
+  "66CCFF.getTranscriptionEngineStatus": { input: EngineStatusInput; output: TranscriptionEngineStatusOutput };
+  "66CCFF.startTranscription": { input: StartTranscriptionInput; output: StartTranscriptionOutput };
+  "66CCFF.readTranscription": { input: TranscriptionIdInput; output: X66CCFFMidiData };
+  "66CCFF.deleteTranscription": { input: TranscriptionIdInput; output: { ok: true } };
 }

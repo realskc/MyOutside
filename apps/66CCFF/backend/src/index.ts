@@ -11,9 +11,14 @@ import {
   ListTracksInput,
   X66CCFFStemKind,
   StartSeparationInput,
+  StartTranscriptionInput,
+  TranscriptionEngineStatusOutput,
+  TranscriptionIdInput,
   type X66CCFFJobStatus,
+  type X66CCFFMidiData,
   type X66CCFFStemKind as StemKind,
   type X66CCFFTrackDetail,
+  type X66CCFFTranscription,
 } from "@myoutside/contracts";
 import {
   defineAsync,
@@ -28,7 +33,9 @@ import {
 import { Midi } from "@tonejs/midi";
 import { z } from "zod";
 import { findMediaTool } from "./media.js";
-import { enginePython, runSeparation } from "./roformer.js";
+import { enginePython } from "./process.js";
+import { runSeparation } from "./roformer.js";
+import { huggingFaceLoggedIn, MUSCRIPTOR_INSTRUMENTS, runTranscription } from "./transcription.js";
 
 const STEM_ORDER: StemKind[] = ["vocals", "drums", "bass", "other", "guitar", "piano"];
 const AUDIO_EXTENSIONS = new Set([".mp3", ".wav", ".flac", ".m4a", ".ogg", ".aac"]);
@@ -65,6 +72,34 @@ const FinishJobInput = z.object({
 });
 
 const DeleteTrackTxInput = z.object({ trackId: z.string() });
+
+const InsertTranscriptionInput = z.object({
+  id: z.string(),
+  trackId: z.string(),
+  stems: z.array(X66CCFFStemKind),
+  instrument: z.string(),
+  model: z.string(),
+});
+
+const UpdateTranscriptionInput = z.object({
+  transcriptionId: z.string(),
+  patch: z.object({
+    status: z.enum(["running", "succeeded", "failed", "cancelled"]).optional(),
+    progress: z.number().optional(),
+    message: z.string().optional(),
+    error: z.string().nullable().optional(),
+  }),
+});
+
+const FinishTranscriptionInput = z.object({
+  transcriptionId: z.string(),
+  file: z.string(),
+  noteCount: z.number().int(),
+  bpm: z.number().nullable(),
+});
+
+/** MuScriptor 的模型大小：medium 是它的默认值，ThinkBook 上试过、效果好（66CCFF-0012） */
+const TRANSCRIPTION_MODEL = "medium";
 const ReadMidiInput = z.object({ path: z.string() });
 const MAX_MIDI_BYTES = 10 * 1024 * 1024;
 
@@ -89,6 +124,23 @@ interface JobRow {
   updated_at: number;
 }
 
+interface TranscriptionRow {
+  id: string;
+  track_id: string;
+  stems: string;
+  instrument: string;
+  model: string;
+  status: string;
+  progress: number;
+  message: string;
+  error: string | null;
+  file: string | null;
+  note_count: number | null;
+  bpm: number | null;
+  created_at: number;
+  updated_at: number;
+}
+
 interface StemRow {
   id: string;
   track_id: string;
@@ -104,6 +156,10 @@ export interface X66CCFFAppOptions {
   dataDir: string;
   /** BS-RoFormer 分离引擎目录；默认 dataDir/roformer-engine */
   engineDir?: string;
+  /** MuScriptor 转写引擎目录；默认 dataDir/muscriptor-engine（66CCFF-0012） */
+  transcriptionEngineDir?: string;
+  /** 仓库里的 apps/66CCFF/scripts（转写包装脚本在这里）；不给就不能转写 */
+  scriptsDir?: string;
 }
 
 /** 各平台的引擎安装命令；UI 的“引擎未安装”提示直接展示它。 */
@@ -113,6 +169,48 @@ function engineSetupCommand(): string {
     return "powershell -ExecutionPolicy Bypass -File apps/66CCFF/scripts/setup-engine.ps1";
   }
   return "请参考 apps/66CCFF/docs/README.md 手动安装分离引擎";
+}
+
+function transcriptionSetupCommand(): string {
+  if (process.platform === "darwin") return "bash apps/66CCFF/scripts/setup-muscriptor-macos.sh";
+  if (process.platform === "win32") {
+    return "powershell -ExecutionPolicy Bypass -File apps/66CCFF/scripts/setup-muscriptor.ps1";
+  }
+  return "请参考 apps/66CCFF/docs/README.md 手动安装转写引擎";
+}
+
+/** 登录 HuggingFace（MuScriptor 的权重需要）：用转写引擎自带的 hf 命令，token 只在终端里输入 */
+function transcriptionLoginCommand(engine: string): string {
+  return process.platform === "win32"
+    ? `& "${join(engine, "venv", "Scripts", "hf.exe")}" auth login`
+    : `"${join(engine, "venv", "bin", "hf")}" auth login`;
+}
+
+/** 解析 MIDI 文件，转成钢琴卷帘需要的秒制音符数据 */
+function parseMidiFile(file: string, name: string): X66CCFFMidiData {
+  let midi: Midi;
+  try {
+    midi = new Midi(readFileSync(file));
+  } catch {
+    throw new KernelError("VALIDATION", "无法解析 MIDI 文件");
+  }
+  return {
+    name,
+    duration: midi.duration,
+    tracks: midi.tracks
+      .map((track, index) => ({
+        index,
+        name: track.name || track.instrument?.name || `Track ${index + 1}`,
+        instrument: track.instrument?.name ?? null,
+        notes: track.notes.map((note) => ({
+          time: note.time,
+          duration: note.duration,
+          midi: note.midi,
+          velocity: note.velocity,
+        })),
+      }))
+      .filter((track) => track.notes.length > 0),
+  };
 }
 
 /** 探测音频时长（秒）；ffprobe 不可用时返回 0 */
@@ -133,9 +231,13 @@ function probeDuration(file: string): number {
 export function createX66CCFFApp({
   dataDir,
   engineDir = join(dataDir, "roformer-engine"),
+  transcriptionEngineDir = join(dataDir, "muscriptor-engine"),
+  scriptsDir,
 }: X66CCFFAppOptions): AppModule {
   const base = resolve(dataDir);
   const engine = resolve(engineDir);
+  const transcriptionEngine = resolve(transcriptionEngineDir);
+  const transcriptionScript = scriptsDir ? join(resolve(scriptsDir), "transcribe_muscriptor.py") : null;
 
   const abs = (relPath: string): string => {
     const resolved = resolve(base, relPath);
@@ -174,6 +276,32 @@ export function createX66CCFFApp({
     updatedAt: row.updated_at,
   });
 
+  const isStaleTranscription = (row: TranscriptionRow): boolean =>
+    row.status === "running" && Date.now() - row.updated_at > STALE_JOB_MS;
+
+  const toTranscription = (row: TranscriptionRow): X66CCFFTranscription => ({
+    id: row.id,
+    trackId: row.track_id,
+    stems: JSON.parse(row.stems) as StemKind[],
+    instrument: row.instrument,
+    model: row.model,
+    status: isStaleTranscription(row) ? "failed" : (row.status as X66CCFFJobStatus),
+    progress: row.progress,
+    message: row.message,
+    error: isStaleTranscription(row) ? "任务已中断（应用关闭或崩溃）" : row.error,
+    file: row.file,
+    noteCount: row.note_count,
+    bpm: row.bpm,
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
+  });
+
+  /** 这首曲目有没有正在跑（且不是遗留）的转写 */
+  const runningTranscription = (db: AppDb, trackId: string): TranscriptionRow | undefined =>
+    db
+      .all<TranscriptionRow>("transcription", { track_id: trackId, status: "running" })
+      .find((row) => !isStaleTranscription(row));
+
   const toDetail = (db: AppDb, track: TrackRow): X66CCFFTrackDetail => {
     const stems = db
       .all<StemRow>("stem", { track_id: track.id })
@@ -193,13 +321,16 @@ export function createX66CCFFApp({
       jobError: effectiveError(job),
       stems: stems.map((stem) => ({ kind: stem.kind as StemKind, file: stem.file, size: stem.size })),
       job: job ? toJob(job) : null,
+      transcriptions: db
+        .all<TranscriptionRow>("transcription", { track_id: track.id }, { orderBy: "created_at DESC" })
+        .map(toTranscription),
     };
   };
 
   return {
     id: "66CCFF",
     name: "纯蓝",
-    owns: ["track", "job", "stem"],
+    owns: ["track", "job", "stem", "transcription"],
 
     migrations: [
       {
@@ -245,6 +376,32 @@ export function createX66CCFFApp({
           ctx.createIndex("track_created", "track", "created_at");
           ctx.createIndex("job_track", "job", "track_id");
           ctx.createIndex("stem_track", "stem", "track_id");
+        },
+      },
+      {
+        // 转 MIDI 的记录（66CCFF-0012）
+        id: "0002_transcription",
+        up: (ctx) => {
+          ctx.createTable(
+            "transcription",
+            [
+              "id TEXT PRIMARY KEY",
+              "track_id TEXT NOT NULL",
+              "stems TEXT NOT NULL", // JSON：所选的 stem
+              "instrument TEXT NOT NULL",
+              "model TEXT NOT NULL",
+              "status TEXT NOT NULL",
+              "progress REAL NOT NULL DEFAULT 0",
+              "message TEXT NOT NULL DEFAULT ''",
+              "error TEXT",
+              "file TEXT", // 相对应用文件根；成功后才有
+              "note_count INTEGER",
+              "bpm REAL",
+              "created_at INTEGER NOT NULL",
+              "updated_at INTEGER NOT NULL",
+            ].join(", "),
+          );
+          ctx.createIndex("transcription_track", "transcription", "track_id");
         },
       },
     ],
@@ -299,29 +456,40 @@ export function createX66CCFFApp({
         if (size > MAX_MIDI_BYTES) {
           throw new KernelError("VALIDATION", "MIDI 文件过大（上限 10MB）");
         }
-        let midi: Midi;
-        try {
-          midi = new Midi(readFileSync(file));
-        } catch {
-          throw new KernelError("VALIDATION", "无法解析 MIDI 文件");
-        }
-        return {
-          name: basename(file),
-          duration: midi.duration,
-          tracks: midi.tracks
-            .map((track, index) => ({
-              index,
-              name: track.name || track.instrument?.name || `Track ${index + 1}`,
-              instrument: track.instrument?.name ?? null,
-              notes: track.notes.map((note) => ({
-                time: note.time,
-                duration: note.duration,
-                midi: note.midi,
-                velocity: note.velocity,
-              })),
-            }))
-            .filter((track) => track.notes.length > 0),
+        return parseMidiFile(file, basename(file));
+      }),
+
+      /** 读取一次转写的结果，格式同 readMidi */
+      readTranscription: defineRead(TranscriptionIdInput, (ctx, input) => {
+        const row = ctx.db.get<TranscriptionRow>("transcription", { id: input.transcriptionId });
+        if (!row) throw new KernelError("NOT_FOUND", `转写记录不存在：${input.transcriptionId}`);
+        if (!row.file) throw new KernelError("PRECONDITION", "这次转写还没有结果");
+        const file = abs(row.file);
+        if (!existsSync(file)) throw new KernelError("NOT_FOUND", "MIDI 文件不见了");
+        const track = ctx.db.get<TrackRow>("track", { id: row.track_id });
+        return parseMidiFile(file, `${track?.title ?? "MIDI"} · ${row.instrument}`);
+      }),
+
+      getTranscriptionEngineStatus: defineRead(EngineStatusInput, () => {
+        const installed = enginePython(transcriptionEngine) !== null && transcriptionScript !== null;
+        const loggedIn = huggingFaceLoggedIn();
+        const setupCommand = transcriptionSetupCommand();
+        const loginCommand = transcriptionLoginCommand(transcriptionEngine);
+        const output: z.infer<typeof TranscriptionEngineStatusOutput> = {
+          ready: installed && loggedIn,
+          installed,
+          loggedIn,
+          engineDir: transcriptionEngine,
+          setupCommand,
+          loginCommand,
+          instruments: [...MUSCRIPTOR_INSTRUMENTS],
+          message: !installed
+            ? `转写引擎未安装：请运行 ${setupCommand}`
+            : !loggedIn
+              ? `MuScriptor 的权重需要先登录 HuggingFace：在终端运行 ${loginCommand}`
+              : "转写引擎已就绪；第一次转写会自动下载模型",
         };
+        return output;
       }),
 
       getEngineStatus: defineRead(EngineStatusInput, () => {
@@ -384,6 +552,8 @@ export function createX66CCFFApp({
        */
       startSeparation: defineAsync(StartSeparationInput, async (ctx, input) => {
         const track = getTrackOrThrow(ctx.db, input.trackId);
+        // 重新分离会换掉分轨文件，正在转写的会读到被删掉的文件
+        if (runningTranscription(ctx.db, track.id)) throw new KernelError("PRECONDITION", "这首曲目正在转 MIDI");
         if (!enginePython(engine)) {
           throw new KernelError("PRECONDITION", "分离引擎未安装（见引擎状态）");
         }
@@ -471,8 +641,113 @@ export function createX66CCFFApp({
         }
       }),
 
+      /**
+       * 转 MIDI（普通异步函数，66CCFF-0012）：所选 stem（几条就先混成一条）→ MuScriptor（只允许一个乐器）→ 单轨 MIDI，
+       * 存到 tracks/<id>/midi/<转写 id>.mid。进度经事件和记录两条路给界面；前端用 runId 取消。
+       */
+      startTranscription: defineAsync(StartTranscriptionInput, async (ctx, input) => {
+        const track = getTrackOrThrow(ctx.db, input.trackId);
+        if (!(MUSCRIPTOR_INSTRUMENTS as readonly string[]).includes(input.instrument)) {
+          throw new KernelError("VALIDATION", `未知的乐器：${input.instrument}`);
+        }
+        if (!enginePython(transcriptionEngine) || !transcriptionScript) {
+          throw new KernelError("PRECONDITION", `转写引擎未安装：请运行 ${transcriptionSetupCommand()}`);
+        }
+        if (!huggingFaceLoggedIn()) {
+          throw new KernelError(
+            "PRECONDITION",
+            `MuScriptor 的权重需要先登录 HuggingFace：在终端运行 ${transcriptionLoginCommand(transcriptionEngine)}`,
+          );
+        }
+        const job = latestJob(ctx.db, track.id);
+        if (job && effectiveStatus(job) === "running") throw new KernelError("PRECONDITION", "这首曲目正在分离");
+        if (runningTranscription(ctx.db, track.id)) throw new KernelError("PRECONDITION", "这首曲目正在转 MIDI");
+        const stems = ctx.db.all<StemRow>("stem", { track_id: track.id });
+        const kinds = [...new Set(input.stems)].sort((a, b) => STEM_ORDER.indexOf(a) - STEM_ORDER.indexOf(b));
+        const inputs = kinds.map((kind) => {
+          const stem = stems.find((row) => row.kind === kind);
+          if (!stem) throw new KernelError("PRECONDITION", `这首曲目没有 ${kind} 轨，请先分离`);
+          return abs(stem.file);
+        });
+
+        const transcriptionId = randomUUID();
+        await ctx.call("66CCFF.insertTranscription", {
+          id: transcriptionId,
+          trackId: track.id,
+          stems: kinds,
+          instrument: input.instrument,
+          model: TRANSCRIPTION_MODEL,
+        });
+        const workDir = join(base, "jobs", `midi-${transcriptionId}`);
+        let lastMessage = "准备中";
+        let lastWrite = 0;
+        const onProgress = (progress: number, message: string) => {
+          lastMessage = message;
+          ctx.emit({ type: "progress", progress, message });
+          const now = Date.now();
+          if (now - lastWrite < 800) return;
+          lastWrite = now;
+          void ctx
+            .call("66CCFF.updateTranscription", { transcriptionId, patch: { progress, message } })
+            .catch(() => undefined);
+        };
+
+        try {
+          const result = await runTranscription({
+            engineDir: transcriptionEngine,
+            script: transcriptionScript,
+            inputs,
+            instrument: input.instrument,
+            model: TRANSCRIPTION_MODEL,
+            workDir,
+            signal: ctx.signal,
+            onProgress,
+          });
+          const midiDir = join(base, "tracks", track.id, "midi");
+          mkdirSync(midiDir, { recursive: true });
+          const dest = join(midiDir, `${transcriptionId}.mid`);
+          copyFileSync(result.midiFile, dest);
+          // 音符数从写好的 MIDI 里数，和卷帘里看到的一致（66CCFF-0014）
+          const noteCount = parseMidiFile(dest, "").tracks.reduce((sum, track) => sum + track.notes.length, 0);
+          await ctx.call("66CCFF.finishTranscription", {
+            transcriptionId,
+            file: rel(dest),
+            noteCount,
+            bpm: result.bpm,
+          });
+          rmSync(workDir, { recursive: true, force: true });
+          return { transcriptionId, noteCount };
+        } catch (error) {
+          const aborted = ctx.signal.aborted;
+          const message = error instanceof Error ? error.message : String(error);
+          try {
+            await ctx.call("66CCFF.updateTranscription", {
+              transcriptionId,
+              patch: { status: aborted ? "cancelled" : "failed", message: lastMessage, error: message },
+            });
+          } catch {
+            /* 记录更新失败时不掩盖原始错误 */
+          }
+          rmSync(workDir, { recursive: true, force: true });
+          if (aborted) throw new KernelError("ABORTED", "转写已取消");
+          throw error;
+        }
+      }),
+
+      deleteTranscription: defineAsync(TranscriptionIdInput, async (ctx, input) => {
+        const row = ctx.db.get<TranscriptionRow>("transcription", { id: input.transcriptionId });
+        if (!row) throw new KernelError("NOT_FOUND", `转写记录不存在：${input.transcriptionId}`);
+        if (row.status === "running" && !isStaleTranscription(row)) {
+          throw new KernelError("PRECONDITION", "转写进行中，先取消");
+        }
+        await ctx.call("66CCFF.deleteTranscriptionTx", { transcriptionId: row.id });
+        if (row.file) rmSync(abs(row.file), { force: true });
+        return { ok: true as const };
+      }),
+
       deleteTrack: defineAsync(DeleteTrackInput, async (ctx, input) => {
         const track = getTrackOrThrow(ctx.db, input.trackId);
+        if (runningTranscription(ctx.db, track.id)) throw new KernelError("PRECONDITION", "转 MIDI 进行中，不能删除");
         const running = ctx.db.get<JobRow>("job", { track_id: track.id, status: "running" });
         if (running) {
           if (!isStale(running)) throw new KernelError("PRECONDITION", "分离进行中，不能删除");
@@ -556,8 +831,67 @@ export function createX66CCFFApp({
         return { ok: true as const };
       }),
 
+      insertTranscription: defineTx(InsertTranscriptionInput, (ctx, input) => {
+        const now = Date.now();
+        ctx.db.insert("transcription", {
+          id: input.id,
+          track_id: input.trackId,
+          stems: JSON.stringify(input.stems),
+          instrument: input.instrument,
+          model: input.model,
+          status: "running",
+          progress: 0,
+          message: "准备中",
+          error: null,
+          file: null,
+          note_count: null,
+          bpm: null,
+          created_at: now,
+          updated_at: now,
+        });
+        return { ok: true as const };
+      }),
+
+      updateTranscription: defineTx(UpdateTranscriptionInput, (ctx, input) => {
+        const row = ctx.db.get<TranscriptionRow>("transcription", { id: input.transcriptionId });
+        if (!row) throw new KernelError("NOT_FOUND", `转写记录不存在：${input.transcriptionId}`);
+        const patch: Record<string, SqlValue> = { updated_at: Date.now() };
+        if (input.patch.status !== undefined) patch.status = input.patch.status;
+        if (input.patch.progress !== undefined) patch.progress = Math.max(0, Math.min(1, input.patch.progress));
+        if (input.patch.message !== undefined) patch.message = input.patch.message.slice(0, 500);
+        if (input.patch.error !== undefined) patch.error = input.patch.error ? input.patch.error.slice(0, 2000) : null;
+        ctx.db.update("transcription", patch, { id: input.transcriptionId });
+        return { ok: true as const };
+      }),
+
+      finishTranscription: defineTx(FinishTranscriptionInput, (ctx, input) => {
+        const row = ctx.db.get<TranscriptionRow>("transcription", { id: input.transcriptionId });
+        if (!row) throw new KernelError("NOT_FOUND", `转写记录不存在：${input.transcriptionId}`);
+        ctx.db.update(
+          "transcription",
+          {
+            status: "succeeded",
+            progress: 1,
+            message: "完成",
+            error: null,
+            file: input.file,
+            note_count: input.noteCount,
+            bpm: input.bpm,
+            updated_at: Date.now(),
+          },
+          { id: input.transcriptionId },
+        );
+        return { ok: true as const };
+      }),
+
+      deleteTranscriptionTx: defineTx(TranscriptionIdInput, (ctx, input) => {
+        ctx.db.delete("transcription", { id: input.transcriptionId });
+        return { ok: true as const };
+      }),
+
       deleteTrackTx: defineTx(DeleteTrackTxInput, (ctx, input) => {
         getTrackOrThrow(ctx.db, input.trackId);
+        ctx.db.delete("transcription", { track_id: input.trackId });
         ctx.db.delete("stem", { track_id: input.trackId });
         ctx.db.delete("job", { track_id: input.trackId });
         ctx.db.delete("track", { id: input.trackId });

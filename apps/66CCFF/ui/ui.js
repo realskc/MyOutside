@@ -61,6 +61,41 @@
       fit: "适应",
       pickerUnavailable: "文件选择器不可用",
       midiLoadFailed: "MIDI 加载失败：",
+      transcribeTitle: "转 MIDI",
+      transcribeHint: "把选中的轨转成一个 MIDI（MuScriptor）",
+      transcribeAs: "转成",
+      transcribe: "转 MIDI",
+      transcribing: "转写中",
+      transcribeStart: "开始转写…",
+      transcribed: (n) => `转写完成：${n} 个音符`,
+      transcribeFailed: "转写失败：",
+      transcribeCancelled: "已取消转写",
+      transcriptionFailed: "转写失败",
+      pickStem: "至少选一条轨",
+      openInRoll: "在卷帘中打开",
+      noTranscriptions: "还没有转写结果",
+      notes: (n) => `${n} 个音符`,
+      deleteTranscriptionConfirm: "删除这个 MIDI？",
+      transcribeEngineMissing: "未检测到转 MIDI 引擎。请先运行：",
+      transcribeLogin: "MuScriptor 的权重要先登录 HuggingFace：先在浏览器里打开 huggingface.co/MuScriptor/muscriptor-medium 接受许可，再在终端运行（token 只在终端里输入）：",
+      instrumentLabels: {
+        acoustic_piano: "钢琴",
+        electric_piano: "电钢琴",
+        voice: "人声（旋律）",
+        acoustic_guitar: "木吉他",
+        clean_electric_guitar: "电吉他（清音）",
+        distorted_electric_guitar: "电吉他（失真）",
+        acoustic_bass: "原声贝斯",
+        electric_bass: "电贝斯",
+        violin: "小提琴",
+        cello: "大提琴",
+        string_ensemble: "弦乐组",
+        flutes: "笛类",
+        organ: "风琴",
+        synth_lead: "合成器主音",
+        synth_pad: "合成器铺底",
+        drums: "鼓",
+      },
     },
     en: {
       appTitle: "66CCFF",
@@ -116,6 +151,41 @@
       fit: "Fit",
       pickerUnavailable: "File picker unavailable",
       midiLoadFailed: "Failed to load MIDI: ",
+      transcribeTitle: "To MIDI",
+      transcribeHint: "Transcribe the selected stems into one MIDI (MuScriptor)",
+      transcribeAs: "As",
+      transcribe: "To MIDI",
+      transcribing: "Transcribing",
+      transcribeStart: "Starting…",
+      transcribed: (n) => `Transcribed: ${n} notes`,
+      transcribeFailed: "Transcription failed: ",
+      transcribeCancelled: "Transcription cancelled",
+      transcriptionFailed: "Failed",
+      pickStem: "Select at least one stem",
+      openInRoll: "Open in piano roll",
+      noTranscriptions: "No transcriptions yet",
+      notes: (n) => `${n} notes`,
+      deleteTranscriptionConfirm: "Delete this MIDI?",
+      transcribeEngineMissing: "MIDI engine not found. Run:",
+      transcribeLogin: "MuScriptor's weights need a HuggingFace login: accept the license at huggingface.co/MuScriptor/muscriptor-medium, then run this in a terminal (the token is typed only there):",
+      instrumentLabels: {
+        acoustic_piano: "Piano",
+        electric_piano: "Electric piano",
+        voice: "Voice (melody)",
+        acoustic_guitar: "Acoustic guitar",
+        clean_electric_guitar: "Electric guitar (clean)",
+        distorted_electric_guitar: "Electric guitar (distorted)",
+        acoustic_bass: "Acoustic bass",
+        electric_bass: "Electric bass",
+        violin: "Violin",
+        cello: "Cello",
+        string_ensemble: "Strings",
+        flutes: "Flutes",
+        organ: "Organ",
+        synth_lead: "Synth lead",
+        synth_pad: "Synth pad",
+        drums: "Drums",
+      },
     },
   };
 
@@ -150,6 +220,7 @@
   const progressBar = document.getElementById("progress-bar");
   const jobMessageEl = document.getElementById("job-message");
   const engineHelpEl = document.getElementById("engine-help");
+  const engineHelpCommand = document.getElementById("engine-help-command");
   const recheckBtn = document.getElementById("btn-recheck");
   const engineChip = document.getElementById("engine-chip");
   const playerEl = document.getElementById("player");
@@ -179,6 +250,16 @@
   const midiFitBtn = document.getElementById("btn-midi-fit");
   const toastEl = document.getElementById("toast");
   const audioHolder = document.getElementById("audio-holder");
+  const transcribePanel = document.getElementById("transcribe-panel");
+  const transcribeStemsEl = document.getElementById("transcribe-stems");
+  const transcribeInstrumentEl = document.getElementById("transcribe-instrument");
+  const transcribeBtn = document.getElementById("btn-transcribe");
+  const transcribeCancelBtn = document.getElementById("btn-transcribe-cancel");
+  const transcribeHelpEl = document.getElementById("transcribe-help");
+  const transcribeHelpText = document.getElementById("transcribe-help-text");
+  const transcribeHelpCommand = document.getElementById("transcribe-help-command");
+  const transcribeRecheckBtn = document.getElementById("btn-transcribe-recheck");
+  const transcriptionsEl = document.getElementById("transcriptions");
 
   // ---- 状态 ----
   let tracks = [];
@@ -190,6 +271,15 @@
   let pollTimer = null;
   let playerSignature = null;
   let draggingSeek = false;
+
+  // 转 MIDI（66CCFF-0012）
+  let transcriptionEngine = null;
+  let transcribeRunId = null;
+  /** 本页发起的转写的实时进度：{ trackId, progress, message } */
+  let transcribeLive = null;
+  const transcribeStems = new Set(["piano"]);
+  /** 作者手动选过乐器后，不再按所选的轨自动换 */
+  let instrumentTouched = false;
 
   const audioMap = new Map();
   const stemParams = new Map();
@@ -962,7 +1052,8 @@
     clearInterval(pollTimer);
     pollTimer = null;
     if (!detail) return;
-    if (detail.job && detail.job.status === "running" && !activeRunId) {
+    const transcriptionRunning = detail.transcriptions.some((item) => item.status === "running");
+    if ((detail.job && detail.job.status === "running" && !activeRunId) || (transcriptionRunning && !transcribeRunId)) {
       pollTimer = setInterval(() => {
         void refreshDetail({ silent: true });
       }, 2000);
@@ -1025,6 +1116,8 @@
       jobMessageEl.classList.remove("error");
     }
     engineHelpEl.classList.toggle("hidden", !!(engine && engine.ready));
+    // 安装命令按平台来自后端，不写死在页面里（66CCFF-0013）
+    engineHelpCommand.textContent = engine ? engine.setupCommand : "";
 
     if (detail.stems.length > 0) {
       playerEl.classList.remove("hidden");
@@ -1036,6 +1129,229 @@
     } else {
       playerEl.classList.add("hidden");
       stopPlayback();
+    }
+    renderTranscribePanel();
+  }
+
+  // ---- 转 MIDI（66CCFF-0012） ----
+
+  async function loadTranscriptionEngine() {
+    try {
+      transcriptionEngine = await callOrThrow("66CCFF.getTranscriptionEngineStatus", {});
+    } catch {
+      transcriptionEngine = null;
+    }
+  }
+
+  function instrumentLabel(name) {
+    return t("instrumentLabels")[name] ?? name;
+  }
+
+  /** 按所选的轨猜一个乐器：只选人声 → 人声旋律，只选贝斯 → 电贝斯，只选吉他 → 木吉他，其余 → 钢琴 */
+  function defaultInstrument() {
+    const kinds = [...transcribeStems];
+    if (kinds.length === 1 && kinds[0] === "vocals") return "voice";
+    if (kinds.length === 1 && kinds[0] === "bass") return "electric_bass";
+    if (kinds.length === 1 && kinds[0] === "guitar") return "acoustic_guitar";
+    if (kinds.length === 1 && kinds[0] === "drums") return "drums";
+    return "acoustic_piano";
+  }
+
+  function renderInstrumentOptions() {
+    const names = transcriptionEngine ? transcriptionEngine.instruments : ["acoustic_piano"];
+    const labelled = Object.keys(t("instrumentLabels")).filter((name) => names.includes(name));
+    const rest = names.filter((name) => !labelled.includes(name));
+    const current = transcribeInstrumentEl.value;
+    transcribeInstrumentEl.innerHTML = "";
+    for (const name of [...labelled, ...rest]) {
+      const option = document.createElement("option");
+      option.value = name;
+      option.textContent = instrumentLabel(name);
+      transcribeInstrumentEl.appendChild(option);
+    }
+    transcribeInstrumentEl.value = instrumentTouched && names.includes(current) ? current : defaultInstrument();
+  }
+
+  function renderTranscribePanel() {
+    if (!detail || detail.stems.length === 0) {
+      transcribePanel.classList.add("hidden");
+      return;
+    }
+    transcribePanel.classList.remove("hidden");
+    const available = detail.stems.map((stem) => stem.kind);
+    for (const kind of [...transcribeStems]) if (!available.includes(kind)) transcribeStems.delete(kind);
+    if (transcribeStems.size === 0) transcribeStems.add(available.includes("piano") ? "piano" : available[0]);
+
+    transcribeStemsEl.innerHTML = "";
+    for (const kind of STEM_ORDER) {
+      if (!available.includes(kind)) continue;
+      const label = document.createElement("label");
+      label.className = "stem-check" + (transcribeStems.has(kind) ? " on" : "");
+      const box = document.createElement("input");
+      box.type = "checkbox";
+      box.checked = transcribeStems.has(kind);
+      box.addEventListener("change", () => {
+        if (box.checked) transcribeStems.add(kind);
+        else transcribeStems.delete(kind);
+        label.classList.toggle("on", box.checked);
+        if (!instrumentTouched) transcribeInstrumentEl.value = defaultInstrument();
+      });
+      label.appendChild(box);
+      label.appendChild(document.createTextNode(stemLabel(kind)));
+      transcribeStemsEl.appendChild(label);
+    }
+    renderInstrumentOptions();
+
+    const busy = !!transcribeRunId || detail.transcriptions.some((item) => item.status === "running");
+    const separating = !!activeRunId || (detail.job && detail.job.status === "running");
+    const ready = !!(transcriptionEngine && transcriptionEngine.ready);
+    transcribeBtn.disabled = busy || separating || !ready;
+    transcribeCancelBtn.classList.toggle("hidden", !transcribeRunId);
+
+    transcribeHelpEl.classList.toggle("hidden", ready);
+    if (!ready) {
+      const installed = !!(transcriptionEngine && transcriptionEngine.installed);
+      transcribeHelpText.textContent = installed ? t("transcribeLogin") : t("transcribeEngineMissing");
+      transcribeHelpCommand.textContent = transcriptionEngine
+        ? installed
+          ? transcriptionEngine.loginCommand
+          : transcriptionEngine.setupCommand
+        : "";
+    }
+    renderTranscriptions();
+  }
+
+  function renderTranscriptions() {
+    transcriptionsEl.innerHTML = "";
+    if (!detail || detail.transcriptions.length === 0) {
+      const empty = document.createElement("div");
+      empty.className = "muted";
+      empty.textContent = t("noTranscriptions");
+      transcriptionsEl.appendChild(empty);
+      return;
+    }
+    for (const item of detail.transcriptions) {
+      const row = document.createElement("div");
+      row.className = "transcription-row";
+      const main = document.createElement("div");
+      main.className = "transcription-main";
+      const title = document.createElement("div");
+      title.className = "transcription-title";
+      title.textContent = `${instrumentLabel(item.instrument)} ← ${item.stems.map(stemLabel).join(" + ")}`;
+      const meta = document.createElement("div");
+      meta.className = "muted transcription-meta";
+      const parts = [new Date(item.createdAt).toLocaleString()];
+      if (item.status === "succeeded") {
+        if (item.noteCount != null) parts.push(t("notes", item.noteCount));
+        if (item.bpm) parts.push(`${Math.round(item.bpm)} BPM`);
+      } else if (item.status === "running") {
+        const live = transcribeLive && transcribeLive.trackId === item.trackId ? transcribeLive : null;
+        const progress = live ? live.progress : item.progress;
+        parts.push(`${t("transcribing")} ${Math.round(progress * 100)}%`, live ? live.message : item.message);
+      } else if (item.status === "failed") {
+        parts.push(`${t("transcriptionFailed")}：${item.error ?? ""}`);
+        meta.classList.add("error");
+      } else {
+        parts.push(t("cancelled"));
+      }
+      meta.textContent = parts.filter(Boolean).join(" · ");
+      main.appendChild(title);
+      main.appendChild(meta);
+      row.appendChild(main);
+
+      const actions = document.createElement("div");
+      actions.className = "transcription-actions";
+      if (item.status === "succeeded") {
+        const open = document.createElement("button");
+        open.type = "button";
+        open.className = "ghost";
+        open.textContent = t("openInRoll");
+        open.addEventListener("click", () => void openTranscriptionInRoll(item.id));
+        actions.appendChild(open);
+      }
+      if (item.status !== "running") {
+        const remove = document.createElement("button");
+        remove.type = "button";
+        remove.className = "link-btn text-danger";
+        remove.textContent = t("delete");
+        remove.addEventListener("click", () => void deleteTranscription(item.id));
+        actions.appendChild(remove);
+      }
+      row.appendChild(actions);
+      transcriptionsEl.appendChild(row);
+    }
+  }
+
+  async function startTranscription() {
+    if (!detail || transcribeRunId) return;
+    if (transcribeStems.size === 0) {
+      toast(t("pickStem"), true);
+      return;
+    }
+    const trackId = detail.id;
+    const runId = bridge.newRunId();
+    transcribeRunId = runId;
+    transcribeLive = { trackId, progress: 0, message: t("transcribeStart") };
+    const off = bridge.onEvent(runId, (event) => {
+      if (!event || event.type !== "progress") return;
+      transcribeLive = { trackId, progress: event.progress ?? 0, message: event.message ?? "" };
+      if (currentId === trackId) renderTranscriptions();
+    });
+    const request = callOrThrow(
+      "66CCFF.startTranscription",
+      { trackId, stems: [...transcribeStems], instrument: transcribeInstrumentEl.value },
+      { runId },
+    );
+    // 记录在请求开始时写入；稍等一下刷新，列表里就有这一行了
+    setTimeout(() => {
+      if (currentId === trackId) void refreshDetail({ silent: true });
+    }, 400);
+    renderTranscribePanel();
+    try {
+      const result = await request;
+      if (currentId === trackId) toast(t("transcribed", result.noteCount));
+    } catch (error) {
+      if (error.code === "ABORTED") toast(t("transcribeCancelled"));
+      else if (currentId === trackId) toast(`${t("transcribeFailed")}${error.message}`, true);
+    } finally {
+      off();
+      transcribeRunId = null;
+      transcribeLive = null;
+      if (currentId === trackId) await refreshDetail({ silent: true });
+    }
+  }
+
+  async function openTranscriptionInRoll(transcriptionId) {
+    try {
+      const data = await callOrThrow("66CCFF.readTranscription", { transcriptionId });
+      stopMidiPlayback(true);
+      if (!midiLayers.some((layer) => layer.transcriptionId === transcriptionId)) {
+        midiLayers.push({
+          name: data.name,
+          transcriptionId,
+          duration: data.duration,
+          tracks: data.tracks.map((track) => ({ ...track, visible: true })),
+        });
+      }
+      midiNeedsFit = true;
+      renderMidiLegend();
+      updateMidiEmpty();
+      openMidiModal();
+    } catch (error) {
+      toast(`${t("midiLoadFailed")}${error.message}`, true);
+    }
+  }
+
+  async function deleteTranscription(transcriptionId) {
+    if (!window.confirm(t("deleteTranscriptionConfirm"))) return;
+    try {
+      await callOrThrow("66CCFF.deleteTranscription", { transcriptionId });
+      midiLayers = midiLayers.filter((layer) => layer.transcriptionId !== transcriptionId);
+      renderMidiLegend();
+      updateMidiEmpty();
+      await refreshDetail({ silent: true });
+    } catch (error) {
+      toast(error.message, true);
     }
   }
 
@@ -1478,12 +1794,25 @@
     renderDetail();
   });
 
+  transcribeBtn.addEventListener("click", () => void startTranscription());
+  transcribeCancelBtn.addEventListener("click", () => {
+    if (transcribeRunId) void bridge.cancel(transcribeRunId);
+  });
+  transcribeInstrumentEl.addEventListener("change", () => {
+    instrumentTouched = true;
+  });
+  transcribeRecheckBtn.addEventListener("click", async () => {
+    await loadTranscriptionEngine();
+    renderDetail();
+  });
+
   // ---- 启动 ----
 
   async function init() {
     initMidi();
     await initLanguage();
     await loadEngine();
+    await loadTranscriptionEngine();
     try {
       await loadTracks();
     } catch (error) {

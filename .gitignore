@@ -8,3 +8,6 @@ out/
 
 # Obsidian：设置提交进仓库（两台电脑共用），只忽略记录界面状态（开了哪些标签页）的文件
 .obsidian/workspace*.json
+
+# Python 编译缓存（运行或检查脚本时生成）
+__pycache__/

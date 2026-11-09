@@ -28,17 +28,16 @@ bash apps/66CCFF/scripts/setup-engine-macos.sh
 
 macOS 没有 CUDA，且 `bs-roformer-infer` 不支持 MPS，因此分离会走 CPU；同一首歌会明显比 Windows + RTX 5060 慢，可能达到几分钟。脚本会安装 CPU 版 PyTorch、`bs-roformer-infer` 和 BS-RoFormer SW 模型。
 
-### MIDI 转写（可选，单音频）
+### 转 MIDI（可选）
 
-MIDI 引擎目前只有 Windows 安装脚本：
-
-```powershell
-powershell -ExecutionPolicy Bypass -File apps/66CCFF/scripts/setup-midi-engine.ps1
+```bash
+bash apps/66CCFF/scripts/setup-muscriptor-macos.sh                                # macOS（Apple Silicon 用 Metal）
+powershell -ExecutionPolicy Bypass -File apps/66CCFF/scripts/setup-muscriptor.ps1  # Windows（CUDA）
 ```
 
-脚本会创建**独立**的 Python 3.10 venv，安装 Basic Pitch + ONNX Runtime，不安装 TensorFlow，也不影响上面的分离引擎。可以转单条 stem，也可以把选定的几条 stem 混成一条音频再转；不转整首歌。
+脚本会创建**独立**的 Python 3.12 venv，安装 MuScriptor 0.4.0，不影响上面的分离引擎。MuScriptor 的权重（CC BY-NC 4.0，非商用）要先在 [模型页](https://huggingface.co/MuScriptor/muscriptor-medium) 接受许可，再在终端用引擎自带的 `hf auth login` 登录（纯蓝界面会显示完整命令）。之后在曲目页的「转 MIDI」里选轨和乐器即可；可以转单条 stem，也可以把选定的几条 stem 混在一起转；不转整首歌（见 [66CCFF-0012](user-spec/decisions/66CCFF-0012-muscriptor-in-app-transcription.md)）。
 
-应用文件（曲目、六轨结果、引擎、MIDI 引擎）位于：
+应用文件（曲目、六轨结果、MIDI、分离引擎、转 MIDI 引擎）位于：
 
 - Windows：`%APPDATA%/MyOutside/apps/66CCFF/`
 - macOS：`~/Library/Application Support/MyOutside/apps/66CCFF/`
@@ -53,7 +52,6 @@ pnpm dev
 ## 开发
 
 - 数据库迁移与 API：`backend/src/index.ts`
-- 引擎调用与进度：`backend/src/roformer.ts`
-- MIDI 单音频转写：`scripts/transcribe_midi.py`（需要 `setup-midi-engine.ps1` 安装的独立引擎；输入可以是单条 stem 或选定 stem 的混合）
+- 引擎调用与进度：`backend/src/roformer.ts`（分离）、`backend/src/transcription.ts` + `scripts/transcribe_muscriptor.py`（转 MIDI）
 - 界面：`ui/`（零构建静态页面）
 - 测试：`pnpm.cmd --filter @myoutside/66ccff test`

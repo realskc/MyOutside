@@ -319,6 +319,100 @@ button {
   padding: 16px 18px 20px;
 }
 
+/* 转 MIDI（66CCFF-0012） */
+.transcribe-panel {
+  margin-top: 18px;
+  margin-bottom: 0;
+}
+
+.panel-title {
+  font-weight: 600;
+  font-size: 14px;
+}
+
+.transcribe-form {
+  margin-top: 12px;
+}
+
+.transcribe-stems {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.stem-check {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 4px 10px 4px 8px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  font-size: 13px;
+  cursor: pointer;
+  user-select: none;
+}
+
+.stem-check.on {
+  border-color: var(--brand);
+  background: #eef9ff;
+  color: var(--accent-strong);
+}
+
+.stem-check input {
+  margin: 0;
+  accent-color: var(--accent);
+}
+
+.transcribe-instrument {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  color: var(--muted);
+}
+
+.transcriptions {
+  margin-top: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.transcription-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+}
+
+.transcription-main {
+  flex: 1;
+  min-width: 0;
+}
+
+.transcription-title {
+  font-size: 14px;
+}
+
+.transcription-meta {
+  margin-top: 2px;
+  font-size: 12px;
+  overflow-wrap: anywhere;
+}
+
+.transcription-meta.error {
+  color: var(--danger);
+}
+
+.transcription-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-shrink: 0;
+}
+
 .transport {
   display: flex;
   align-items: center;
@@ -375,7 +469,8 @@ button {
   color: var(--muted);
 }
 
-.speed select {
+.speed select,
+.transcribe-instrument select {
   font: inherit;
   font-size: 12px;
   border: 1px solid var(--border);

@@ -4,10 +4,10 @@
 
 ## 1. 组成
 
-- **后端**：`backend/src/index.ts` 的 `createX66CCFFApp({ dataDir, engineDir? })`（宿主在启动时用数据目录构造并注册）；`roformer.ts` 负责引擎探测、音频转 WAV 与分离进程。
+- **后端**：`backend/src/index.ts` 的 `createX66CCFFApp({ dataDir, engineDir?, transcriptionEngineDir?, scriptsDir? })`（宿主在启动时用数据目录和仓库里的 `apps/66CCFF/scripts` 构造并注册）；`process.ts` 是引擎 Python 探测和子进程；`roformer.ts` 负责音频转 WAV 与分离进程；`transcription.ts` 负责混合 stem 与 MuScriptor 转写进程。
 - **界面**：`ui/` 静态 HTML / CSS / JS（零构建）。
 - **引擎**：`scripts/setup-engine.ps1`（Windows）或 `scripts/setup-engine-macos.sh`（macOS）安装到 `<userData>/apps/66CCFF/roformer-engine`（Python 3.12 venv + `bs-roformer-infer` + PyTorch + BS-RoFormer SW 六轨模型；见 [66CCFF-0003](../user-spec/decisions/66CCFF-0003-engine-setup-script.md)、[66CCFF-0008](../user-spec/decisions/66CCFF-0008-bs-roformer-engine.md)、[66CCFF-0009](../user-spec/decisions/66CCFF-0009-macos-source-install.md)）。
-- **MIDI 引擎（可选）**：`scripts/setup-midi-engine.ps1` 安装到 `<userData>/apps/66CCFF/midi-engine`（独立 Python 3.10 venv + Basic Pitch + ONNX Runtime；见 [66CCFF-0007](../user-spec/decisions/66CCFF-0007-basic-pitch-midi.md)）；`scripts/transcribe_midi.py` 负责单音频（单条 stem 或选定 stem 混合）转 MIDI。
+- **转 MIDI 引擎**：`scripts/setup-muscriptor-macos.sh`（macOS）或 `scripts/setup-muscriptor.ps1`（Windows）安装到 `<userData>/apps/66CCFF/muscriptor-engine`（Python 3.12 venv + MuScriptor 0.4.0 + PyTorch；权重缓存在 `models/`，要先登录 HuggingFace；见 [66CCFF-0012](../user-spec/decisions/66CCFF-0012-muscriptor-in-app-transcription.md)）；`scripts/transcribe_muscriptor.py` 是应用调用的包装脚本（检测节拍、写 MIDI、逐行打印 JSON 进度）。
 - **媒体**：宿主 `media://<appId>/<相对路径>` 协议读取 `<userData>/apps/<appId>/`（见 [66CCFF-0004](../user-spec/decisions/66CCFF-0004-app-files-and-media-protocol.md)）。
 
 ## 2. 数据
@@ -16,11 +16,14 @@
 app_66CCFF__track(id, title, file, ext, size, duration, created_at)
 app_66CCFF__job(id, track_id, status, progress, message, error, created_at, updated_at)
 app_66CCFF__stem(id, track_id, job_id, kind, file, size, created_at)
+app_66CCFF__transcription(id, track_id, stems, instrument, model, status, progress, message, error, file, note_count, bpm, created_at, updated_at)
 ```
 
 - `file` 是相对应用文件根的路径；曲目在 `tracks/<id>/source.<ext>`，六轨在 `tracks/<id>/stems-<jobId>/<kind>.flac`（每次分离独立目录，成功后切换引用并清理旧目录）；
 - 同一曲目同一时间只允许一个 `running` 任务；重新分离会替换旧的 stem 记录与文件；
-- 删除曲目会删除数据库记录和 `tracks/<id>` 目录。
+- 转 MIDI 的结果在 `tracks/<id>/midi/<转写 id>.mid`；`stems` 是所选 stem 的 JSON 数组；迁移 `0002_transcription` 建表（66CCFF-0012）；
+- 同一曲目上分离和转 MIDI 不能同时跑；
+- 删除曲目会删除数据库记录（含转写记录）和 `tracks/<id>` 目录。
 
 ## 3. API
 
@@ -30,12 +33,16 @@ app_66CCFF__stem(id, track_id, job_id, kind, file, size, created_at)
 | `66CCFF.getTrack` | 只读 | 曲目详情 + stems + 最新任务 |
 | `66CCFF.getEngineStatus` | 只读 | 引擎目录 / Python / 安装提示 |
 | `66CCFF.readMidi` | 只读 | 读取本地 `.mid` / `.midi`，返回秒制音符和轨道；供 MIDI 卷帘使用 |
+| `66CCFF.readTranscription` | 只读 | 读取一次转写的 MIDI，格式同 `readMidi` |
+| `66CCFF.getTranscriptionEngineStatus` | 只读 | 转 MIDI 引擎是否安装、是否已登录 HuggingFace、安装 / 登录命令、可选乐器 |
+| `66CCFF.startTranscription` | 内部异步 | 所选 stem（多条先混合）→ MuScriptor（一个乐器）→ 单轨 MIDI；进度事件 + 写进记录 |
+| `66CCFF.deleteTranscription` | 内部异步 | 删除转写记录和 MIDI 文件 |
 | `66CCFF.importTrack` | 内部异步 | 校验并复制音频、ffprobe 时长，事务写入 |
 | `66CCFF.startSeparation` | 内部异步 | 创建任务、运行 BS-RoFormer、进度事件、事务写六轨 |
 | `66CCFF.deleteTrack` | 内部异步 | 事务删除记录 + 删除文件目录 |
-| `insertTrack` / `insertJob` / `updateJob` / `finishJob` / `deleteTrackTx` | 内部事务 | 供异步函数使用 |
+| `insertTrack` / `insertJob` / `updateJob` / `finishJob` / `deleteTrackTx` / `insertTranscription` / `updateTranscription` / `finishTranscription` / `deleteTranscriptionTx` | 内部事务 | 供异步函数使用 |
 
-- `startSeparation` 用 `runId` 推送 `{ type: "progress", progress, message }`；取消用 `bridge.cancel(runId)`（见 [66CCFF-0006](../user-spec/decisions/66CCFF-0006-separation-job-execution.md)）。
+- `startSeparation`、`startTranscription` 用 `runId` 推送 `{ type: "progress", progress, message }`；取消用 `bridge.cancel(runId)`（见 [66CCFF-0006](../user-spec/decisions/66CCFF-0006-separation-job-execution.md)）。
 - 所有 API 目前是内部 API；将来给 agent 用时按需公开并声明权限。
 
 ## 4. 引擎与分离
@@ -53,17 +60,20 @@ app_66CCFF__stem(id, track_id, job_id, kind, file, size, created_at)
 
 - BS-RoFormer SW 六轨权重 `BS-Rofo-SW-Fixed.ckpt`：约 667MB；实际推理在 RTX 5060 上处理 3 分 02 秒歌曲约 36 秒。
 - 引擎体积主要来自 PyTorch；当前测试环境通过独立 `roformer-engine` venv 安装 `bs-roformer-infer`。Windows 使用 CUDA 版 PyTorch，macOS 使用 CPU 版。
-- Basic Pitch：ONNX 模型 230,444 字节（0.22MB），约 3.6 万个 ONNX 初始化器元素（float32 约 3.57 万个）；独立 MIDI 引擎约 423MB，主要是 ONNX Runtime、scipy、llvmlite、librosa 等依赖。
+- MuScriptor `medium` 权重 1.23GB；转 MIDI 引擎（Python 3.12 venv + PyTorch）在 macOS 上约 730MB。
 
-## 5. MIDI 转写（验证）
+## 5. 转 MIDI（MuScriptor，66CCFF-0012）
 
-- 引擎：Spotify Basic Pitch `0.4.0`，独立 Python 3.10 venv + ONNX Runtime；不安装 TensorFlow，也不与分离引擎的 Python 3.12 环境混用；
-- 安装：`powershell -ExecutionPolicy Bypass -File apps/66CCFF/scripts/setup-midi-engine.ps1`；
-- 转写：`apps/66CCFF/scripts/transcribe_midi.py <音频> <输出.mid>`，可选 `--instrument-name`、`--program`、`--min-frequency`、`--max-frequency`、阈值参数；
-- 输入只接受**一个音频文件**；可以是单条 stem，也可以是选定的几条 stem 混合；不转整首歌；输出一个单轨 MIDI；鼓轨没有音高，不转；
-- 脚本 stdout 输出 JSON 摘要（音符数、音高范围、时长、输出路径），供后续后端接入；
-- 验证：2026-11-06 在 `htdemucs_6s` 的 piano stem 上得到 1,131 个音符，guitar stem 上得到 880 个音符；2026-11-07 在 BS-RoFormer SW 的 piano stem 上得到 1,436 个音符，guitar stem 上得到 771 个音符；音符数量不代表质量，作者反馈转写效果仍然一般；冷启动约 20 秒（模型加载），预热后约 5 秒；输出在 `tracks/<id>/midi-validation/`（尚未写入数据库、尚未接入界面）；
-- Basic Pitch 以 Apache-2.0 发布；若随应用分发，需要保留 LICENSE / NOTICE。
+- 引擎：MuScriptor 0.4.0、`medium` 权重（1.23GB，CC BY-NC 4.0）；Python 3.12 venv；macOS 自动用 Metal（MPS），Windows 用 CUDA；
+- 安装：`bash apps/66CCFF/scripts/setup-muscriptor-macos.sh` 或 `powershell -ExecutionPolicy Bypass -File apps/66CCFF/scripts/setup-muscriptor.ps1`；
+- 登录：先在 huggingface.co/MuScriptor/muscriptor-medium 接受许可，再在终端运行 `<引擎>/venv/bin/hf auth login`（Windows：`venv\Scripts\hf.exe`）；纯蓝只检查 `HF_TOKEN` 或 HuggingFace 的 token 文件在不在，不读也不存 token；
+- 流程：界面选 stem（多条先 ffmpeg `amix` 成 16kHz 单声道 WAV）和一个乐器 → `scripts/transcribe_muscriptor.py`（`--instrument <一个乐器组> --model medium`；环境变量 `HF_HUB_CACHE=<引擎>/models`）→ 逐行 JSON：`loading` / `beats` / `transcribing`（completed / total 块）/ `done`（BPM）/ `error`；音符数由纯蓝从写好的 MIDI 里数（66CCFF-0014）；
+- 进度映射：加载模型 3%、检测节拍 6%、转写 8%–98%；记录每 0.8 秒最多写一次；
+- 默认乐器：只选人声 → `voice`，只选贝斯 → `electric_bass`，只选吉他 → `acoustic_guitar`，只选鼓 → `drums`，其余 → `acoustic_piano`。
+
+## 5.1 Basic Pitch（已删除）
+
+- 之前在 ThinkBook 上用 Basic Pitch 做过命令行验证（66CCFF-0007），作者反馈效果一般；改用 MuScriptor 后，它的安装与转写脚本已删除（66CCFF-0012 修订记录）。验证数据留在 66CCFF-0007 里。
 
 ## 6. 界面
 
@@ -73,15 +83,16 @@ app_66CCFF__stem(id, track_id, job_id, kind, file, size, created_at)
 - 播放 / 暂停按钮用图标切换（播放三角 / 暂停条），播放中按钮颜色加深；进度条、速度 50%–100%（保持音高）、循环与 AB 段、清除；空格键暂停 / 继续（文字输入框聚焦时除外）；
 - 播放用多个 `<audio>` 元素同步，主轨 `timeupdate` 定期校正其它轨；无波形（v1）。
 - 每个 `<audio>` 经 `createMediaElementSource` 接进同一个 `AudioContext` + `GainNode`；静音 / 独奏 / 音量只改音量节点，`<audio>` 本身永远不静音（66CCFF-0011：浏览器会在窗口隐藏时暂停一直静音的 `<audio>`，主轨一停，切回来进度会回退）。冒烟检查 `66CCFF background` / `66CCFF web audio` 守着这两点。
-- MIDI 卷帘：从曲目详情打开；通过系统文件选择器加载一个或多个 MIDI，Canvas 叠加显示多文件/多轨；支持缩放、拖动、悬停查看音符信息和轨道开关；可用简单 Web Audio 合成器播放可见轨道，带播放头；不编辑、不写入数据库（66CCFF-0010）。
+- MIDI 卷帘：从曲目详情打开；通过系统文件选择器加载一个或多个 MIDI，Canvas 叠加显示多文件/多轨；支持缩放、拖动、悬停查看音符信息和轨道开关；可用简单 Web Audio 合成器播放可见轨道，带播放头；不编辑（66CCFF-0010）。
+- 转 MIDI 面板（有分轨时出现）：选 stem（勾选）、选乐器、「转 MIDI」/「取消」；引擎没装或没登录时显示对应命令与「重新检查」；下面列出这首曲目的所有转写结果（乐器 ← 所选的轨、时间、音符数、BPM、进度或失败原因），可以「在卷帘中打开」或删除（66CCFF-0012）。冒烟检查 `66CCFF transcribe panel` 确认面板出现。
 
 ## 7. 已知限制
 
-- MIDI 转写目前只有命令行验证，没有转写界面 / API；已有只读 MIDI 卷帘和基础合成器播放，但未做真实钢琴音色、音频同步、多轨合并或编辑。
+- 转 MIDI 每次只能选一个乐器（单轨 MIDI）；卷帘还没有真实钢琴音色、音频同步或编辑。
 - MIDI 卷帘的文件选择器只在 Electron 宿主可用；LAN / 浏览器版暂不支持。
 - 取消只对当前页面发起的任务有效；刷新后正在运行的任务无法从界面取消（会继续并靠轮询显示）。
 - 没有导出、变调、两轨快捷预设、波形；这些见应用 user spec 的「未定 / 非目标」。
 - `media://` 没有跨应用权限：目前任意子应用理论上能猜到并读取其它应用的 media 路径；builder / 不可信应用出现前必须收紧（66CCFF-0004）。
-- 分离安装脚本覆盖 Windows / macOS；Linux 需要另行安装。MIDI 安装脚本目前只有 Windows 版本（66CCFF-0003、66CCFF-0007、66CCFF-0009）。
+- 分离与转 MIDI 的安装脚本都覆盖 Windows / macOS（转 MIDI 的 Windows 脚本尚未实测）；Linux 需要另行安装（66CCFF-0003、66CCFF-0009、66CCFF-0012）。
 - 分离依赖系统 `ffmpeg` / `ffprobe`；Windows 使用 CUDA，macOS 使用 CPU，Mac 会比 GPU 明显慢。
 - 如果从 Finder 启动 Electron，Homebrew 的 `ffmpeg` 可能不在 PATH 中；后端会补查 `/opt/homebrew/bin`、`/usr/local/bin`、`/opt/local/bin`，也可用 `FFMPEG_PATH` / `FFPROBE_PATH` 指定。

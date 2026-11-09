@@ -53,7 +53,7 @@
             <div id="job-message" class="job-message"></div>
             <div id="engine-help" class="engine-help hidden">
               <div data-i18n="engineMissing">未检测到分离引擎。请先运行：</div>
-              <code>powershell -ExecutionPolicy Bypass -File apps/66CCFF/scripts/setup-engine.ps1</code>
+              <code id="engine-help-command"></code>
               <div class="engine-help-actions">
                 <button id="btn-recheck" class="link-btn" data-i18n="recheck">重新检查</button>
               </div>
@@ -86,6 +86,30 @@
               <button id="btn-clear-loop" class="link-btn" data-i18n="clearLoop">清除</button>
             </div>
             <div id="mixer" class="mixer"></div>
+          </div>
+
+          <div id="transcribe-panel" class="panel transcribe-panel hidden">
+            <div class="panel-row">
+              <span class="panel-title" data-i18n="transcribeTitle">转 MIDI</span>
+              <span class="muted" data-i18n="transcribeHint">把选中的轨转成一个 MIDI（MuScriptor）</span>
+            </div>
+            <div class="panel-row transcribe-form">
+              <div id="transcribe-stems" class="transcribe-stems"></div>
+              <label class="transcribe-instrument">
+                <span data-i18n="transcribeAs">转成</span>
+                <select id="transcribe-instrument"></select>
+              </label>
+              <button id="btn-transcribe" class="primary" data-i18n="transcribe">转 MIDI</button>
+              <button id="btn-transcribe-cancel" class="ghost hidden" data-i18n="cancel">取消</button>
+            </div>
+            <div id="transcribe-help" class="engine-help hidden">
+              <div id="transcribe-help-text"></div>
+              <code id="transcribe-help-command"></code>
+              <div class="engine-help-actions">
+                <button id="btn-transcribe-recheck" class="link-btn" data-i18n="recheck">重新检查</button>
+              </div>
+            </div>
+            <div id="transcriptions" class="transcriptions"></div>
           </div>
         </div>
       </section>
