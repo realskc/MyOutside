@@ -64,9 +64,9 @@
 | 资料 | 形式 | 我们的想法 | 备注 |
 |---|---|---|---|
 | [GarageBand（库乐队）](piano-roll/GarageBand.md) | macOS 免费 DAW | [有](piano-roll/GarageBand-thoughts.md) | 横向卷帘，左边有琴键；作者试过，觉得挺好，但只能一次放大看一条轨 |
-| [Signal](piano-roll/Signal.md) | 开源网页 MIDI 编辑器 | 无 | 多轨横向卷帘 |
-| [Midiano](piano-roll/Midiano.md) | 网页学琴工具 | 无 | 音符从上往下落到琴键上，同时显示五线谱 |
-| [Neothesia](piano-roll/Neothesia.md) | 开源桌面学琴软件 | 无 | 音符从上往下落到琴键上 |
+| [Signal](piano-roll/Signal.md) | 开源网页 MIDI 编辑器 | [有](piano-roll/Signal-thoughts.md) | 多轨横向卷帘；音符块够大时显示音名 |
+| [Midiano](piano-roll/Midiano.md) | 网页学琴工具 | [有](piano-roll/Midiano-thoughts.md) | 音符从上往下落到琴键上，带小节线、按乐器上色；作者很喜欢 |
+| [Neothesia](piano-roll/Neothesia.md) | 开源桌面学琴软件 | [有](piano-roll/Neothesia-thoughts.md) | 音符从上往下落到琴键上 |
 
 ## 其他 MIDI 线索
 
