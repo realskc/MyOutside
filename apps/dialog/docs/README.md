@@ -62,7 +62,7 @@ app_dialog__lab_run
 
 索引：`message(conversation_id, parent_id)`、`message(conversation_id, created_at)`、`conversation(updated_at)`、`lab_run(created_at)`。
 
-迁移：`0001_init` 建会话与消息；`0002_lab` 建实验室运行记录（开发阶段的表结构变更，作者的两台设备各自执行一次即可，见 `user-spec/workflow.md`「当前阶段的节奏」）。
+迁移：`0001_init` 建会话与消息；`0002_lab` 建实验室运行记录（开发阶段的表结构变更，作者的两台设备各自执行一次即可，见 `AGENTS.md`「当前阶段的节奏」）。
 
 **当前路径**：从 `active_first_id` 起，沿各消息的 `active_child_id` 下降；指针缺失或失效时兜底取最新的子消息。界面渲染与发给 AI 的上下文都取当前路径。
 

@@ -6,6 +6,8 @@
 
 概念来源：`future/user-spec.md`（user spec 作为 MyOutside 产品功能的设计）。本目录是这个概念在本项目自身开发中的落地。
 
+**仓库根目录的 [AGENTS.md](../AGENTS.md) 也属于 user spec**：它是作者对开发方式、对 agent 怎么参与开发的预期，只是位置不在本目录——放在根目录，agent 工具开工时会自动读到。只看 user spec 重构项目时，范围是本目录加上 AGENTS.md。
+
 ## 两层内容
 
 ### 1. spec 文档（本目录下除 `decisions/` 以外的文档）
@@ -80,7 +82,7 @@ agent 发现 spec 与需求或现状冲突时，正确的反应不是覆盖，�
 | `principles.md` | 贯穿全局的原则 |
 | `platform.md` | 平台层的预期 |
 | `future/` | 尚未实现的方向：`builder.md`、`user-spec.md`（user spec 作为产品能力的构想）、`unified-capabilities.md`（统一能力：入口、事件记录、界面、记忆）、`agent-design.md`（agent 设计：记忆分级、三类身份、fork） |
-| `workflow.md` | 对开发方式的预期 |
+| `../AGENTS.md`（仓库根目录） | 对开发方式的预期，也是给 agent 的规则（属于 user spec） |
 | `concepts/` | 概念：给项目里的东西起明确的名字 |
 | `decisions/` | 全局/跨应用决策（`D-NNNN`） |
 | `apps/<app>/user-spec/`（仓库根目录下） | 各子应用的预期与决策：学英语、对话、围棋、哲野、66CCFF（纯蓝）、乌托邦（构想中） |
