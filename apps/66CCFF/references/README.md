@@ -47,7 +47,7 @@
 
 | 资料 | 备注 |
 |---|---|
-| [GAME](midi/game.md) | openvpi（中文虚拟歌手社区），SOME 的下一代；对分离出的人声稳；原生支持普通话 / 日语；权重 CC BY-NC-SA |
+| [GAME](midi/game.md) | openvpi（中文虚拟歌手社区），SOME 的下一代；对分离出的人声稳；原生支持普通话 / 日语；权重 CC BY-NC-SA；《白石溪》上作者听了觉得基本可用（[想法](midi/game-thoughts.md)） |
 | [ROSVOT](midi/rosvot.md) | ACL 2024；权重用普通话训练；能处理带伴奏的人声 |
 | [VocalParse](midi/vocalparse.md) | 2026，音频大模型，同时出歌词和音符；普通话；不预测音符时长 |
 
@@ -55,7 +55,7 @@
 
 | 资料 | 备注 |
 |---|---|
-| [UNMIXX](separation/unmixx.md) | ICASSP 2026，盲分离两位歌手；仓库带权重；未声明许可证 |
+| [UNMIXX](separation/unmixx.md) | ICASSP 2026，盲分离两位歌手；仓库带权重；未声明许可证；《白石溪》上几乎没分开两个人（[想法](separation/unmixx-thoughts.md)） |
 | [按参考录音提取指定歌手](separation/singer-informed-separation.md) | 给一段目标歌手的独唱参考，提取这位歌手 |
 | [MedleyVox 与合唱分离模型](separation/medleyvox.md) | 评测集 + 社区模型（Cyru5 权重、MVSEP duet 模型、karaoke 模型） |
 

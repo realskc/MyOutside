@@ -24,6 +24,6 @@ openvpi（DiffSinger / 中文虚拟歌手社区）做的**人声转 MIDI**模型
 - 命令：`python infer.py extract <人声> -m GAME-1.0-large/model.pt -l zh --output-dir <目录> --output-formats mid,csv`。不给 `--output-dir` 时结果写在音频旁边；MIDI 用固定速度（默认 120 BPM）。
 - 《白石溪》BS-RoFormer SW 分出的 vocals（5 分 34 秒）：用时 82 秒（含加载模型）；373 个音符，**没有重叠**（单旋律），音高 56–77（G♯3–F5），中位 F4。开头 F4 D4 C4 A♯3 C4 A♯3 C4 F4……
 - 同一条人声，MuScriptor（`voice`）是 538 个音符，音高 47–97，相邻音符重叠 104 处，39 个音高于 G5。
-- GAME 的 373 个音符里，277 个（74%）在同一时间有 MuScriptor 的同音高音符；5 个只差八度；91 个对不上。两边谁对，要作者听了才知道。
+- GAME 的 373 个音符里，在同一时间有 MuScriptor 同音高音符的：直接比是 277 个（74%）；减掉 MuScriptor 为对齐小节线加的 0.3986 秒延后（66CCFF-0016）后是 366 个（98%）。MuScriptor 多出来的主要是高八度以上的音和叠音。
 - CSV 里音高带音分（如 `F4-6`、`C4-30`），写 MIDI 时取整。
-- 为了和 MuScriptor 的结果用同一套小节线，把 GAME 的音符按 MuScriptor 人声 MIDI 的速度表（128 个速度变化）重新换算成 tick，另存为 `~/Downloads/白石溪 MIDI/白石溪-人声-GAME.mid`（开始时间误差 < 1 毫秒）。
+- 为了和 MuScriptor 的结果用同一套小节线，把 GAME 的音符按 MuScriptor 人声 MIDI 的速度表（128 个速度变化）重新换算成 tick，并照 MuScriptor 的约定延后 0.3986 秒、写同样的 marker，另存为 `~/Downloads/白石溪 MIDI/白石溪-人声-GAME.mid`（开始时间误差 < 1 毫秒）。作者听了觉得基本可用（见 [想法](game-thoughts.md)）。
