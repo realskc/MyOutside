@@ -2,7 +2,7 @@
 
 - 状态：有效（未实现）
 - 日期：2026-11-10
-- 决策者：讨论（agent 提议，作者同意；LoRA 那一条是 agent 的判断）
+- 决策者：讨论（agent 提议，作者同意）
 - 服务于：
   - 作者预期：[`../README.md`](../README.md)「核心流程」合唱那一条：每位歌手各自的轨道；两人一起唱时也要各自的 MIDI；不能假设是齐唱；想拿虚拟歌手自己的声库 / 歌训练模型
   - 参考：[UNMIXX](../../references/separation/unmixx.md)、[按参考录音提取指定歌手](../../references/separation/singer-informed-separation.md)、[duet-svs-diffusion](../../references/separation/duet-svs-diffusion.md)、[SpeechBrain ECAPA](../../references/separation/speechbrain-ecapa.md)、[BS-RoFormer SW 的结构](../../references/separation/bs-roformer-sw-6stem.md)
@@ -32,7 +32,7 @@
 - **从 BS-RoFormer SW 微调**：保留主体（切频带 + 12 层 Transformer，25.3M 参数），**只要一个输出头**，从训练好的人声头复制初始化；它算出天依，**阿绫 = 输入 − 天依**。两路相加一定等于输入；模型约 51M 参数，是原来的三成。
 - **分两步训**：先冻住主体只训输出头，再放开全部用很小的学习率微调。
 - **训练输入和实际输入同一种来源**：用同一个六轨模型从两人的独唱歌里分出人声，再叠起来当训练输入（带着同样的分离痕迹）。样本有几种：两人叠在一起 → 目标是天依那一份；只有天依 → 目标是整个输入；只有阿绫 → 目标是静音。
-- **暂不用 LoRA**（agent 的判断）：LoRA 主要省显存、省存储；模型只有约 51M，直接微调在租的卡上、甚至 Mac 上都放得下。数据很少、出现过拟合时，再拿它和「冻住主体」比一比。以后要支持很多对歌手时，每对一个 LoRA 共用一个底座，也可能用得上。
+- **暂不用 LoRA**（agent 提议，作者同意）：LoRA 主要省显存、省存储；模型只有约 51M，直接微调在租的卡上、甚至 Mac 上都放得下。数据很少、出现过拟合时，再拿它和「冻住主体」比一比。以后要支持很多对歌手时，每对一个 LoRA 共用一个底座，也可能用得上。
 
 ## 还没定
 
