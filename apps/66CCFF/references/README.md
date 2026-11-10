@@ -14,7 +14,7 @@
 ## 当前实现
 
 - 六轨：BS-RoFormer SW 6-stem（`BS-Rofo-SW-Fixed.ckpt`；Windows CUDA、macOS CPU；见 [66CCFF-0008](../user-spec/decisions/66CCFF-0008-bs-roformer-engine.md)）。
-- MIDI：MuScriptor 0.4.0（medium），已接进应用（[66CCFF-0012](../user-spec/decisions/66CCFF-0012-muscriptor-in-app-transcription.md)）；之前的 Basic Pitch 作者反馈效果一般，应用已不再使用。
+- MIDI：MuScriptor 0.4.0（medium），已接进应用（[66CCFF-0012](../user-spec/decisions/66CCFF-0012-muscriptor-in-app-transcription.md)）；人声旋律用 GAME large（[66CCFF-0017](../user-spec/decisions/66CCFF-0017-game-vocal-midi.md)）；之前的 Basic Pitch 作者反馈效果一般，应用已不再使用。
 
 ## 分轨 / 源分离候选
 

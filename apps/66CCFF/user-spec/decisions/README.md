@@ -30,3 +30,4 @@
 | [66CCFF-0014](66CCFF-0014-note-count-from-midi.md) | 转写结果的音符数从写好的 MIDI 里数（修复音符数多算） | 有效 |
 | [66CCFF-0015](66CCFF-0015-roll-on-player-timeline.md) | 钢琴卷帘放进曲目页，和分轨播放器共用一条时间线；加竖着的沉浸模式 | 有效 |
 | [66CCFF-0016](66CCFF-0016-midi-bar-offset.md) | 读 MIDI 时去掉 MuScriptor 为对齐小节线加的延后（修复卷帘里 MuScriptor 的音比分轨晚） | 有效 |
+| [66CCFF-0017](66CCFF-0017-game-vocal-midi.md) | 人声旋律转 MIDI 用 GAME；转 MIDI 的节拍都在整首歌上检测 | 有效 |

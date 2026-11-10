@@ -1,4 +1,4 @@
-import { chmodSync, existsSync, mkdtempSync, readFileSync, statSync, writeFileSync, mkdirSync, rmSync } from "node:fs";
+import { chmodSync, copyFileSync, existsSync, mkdtempSync, readFileSync, statSync, writeFileSync, mkdirSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { Midi } from "@tonejs/midi";
@@ -206,15 +206,25 @@ describe("66CCFF backend", () => {
     return buffer;
   }
 
-  /** 一首已分离的曲目 + 假的转写引擎：假 python 打印进度、把准备好的 MIDI 写到输出、记下收到的参数 */
+  /**
+   * 一首已分离的曲目 + 假的转写引擎（MuScriptor 和 GAME 各一个）：假 python 打印进度、把准备好的 MIDI 写到输出、
+   * 记下收到的参数
+   */
   async function setupTranscription() {
     const dataDir = mkdtempSync(join(tmpdir(), "66CCFF-test-"));
     cleanup.push(dataDir);
     const engineDir = join(dataDir, "muscriptor-engine");
+    const gameEngineDir = join(dataDir, "game-engine");
     const scriptsDir = join(dataDir, "scripts");
     mkdirSync(join(engineDir, "venv", "bin"), { recursive: true });
     mkdirSync(scriptsDir, { recursive: true });
     writeFileSync(join(scriptsDir, "transcribe_muscriptor.py"), "");
+    writeFileSync(join(scriptsDir, "transcribe_game.py"), "");
+    mkdirSync(join(gameEngineDir, "venv", "bin"), { recursive: true });
+    mkdirSync(join(gameEngineDir, "GAME"), { recursive: true });
+    mkdirSync(join(gameEngineDir, "models", "GAME-1.0-large"), { recursive: true });
+    writeFileSync(join(gameEngineDir, "GAME", "infer.py"), "");
+    writeFileSync(join(gameEngineDir, "models", "GAME-1.0-large", "model.pt"), "");
     const midi = new Midi();
     const track = midi.addTrack();
     track.addNote({ midi: 60, time: 0, duration: 0.5, velocity: 0.8 });
@@ -236,12 +246,16 @@ describe("66CCFF backend", () => {
       ].join("\n"),
     );
     chmodSync(python, 0o755);
+    copyFileSync(python, join(gameEngineDir, "venv", "bin", "python"));
+    chmodSync(join(gameEngineDir, "venv", "bin", "python"), 0o755);
 
     const kernel = createKernel({ storage: createNodeSqliteAdapter({ path: ":memory:" }) });
-    kernel.registerApp(createX66CCFFApp({ dataDir, transcriptionEngineDir: engineDir, scriptsDir }));
+    kernel.registerApp(createX66CCFFApp({ dataDir, transcriptionEngineDir: engineDir, gameEngineDir, scriptsDir }));
     kernel.start();
     const stemsDir = join(dataDir, "tracks", "t1", "stems-j1");
     mkdirSync(stemsDir, { recursive: true });
+    // 整首歌：两个引擎都在它上面检测节拍（66CCFF-0017）
+    writeFileSync(join(dataDir, "tracks", "t1", "source.wav"), silentWav(1));
     await call(kernel, "66CCFF.insertTrack", { id: "t1", title: "白石溪", file: "tracks/t1/source.wav", ext: "wav", size: 4, duration: 1 });
     await call(kernel, "66CCFF.insertJob", { id: "j1", trackId: "t1" });
     const stems = (["piano", "guitar"] as const).map((kind) => {
@@ -249,7 +263,7 @@ describe("66CCFF backend", () => {
       return { kind, file: `tracks/t1/stems-j1/${kind}.wav`, size: 1 };
     });
     await call(kernel, "66CCFF.finishJob", { jobId: "j1", trackId: "t1", stems });
-    return { kernel, dataDir, argsLog };
+    return { kernel, dataDir, argsLog, gameEngineDir };
   }
 
   const withHfToken = async (work: () => Promise<void>) => {
@@ -282,12 +296,16 @@ describe("66CCFF backend", () => {
         const args = readFileSync(argsLog, "utf8").trim().split("\n");
         expect(args[1]).toMatch(/input\.wav$/);
         expect(args.slice(3, 5)).toEqual(["--instrument", "acoustic_piano"]);
+        // 节拍在整首歌上检测（先解成 16kHz 单声道 WAV）
+        expect(args[7]).toBe("--beats-audio");
+        expect(args[8]).toMatch(/beats\.wav$/);
 
         const detail = await call<{ transcriptions: Array<Record<string, unknown>> }>(kernel, "66CCFF.getTrack", { trackId: "t1" });
         expect(detail.transcriptions).toHaveLength(1);
         expect(detail.transcriptions[0]).toMatchObject({
           status: "succeeded",
           stems: ["guitar", "piano"],
+          engine: "muscriptor",
           instrument: "acoustic_piano",
           noteCount: 2,
           bpm: 96,
@@ -332,6 +350,51 @@ describe("66CCFF backend", () => {
       expect(missing.ok).toBe(false);
       if (!missing.ok) expect(missing.error.message).toContain("没有 vocals 轨");
     });
+  });
+
+  it.skipIf(process.platform === "win32")("转 MIDI（GAME，66CCFF-0017）：只转人声、不用登录 HuggingFace，节拍也在整首歌上检测", async () => {
+    const { kernel, argsLog, gameEngineDir } = await setupTranscription();
+    const before = process.env.HF_TOKEN;
+    const hfHome = process.env.HF_HOME;
+    delete process.env.HF_TOKEN;
+    process.env.HF_HOME = join(tmpdir(), `66CCFF-no-hf-${Date.now()}`);
+    try {
+      const status = await call<{ ready: boolean; game: { ready: boolean; setupCommand: string } }>(
+        kernel,
+        "66CCFF.getTranscriptionEngineStatus",
+        {},
+      );
+      expect(status.ready).toBe(false);
+      expect(status.game.ready).toBe(true);
+
+      const wrong = await raw(kernel, "66CCFF.startTranscription", {
+        trackId: "t1",
+        stems: ["piano"],
+        engine: "game",
+        instrument: "acoustic_piano",
+      });
+      expect(wrong.ok).toBe(false);
+      if (!wrong.ok) expect(wrong.error.code).toBe("VALIDATION");
+
+      const result = await call<{ transcriptionId: string; noteCount: number }>(kernel, "66CCFF.startTranscription", {
+        trackId: "t1",
+        stems: ["guitar", "piano"],
+        engine: "game",
+        instrument: "voice",
+      });
+      expect(result.noteCount).toBe(2);
+      const args = readFileSync(argsLog, "utf8").trim().split("\n");
+      expect(args[0]).toMatch(/transcribe_game\.py$/);
+      expect(args[1]).toMatch(/input\.wav$/);
+      expect(args.slice(3, 6)).toEqual(["--engine", gameEngineDir, "--beats-audio"]);
+      expect(args[6]).toMatch(/beats\.wav$/);
+      const detail = await call<{ transcriptions: Array<Record<string, unknown>> }>(kernel, "66CCFF.getTrack", { trackId: "t1" });
+      expect(detail.transcriptions[0]).toMatchObject({ status: "succeeded", engine: "game", instrument: "voice", model: "game-large" });
+    } finally {
+      if (before !== undefined) process.env.HF_TOKEN = before;
+      if (hfHome === undefined) delete process.env.HF_HOME;
+      else process.env.HF_HOME = hfHome;
+    }
   });
 
   it("正在转 MIDI 时不能重新分离（分轨文件会被换掉）", async () => {

@@ -647,6 +647,30 @@ async function smokeX66ccffBackground(kernel: Kernel, appDir: string, trackId: s
       JSON.stringify({ ok: transcribe.visible && transcribe.stems === 6 && transcribe.instruments > 30, ...transcribe }),
     );
 
+    // 只勾人声时默认用 GAME 转人声旋律（66CCFF-0017）；冒烟数据里没装 GAME，应显示 GAME 的安装命令
+    const game = await probe.webContents.executeJavaScript(
+      `(() => {
+        for (const label of document.querySelectorAll("#transcribe-stems .stem-check")) {
+          const box = label.querySelector("input");
+          const want = label.textContent === "人声";
+          if (box.checked !== want) {
+            box.checked = want;
+            box.dispatchEvent(new Event("change"));
+          }
+        }
+        return {
+          instrument: document.getElementById("transcribe-instrument").value,
+          help: document.getElementById("transcribe-help-command").textContent,
+          buttonDisabled: document.getElementById("btn-transcribe").disabled,
+        };
+      })()`,
+    );
+    const expectedGame = process.platform === "darwin" ? "setup-game-macos.sh" : process.platform === "win32" ? "setup-game.ps1" : "";
+    console.log(
+      "[smoke] 66CCFF game choice:",
+      JSON.stringify({ ok: game.instrument === "game:voice" && !!expectedGame && game.help.includes(expectedGame) && game.buttonDisabled, ...game }),
+    );
+
     // 钢琴卷帘（66CCFF-0015）：给测试曲目一个转写结果，卷帘应读出来、能切到沉浸模式；这一段只跳转不播放，后面的合成器检查先把窗口静音再播
     const transcriptionId = randomUUID();
     const midiFile = `tracks/${trackId}/midi/${transcriptionId}.mid`;

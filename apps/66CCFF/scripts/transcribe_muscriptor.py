@@ -1,12 +1,12 @@
 """纯蓝的 MuScriptor 转写脚本（66CCFF-0012）：一条音频 → 一个 MIDI。
 
 和 `muscriptor transcribe` 做的事一样（检测节拍、写进 MIDI），只是把转写进度按行打印成 JSON，
-方便纯蓝显示进度：
+方便纯蓝显示进度。节拍在 `--beats-audio`（纯蓝传整首歌）上检测，同一首歌的每次转写都用同一套小节线（66CCFF-0017）：
   {"stage": "loading"} / {"stage": "beats"} / {"stage": "transcribing", "completed": n, "total": m}
   {"stage": "done", "bpm": x}
 出错时打印 {"stage": "error", "message": "..."}，退出码非 0。
 
-运行：<venv>/bin/python transcribe_muscriptor.py <音频> <输出.mid> --instrument acoustic_piano [--model medium]
+运行：<venv>/bin/python transcribe_muscriptor.py <音频> <输出.mid> --instrument acoustic_piano [--model medium] [--beats-audio <整首歌>]
 """
 
 import argparse
@@ -26,6 +26,7 @@ def main() -> int:
     parser.add_argument("--instrument", required=True, help="MuScriptor 的乐器组名，例如 acoustic_piano")
     parser.add_argument("--model", default="medium")
     parser.add_argument("--device", default="auto")
+    parser.add_argument("--beats-audio", help="检测节拍用的音频（整首歌）；不给就用转写的音频")
     args = parser.parse_args()
 
     from muscriptor.events import NoteStartEvent, ProgressEvent
@@ -50,7 +51,7 @@ def main() -> int:
         return 3
 
     emit({"stage": "beats"})
-    beat_grid = model.detect_beat_grid_for(args.audio, "best-effort")
+    beat_grid = model.detect_beat_grid_for(args.beats_audio or args.audio, "best-effort")
 
     events = []
     for event in model.transcribe(args.audio, instruments=instruments):

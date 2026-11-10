@@ -42,13 +42,22 @@ export const X66CCFFTrackSchema = z.object({
 });
 export type X66CCFFTrack = z.infer<typeof X66CCFFTrackSchema>;
 
-/** 一次转 MIDI（66CCFF-0012）：所选的 stem → MuScriptor（只允许一个乐器）→ 一个单轨 MIDI */
+/**
+ * 转 MIDI 的引擎（66CCFF-0017）：MuScriptor（多种乐器，66CCFF-0012）；GAME（只转人声旋律，单旋律）。
+ * 记录里不单独存，从 model 看出来：GAME 的 model 以 `game-` 开头。
+ */
+export const X66CCFFTranscriptionEngine = z.enum(["muscriptor", "game"]);
+export type X66CCFFTranscriptionEngine = z.infer<typeof X66CCFFTranscriptionEngine>;
+
+/** 一次转 MIDI（66CCFF-0012）：所选的 stem → 一个引擎、一个乐器 → 一个单轨 MIDI */
 export const X66CCFFTranscriptionSchema = z.object({
   id: z.string(),
   trackId: z.string(),
   stems: z.array(X66CCFFStemKind),
-  /** MuScriptor 的乐器组名，例如 acoustic_piano */
+  engine: X66CCFFTranscriptionEngine,
+  /** MuScriptor 的乐器组名，例如 acoustic_piano；GAME 固定是 voice */
   instrument: z.string(),
+  /** MuScriptor 是权重大小（medium）；GAME 是 game-large */
   model: z.string(),
   status: X66CCFFJobStatus,
   progress: z.number(),
@@ -95,6 +104,8 @@ export type DeleteTrackInput = z.infer<typeof DeleteTrackInput>;
 export const StartTranscriptionInput = z.object({
   trackId: z.string(),
   stems: z.array(X66CCFFStemKind).min(1),
+  engine: X66CCFFTranscriptionEngine.default("muscriptor"),
+  /** GAME 只接受 voice */
   instrument: z.string().min(1),
 });
 export type StartTranscriptionInput = z.infer<typeof StartTranscriptionInput>;
@@ -147,6 +158,13 @@ export const TranscriptionEngineStatusOutput = z.object({
   loginCommand: z.string(),
   instruments: z.array(z.string()),
   message: z.string(),
+  /** 人声旋律用的 GAME（66CCFF-0017）；不用登录 */
+  game: z.object({
+    ready: z.boolean(),
+    engineDir: z.string(),
+    setupCommand: z.string(),
+    message: z.string(),
+  }),
 });
 export type TranscriptionEngineStatusOutput = z.infer<typeof TranscriptionEngineStatusOutput>;
 

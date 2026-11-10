@@ -44,6 +44,25 @@ export const MUSCRIPTOR_INSTRUMENTS = [
   "drums",
 ] as const;
 
+/** GAME（66CCFF-0017）：只转人声旋律；记录里的 model 以 `game-` 开头 */
+export const GAME_MODEL = "game-large";
+const GAME_WEIGHTS = "GAME-1.0-large";
+
+export type TranscriptionEngine = "muscriptor" | "game";
+
+export function engineOfModel(model: string): TranscriptionEngine {
+  return model.startsWith("game-") ? "game" : "muscriptor";
+}
+
+/** GAME 引擎目录里要有 venv、代码（GAME/infer.py）和权重 */
+export function gameInstalled(engineDir: string): boolean {
+  return (
+    enginePython(engineDir) !== null &&
+    existsSync(join(engineDir, "GAME", "infer.py")) &&
+    existsSync(join(engineDir, "models", GAME_WEIGHTS, "model.pt"))
+  );
+}
+
 /** MuScriptor 的权重要登录 HuggingFace 才能下载：有 HF_TOKEN 或 huggingface_hub 的 token 文件就算已登录 */
 export function huggingFaceLoggedIn(env: NodeJS.ProcessEnv = process.env): boolean {
   if (env.HF_TOKEN?.trim()) return true;
@@ -53,11 +72,14 @@ export function huggingFaceLoggedIn(env: NodeJS.ProcessEnv = process.env): boole
 }
 
 export interface RunTranscriptionOptions {
+  engine: TranscriptionEngine;
   engineDir: string;
-  /** apps/66CCFF/scripts/transcribe_muscriptor.py */
+  /** apps/66CCFF/scripts/transcribe_muscriptor.py 或 transcribe_game.py */
   script: string;
   /** 一条或几条 stem；几条时先混成一条 */
   inputs: string[];
+  /** 检测节拍用的整首歌：同一首歌的每次转写都用同一套小节线（66CCFF-0017）；没有就在 inputs 上检测 */
+  beatsAudio?: string | null;
   instrument: string;
   model: string;
   workDir: string;
@@ -70,7 +92,7 @@ export interface TranscriptionResult {
   bpm: number | null;
 }
 
-/** 后台运行 MuScriptor：多条 stem 先用 ffmpeg 混成一条，再转成一个 MIDI；进度来自脚本逐行打印的 JSON */
+/** 后台运行转写脚本：多条 stem 先用 ffmpeg 混成一条，再转成一个 MIDI；进度来自脚本逐行打印的 JSON */
 export async function runTranscription(options: RunTranscriptionOptions): Promise<TranscriptionResult> {
   const python = enginePython(options.engineDir);
   if (!python) throw new KernelError("PRECONDITION", "转写引擎未安装");
@@ -91,13 +113,24 @@ export async function runTranscription(options: RunTranscriptionOptions): Promis
         ...options.inputs.flatMap((file) => ["-i", file]),
         "-filter_complex",
         `amix=inputs=${options.inputs.length}`,
-        // MuScriptor 自己按 16kHz 单声道读入，混好的文件直接用这个规格，省空间
+        // 混成引擎读入的规格，省空间：MuScriptor 16kHz 单声道，GAME 44.1kHz 单声道
         "-ac",
         "1",
         "-ar",
-        "16000",
+        options.engine === "game" ? "44100" : "16000",
         input,
       ],
+      { signal: options.signal },
+    );
+  }
+
+  // 检测节拍用的整首歌：先用 ffmpeg 解成 16kHz 单声道 WAV，m4a / aac 等格式也能读，两个引擎拿到的也是同一个文件（66CCFF-0017）
+  let beatsAudio: string | null = null;
+  if (options.beatsAudio) {
+    beatsAudio = join(options.workDir, "beats.wav");
+    await runCommand(
+      findMediaTool("ffmpeg"),
+      ["-hide_banner", "-loglevel", "error", "-y", "-i", options.beatsAudio, "-ac", "1", "-ar", "16000", beatsAudio],
       { signal: options.signal },
     );
   }
@@ -107,15 +140,21 @@ export async function runTranscription(options: RunTranscriptionOptions): Promis
   let scriptError: string | null = null;
   options.onProgress?.(0.03, "加载模型…");
   try {
+    const beats = beatsAudio ? ["--beats-audio", beatsAudio] : [];
+    const args =
+      options.engine === "game"
+        ? [options.script, input, midiFile, "--engine", options.engineDir, ...beats]
+        : [options.script, input, midiFile, "--instrument", options.instrument, "--model", options.model, ...beats];
     await runCommand(
       python,
-      [options.script, input, midiFile, "--instrument", options.instrument, "--model", options.model],
+      args,
       {
         signal: options.signal,
         env: {
-          // 权重缓存在引擎目录里；登录用的 token 仍在 HuggingFace 默认位置
-          HF_HUB_CACHE: join(options.engineDir, "models"),
-          HF_HUB_DISABLE_SYMLINKS_WARNING: "1",
+          // MuScriptor 的权重缓存在引擎目录里；登录用的 token 仍在 HuggingFace 默认位置
+          ...(options.engine === "muscriptor"
+            ? { HF_HUB_CACHE: join(options.engineDir, "models"), HF_HUB_DISABLE_SYMLINKS_WARNING: "1" }
+            : {}),
           PYTHONUNBUFFERED: "1",
           PYTHONIOENCODING: "utf-8",
         },

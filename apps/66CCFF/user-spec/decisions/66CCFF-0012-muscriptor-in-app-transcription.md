@@ -1,6 +1,6 @@
 # 66CCFF-0012 转 MIDI 接进纯蓝：MuScriptor，所选 stem → 一个乐器 → 单轨 MIDI，结果存进曲目
 
-- 状态：有效（音符数的统计方式被 [66CCFF-0014](66CCFF-0014-note-count-from-midi.md) 取代）
+- 状态：有效（音符数的统计方式被 [66CCFF-0014](66CCFF-0014-note-count-from-midi.md) 取代；节拍改在整首歌上检测、只选人声时默认改用 GAME，见 [66CCFF-0017](66CCFF-0017-game-vocal-midi.md)）
 - 日期：2026-11-09
 - 决策者：讨论（作者定了「转 MIDI 暂时就用 MuScriptor」并要求现在接进应用；具体设计由 agent）
 - 取代：[66CCFF-0007](66CCFF-0007-basic-pitch-midi.md) 中「使用 Basic Pitch」「界面 / API 待接入」的部分

@@ -78,7 +78,9 @@
       showInRoll: "在卷帘中显示",
       hideInRoll: "从卷帘隐藏",
       transcribeTitle: "转 MIDI",
-      transcribeHint: "把选中的轨转成一个 MIDI（MuScriptor）",
+      transcribeHint: "把选中的轨转成一个 MIDI（MuScriptor；人声旋律用 GAME）",
+      gameVoice: "人声旋律（GAME）",
+      gameEngineMissing: "未检测到 GAME（人声转 MIDI）。请先运行：",
       transcribeAs: "转成",
       transcribe: "转 MIDI",
       transcribing: "转写中",
@@ -96,7 +98,7 @@
       instrumentLabels: {
         acoustic_piano: "钢琴",
         electric_piano: "电钢琴",
-        voice: "人声（旋律）",
+        voice: "人声（MuScriptor）",
         acoustic_guitar: "木吉他",
         clean_electric_guitar: "电吉他（清音）",
         distorted_electric_guitar: "电吉他（失真）",
@@ -183,7 +185,9 @@
       showInRoll: "Show in roll",
       hideInRoll: "Hide from roll",
       transcribeTitle: "To MIDI",
-      transcribeHint: "Transcribe the selected stems into one MIDI (MuScriptor)",
+      transcribeHint: "Transcribe the selected stems into one MIDI (MuScriptor; GAME for the vocal melody)",
+      gameVoice: "Vocal melody (GAME)",
+      gameEngineMissing: "GAME (vocals to MIDI) not found. Run:",
       transcribeAs: "As",
       transcribe: "To MIDI",
       transcribing: "Transcribing",
@@ -201,7 +205,7 @@
       instrumentLabels: {
         acoustic_piano: "Piano",
         electric_piano: "Electric piano",
-        voice: "Voice (melody)",
+        voice: "Voice (MuScriptor)",
         acoustic_guitar: "Acoustic guitar",
         clean_electric_guitar: "Electric guitar (clean)",
         distorted_electric_guitar: "Electric guitar (distorted)",
@@ -594,10 +598,24 @@
     return t("instrumentLabels")[name] ?? name;
   }
 
-  /** 按所选的轨猜一个乐器：只选人声 → 人声旋律，只选贝斯 → 电贝斯，只选吉他 → 木吉他，其余 → 钢琴 */
+  /** 「转成」里 GAME 那一项的值；其余各项的值是 MuScriptor 的乐器名（66CCFF-0017） */
+  const GAME_CHOICE = "game:voice";
+
+  /** 当前选的是哪个引擎、哪个乐器 */
+  function transcribeChoice() {
+    const value = transcribeInstrumentEl.value;
+    return value === GAME_CHOICE ? { engine: "game", instrument: "voice" } : { engine: "muscriptor", instrument: value };
+  }
+
+  /** 一次转写结果的名字：GAME 的叫「人声旋律（GAME）」，MuScriptor 的用乐器名 */
+  function transcriptionName(item) {
+    return item.engine === "game" ? t("gameVoice") : instrumentLabel(item.instrument);
+  }
+
+  /** 按所选的轨猜一个乐器：只选人声 → 人声旋律（GAME），只选贝斯 → 电贝斯，只选吉他 → 木吉他，其余 → 钢琴 */
   function defaultInstrument() {
     const kinds = [...transcribeStems];
-    if (kinds.length === 1 && kinds[0] === "vocals") return "voice";
+    if (kinds.length === 1 && kinds[0] === "vocals") return GAME_CHOICE;
     if (kinds.length === 1 && kinds[0] === "bass") return "electric_bass";
     if (kinds.length === 1 && kinds[0] === "guitar") return "acoustic_guitar";
     if (kinds.length === 1 && kinds[0] === "drums") return "drums";
@@ -610,13 +628,19 @@
     const rest = names.filter((name) => !labelled.includes(name));
     const current = transcribeInstrumentEl.value;
     transcribeInstrumentEl.innerHTML = "";
+    // GAME 只转人声旋律，放在最前面（作者听了觉得基本可用，66CCFF-0017）
+    const game = document.createElement("option");
+    game.value = GAME_CHOICE;
+    game.textContent = t("gameVoice");
+    transcribeInstrumentEl.appendChild(game);
     for (const name of [...labelled, ...rest]) {
       const option = document.createElement("option");
       option.value = name;
       option.textContent = instrumentLabel(name);
       transcribeInstrumentEl.appendChild(option);
     }
-    transcribeInstrumentEl.value = instrumentTouched && names.includes(current) ? current : defaultInstrument();
+    const keep = instrumentTouched && (current === GAME_CHOICE || names.includes(current));
+    transcribeInstrumentEl.value = keep ? current : defaultInstrument();
   }
 
   function renderTranscribePanel() {
@@ -642,6 +666,7 @@
         else transcribeStems.delete(kind);
         label.classList.toggle("on", box.checked);
         if (!instrumentTouched) transcribeInstrumentEl.value = defaultInstrument();
+        renderTranscribeReadiness();
       });
       label.appendChild(box);
       label.appendChild(document.createTextNode(stemLabel(kind)));
@@ -649,23 +674,34 @@
     }
     renderInstrumentOptions();
 
+    renderTranscribeReadiness();
+    renderTranscriptions();
+  }
+
+  /** 按所选的引擎决定「转 MIDI」能不能点、要不要显示安装 / 登录命令 */
+  function renderTranscribeReadiness() {
+    if (!detail) return;
     const busy = !!transcribeRunId || detail.transcriptions.some((item) => item.status === "running");
     const separating = !!activeRunId || (detail.job && detail.job.status === "running");
-    const ready = !!(transcriptionEngine && transcriptionEngine.ready);
+    const useGame = transcribeChoice().engine === "game";
+    const ready = !!transcriptionEngine && (useGame ? transcriptionEngine.game.ready : transcriptionEngine.ready);
     transcribeBtn.disabled = busy || separating || !ready;
     transcribeCancelBtn.classList.toggle("hidden", !transcribeRunId);
 
     transcribeHelpEl.classList.toggle("hidden", ready);
-    if (!ready) {
-      const installed = !!(transcriptionEngine && transcriptionEngine.installed);
-      transcribeHelpText.textContent = installed ? t("transcribeLogin") : t("transcribeEngineMissing");
-      transcribeHelpCommand.textContent = transcriptionEngine
-        ? installed
-          ? transcriptionEngine.loginCommand
-          : transcriptionEngine.setupCommand
-        : "";
+    if (ready) return;
+    if (useGame) {
+      transcribeHelpText.textContent = t("gameEngineMissing");
+      transcribeHelpCommand.textContent = transcriptionEngine ? transcriptionEngine.game.setupCommand : "";
+      return;
     }
-    renderTranscriptions();
+    const installed = !!(transcriptionEngine && transcriptionEngine.installed);
+    transcribeHelpText.textContent = installed ? t("transcribeLogin") : t("transcribeEngineMissing");
+    transcribeHelpCommand.textContent = transcriptionEngine
+      ? installed
+        ? transcriptionEngine.loginCommand
+        : transcriptionEngine.setupCommand
+      : "";
   }
 
   function renderTranscriptions() {
@@ -684,7 +720,7 @@
       main.className = "transcription-main";
       const title = document.createElement("div");
       title.className = "transcription-title";
-      title.textContent = `${instrumentLabel(item.instrument)} ← ${item.stems.map(stemLabel).join(" + ")}`;
+      title.textContent = `${transcriptionName(item)} ← ${item.stems.map(stemLabel).join(" + ")}`;
       const meta = document.createElement("div");
       meta.className = "muted transcription-meta";
       const parts = [new Date(item.createdAt).toLocaleString()];
@@ -747,7 +783,7 @@
     });
     const request = callOrThrow(
       "66CCFF.startTranscription",
-      { trackId, stems: [...transcribeStems], instrument: transcribeInstrumentEl.value },
+      { trackId, stems: [...transcribeStems], ...transcribeChoice() },
       { runId },
     );
     // 记录在请求开始时写入；稍等一下刷新，列表里就有这一行了
@@ -822,8 +858,8 @@
     rollPanel.appendChild(hint);
   }
 
-  /** 卷帘里的一个图层：单轨的转写结果，轨名用乐器名，比 MIDI 里的 GM 音色名好认 */
-  function layerFromMidi(id, name, data, { visible, removable, instrument }) {
+  /** 卷帘里的一个图层：单轨的转写结果，轨名用转写的名字（乐器名 / 人声旋律（GAME）），比 MIDI 里的 GM 音色名好认 */
+  function layerFromMidi(id, name, data, { visible, removable, trackName }) {
     return {
       id,
       name,
@@ -831,7 +867,7 @@
       duration: data.duration,
       grid: data.grid,
       tracks: data.tracks.map((track) => ({
-        name: data.tracks.length === 1 && instrument ? instrumentLabel(instrument) : track.name,
+        name: data.tracks.length === 1 && trackName ? trackName : track.name,
         notes: track.notes,
         percussion: track.percussion,
         visible,
@@ -840,7 +876,7 @@
   }
 
   function transcriptionLabel(item) {
-    return `${instrumentLabel(item.instrument)} ← ${item.stems.map(stemLabel).join(" + ")}`;
+    return `${transcriptionName(item)} ← ${item.stems.map(stemLabel).join(" + ")}`;
   }
 
   /**
@@ -869,7 +905,7 @@
         if (rollTrackId !== trackId || rollLayers.some((layer) => layer.id === id)) continue;
         // 第一次打开只显示最新的一个；之后新转出来的直接显示
         const visible = firstLoad ? index === 0 : true;
-        rollLayers.push(layerFromMidi(id, transcriptionLabel(item), data, { visible, removable: false, instrument: item.instrument }));
+        rollLayers.push(layerFromMidi(id, transcriptionLabel(item), data, { visible, removable: false, trackName: transcriptionName(item) }));
         changed = true;
       } catch (error) {
         toast(`${t("midiLoadFailed")}${error.message}`, true);
@@ -1418,6 +1454,7 @@
   });
   transcribeInstrumentEl.addEventListener("change", () => {
     instrumentTouched = true;
+    renderTranscribeReadiness();
   });
   transcribeRecheckBtn.addEventListener("click", async () => {
     await loadTranscriptionEngine();

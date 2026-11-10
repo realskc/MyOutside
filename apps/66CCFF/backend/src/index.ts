@@ -35,7 +35,14 @@ import { z } from "zod";
 import { findMediaTool } from "./media.js";
 import { enginePython } from "./process.js";
 import { runSeparation } from "./roformer.js";
-import { huggingFaceLoggedIn, MUSCRIPTOR_INSTRUMENTS, runTranscription } from "./transcription.js";
+import {
+  engineOfModel,
+  GAME_MODEL,
+  gameInstalled,
+  huggingFaceLoggedIn,
+  MUSCRIPTOR_INSTRUMENTS,
+  runTranscription,
+} from "./transcription.js";
 
 const STEM_ORDER: StemKind[] = ["vocals", "drums", "bass", "other", "guitar", "piano"];
 const AUDIO_EXTENSIONS = new Set([".mp3", ".wav", ".flac", ".m4a", ".ogg", ".aac"]);
@@ -158,6 +165,8 @@ export interface X66CCFFAppOptions {
   engineDir?: string;
   /** MuScriptor 转写引擎目录；默认 dataDir/muscriptor-engine（66CCFF-0012） */
   transcriptionEngineDir?: string;
+  /** GAME 人声转 MIDI 引擎目录；默认 dataDir/game-engine（66CCFF-0017） */
+  gameEngineDir?: string;
   /** 仓库里的 apps/66CCFF/scripts（转写包装脚本在这里）；不给就不能转写 */
   scriptsDir?: string;
 }
@@ -177,6 +186,14 @@ function transcriptionSetupCommand(): string {
     return "powershell -ExecutionPolicy Bypass -File apps/66CCFF/scripts/setup-muscriptor.ps1";
   }
   return "请参考 apps/66CCFF/docs/README.md 手动安装转写引擎";
+}
+
+function gameSetupCommand(): string {
+  if (process.platform === "darwin") return "bash apps/66CCFF/scripts/setup-game-macos.sh";
+  if (process.platform === "win32") {
+    return "powershell -ExecutionPolicy Bypass -File apps/66CCFF/scripts/setup-game.ps1";
+  }
+  return "请参考 apps/66CCFF/docs/README.md 手动安装 GAME";
 }
 
 /** 登录 HuggingFace（MuScriptor 的权重需要）：用转写引擎自带的 hf 命令，token 只在终端里输入 */
@@ -282,12 +299,15 @@ export function createX66CCFFApp({
   dataDir,
   engineDir = join(dataDir, "roformer-engine"),
   transcriptionEngineDir = join(dataDir, "muscriptor-engine"),
+  gameEngineDir = join(dataDir, "game-engine"),
   scriptsDir,
 }: X66CCFFAppOptions): AppModule {
   const base = resolve(dataDir);
   const engine = resolve(engineDir);
   const transcriptionEngine = resolve(transcriptionEngineDir);
   const transcriptionScript = scriptsDir ? join(resolve(scriptsDir), "transcribe_muscriptor.py") : null;
+  const gameEngine = resolve(gameEngineDir);
+  const gameScript = scriptsDir ? join(resolve(scriptsDir), "transcribe_game.py") : null;
 
   const abs = (relPath: string): string => {
     const resolved = resolve(base, relPath);
@@ -333,6 +353,7 @@ export function createX66CCFFApp({
     id: row.id,
     trackId: row.track_id,
     stems: JSON.parse(row.stems) as StemKind[],
+    engine: engineOfModel(row.model),
     instrument: row.instrument,
     model: row.model,
     status: isStaleTranscription(row) ? "failed" : (row.status as X66CCFFJobStatus),
@@ -538,6 +559,15 @@ export function createX66CCFFApp({
             : !loggedIn
               ? `MuScriptor 的权重需要先登录 HuggingFace：在终端运行 ${loginCommand}`
               : "转写引擎已就绪；第一次转写会自动下载模型",
+          game: {
+            ready: gameInstalled(gameEngine) && gameScript !== null,
+            engineDir: gameEngine,
+            setupCommand: gameSetupCommand(),
+            message:
+              gameInstalled(gameEngine) && gameScript !== null
+                ? "GAME 已就绪"
+                : `GAME 未安装：请运行 ${gameSetupCommand()}`,
+          },
         };
         return output;
       }),
@@ -697,18 +727,31 @@ export function createX66CCFFApp({
        */
       startTranscription: defineAsync(StartTranscriptionInput, async (ctx, input) => {
         const track = getTrackOrThrow(ctx.db, input.trackId);
-        if (!(MUSCRIPTOR_INSTRUMENTS as readonly string[]).includes(input.instrument)) {
-          throw new KernelError("VALIDATION", `未知的乐器：${input.instrument}`);
+        const useGame = input.engine === "game";
+        let script: string;
+        if (useGame) {
+          // GAME 只转人声旋律（66CCFF-0017）
+          if (input.instrument !== "voice") throw new KernelError("VALIDATION", "GAME 只能转人声");
+          if (!gameInstalled(gameEngine) || !gameScript) {
+            throw new KernelError("PRECONDITION", `GAME 未安装：请运行 ${gameSetupCommand()}`);
+          }
+          script = gameScript;
+        } else {
+          if (!(MUSCRIPTOR_INSTRUMENTS as readonly string[]).includes(input.instrument)) {
+            throw new KernelError("VALIDATION", `未知的乐器：${input.instrument}`);
+          }
+          if (!enginePython(transcriptionEngine) || !transcriptionScript) {
+            throw new KernelError("PRECONDITION", `转写引擎未安装：请运行 ${transcriptionSetupCommand()}`);
+          }
+          if (!huggingFaceLoggedIn()) {
+            throw new KernelError(
+              "PRECONDITION",
+              `MuScriptor 的权重需要先登录 HuggingFace：在终端运行 ${transcriptionLoginCommand(transcriptionEngine)}`,
+            );
+          }
+          script = transcriptionScript;
         }
-        if (!enginePython(transcriptionEngine) || !transcriptionScript) {
-          throw new KernelError("PRECONDITION", `转写引擎未安装：请运行 ${transcriptionSetupCommand()}`);
-        }
-        if (!huggingFaceLoggedIn()) {
-          throw new KernelError(
-            "PRECONDITION",
-            `MuScriptor 的权重需要先登录 HuggingFace：在终端运行 ${transcriptionLoginCommand(transcriptionEngine)}`,
-          );
-        }
+        const model = useGame ? GAME_MODEL : TRANSCRIPTION_MODEL;
         const job = latestJob(ctx.db, track.id);
         if (job && effectiveStatus(job) === "running") throw new KernelError("PRECONDITION", "这首曲目正在分离");
         if (runningTranscription(ctx.db, track.id)) throw new KernelError("PRECONDITION", "这首曲目正在转 MIDI");
@@ -726,7 +769,7 @@ export function createX66CCFFApp({
           trackId: track.id,
           stems: kinds,
           instrument: input.instrument,
-          model: TRANSCRIPTION_MODEL,
+          model,
         });
         const workDir = join(base, "jobs", `midi-${transcriptionId}`);
         let lastMessage = "准备中";
@@ -743,12 +786,16 @@ export function createX66CCFFApp({
         };
 
         try {
+          // 节拍在整首歌上检测：同一首歌的每次转写都用同一套小节线（66CCFF-0017）
+          const source = abs(track.file);
           const result = await runTranscription({
-            engineDir: transcriptionEngine,
-            script: transcriptionScript,
+            engine: useGame ? "game" : "muscriptor",
+            engineDir: useGame ? gameEngine : transcriptionEngine,
+            script,
             inputs,
+            beatsAudio: existsSync(source) ? source : null,
             instrument: input.instrument,
-            model: TRANSCRIPTION_MODEL,
+            model,
             workDir,
             signal: ctx.signal,
             onProgress,
