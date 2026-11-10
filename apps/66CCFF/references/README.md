@@ -57,7 +57,7 @@
 |---|---|
 | [UNMIXX](separation/unmixx.md) | ICASSP 2026，盲分离两位歌手；仓库带权重；未声明许可证；《白石溪》上几乎没分开两个人（[想法](separation/unmixx-thoughts.md)） |
 | [按参考录音提取指定歌手](separation/singer-informed-separation.md) | 给一段目标歌手的独唱参考，提取这位歌手；在虚拟歌手上用不了（拼接版因代码 bug 根本不看参考，FiLM 版结果乱；作者听了：几乎啥都没分出来，[想法](separation/singer-informed-separation-thoughts.md)） |
-| [timbreAMT](separation/timbreamt.md) | TISMIR 2026，不分离音频、按音色把音符聚成几条 MIDI；按乐器类别训练；《白石溪》上两类不是两个人（54%） |
+| [timbreAMT](separation/timbreamt.md) | TISMIR 2026，不分离音频、按音色把音符聚成几条 MIDI；按乐器类别训练；《白石溪》上两类不是两个人（54%），作者看了：基本没分出来（[想法](separation/timbreamt-thoughts.md)） |
 | [SpeechBrain ECAPA](separation/speechbrain-ecapa.md) | 说话人识别模型；不分离，改为判断「谁在唱」再把 GAME 的音符分到两个人；作者听了：比 UNMIXX 好，但还不可用（[想法](separation/speechbrain-ecapa-thoughts.md)）；两人同时唱不同的音时无能为力 |
 | [MedleyVox 与合唱分离模型](separation/medleyvox.md) | 评测集 + 社区模型（Cyru5 权重、MVSEP duet 模型、karaoke 模型） |
 
@@ -69,6 +69,7 @@
 | [Signal](piano-roll/Signal.md) | 开源网页 MIDI 编辑器 | [有](piano-roll/Signal-thoughts.md) | 多轨横向卷帘；音符块够大时显示音名 |
 | [Midiano](piano-roll/Midiano.md) | 网页学琴工具 | [有](piano-roll/Midiano-thoughts.md) | 音符从上往下落到琴键上，带小节线、按乐器上色；作者很喜欢 |
 | [Neothesia](piano-roll/Neothesia.md) | 开源桌面学琴软件 | [有](piano-roll/Neothesia-thoughts.md) | 音符从上往下落到琴键上 |
+| [noteDigger](piano-roll/noteDigger.md) | 网页辅助扒谱工具（中文） | 暂无 | 在频谱上画 MIDI 音符；节拍检测、去谐波、AI 转写当参考；timbreAMT 的作者做的 |
 
 ## 其他 MIDI 线索
 
