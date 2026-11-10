@@ -59,3 +59,9 @@ bass, drums, other, vocals, guitar, piano
 ## 与纯蓝的关系
 
 2026-11-07 作者试听：六轨效果明显好于旧 `htdemucs_6s`，旧的六轨模型可以弃用；已选为纯蓝的分离引擎（见 [66CCFF-0008](../../user-spec/decisions/66CCFF-0008-bs-roformer-engine.md)）。正式安装脚本会创建独立的 `roformer-engine` 环境：Windows CUDA，macOS CPU。
+
+## 结构（2026-11-10 读本机代码和权重核对）
+
+- 代码：`bs_roformer/bs_roformer.py`（`BSRoformer`）；配置 `BS-Rofo-SW-Fixed.yaml`：`dim 256`、`depth 12`（每层一个沿时间的 Transformer + 一个沿频带的 Transformer）、8 头注意力；STFT 窗 2048、步长 512（1025 个频点）；推理一块 588800 个采样（13.35 秒），相邻块重叠一半。
+- 每一路一个「遮罩估计器」（`mask_estimators`，顺序 bass、drums、other、vocals、guitar、piano，人声是第 3 个，从 0 数）：每个频带一个小 MLP（扩展 4 倍、2 层、GLU），输出**复数遮罩**，和混合的频谱做复数乘法（`stft_repr * mask`），不限制在 0–1。
+- 参数共 174.7M：12 层 Transformer 主体只有 25.3M（14.5%），**每个遮罩估计器 24.7M（14.2%），六个占 85%**；频带切分 1.1M。
