@@ -56,7 +56,8 @@
 | 资料 | 备注 |
 |---|---|
 | [UNMIXX](separation/unmixx.md) | ICASSP 2026，盲分离两位歌手；仓库带权重；未声明许可证；《白石溪》上几乎没分开两个人（[想法](separation/unmixx-thoughts.md)） |
-| [按参考录音提取指定歌手](separation/singer-informed-separation.md) | 给一段目标歌手的独唱参考，提取这位歌手 |
+| [按参考录音提取指定歌手](separation/singer-informed-separation.md) | 给一段目标歌手的独唱参考，提取这位歌手；在虚拟歌手上用不了（拼接版因代码 bug 根本不看参考，FiLM 版结果乱） |
+| [SpeechBrain ECAPA](separation/speechbrain-ecapa.md) | 说话人识别模型；不分离，改为判断「谁在唱」再把 GAME 的音符分到两个人；《白石溪》独唱部分约 85% 判对，两人一起唱的地方还分不出来 |
 | [MedleyVox 与合唱分离模型](separation/medleyvox.md) | 评测集 + 社区模型（Cyru5 权重、MVSEP duet 模型、karaoke 模型） |
 
 ## 钢琴卷帘 / MIDI 查看工具
