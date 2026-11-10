@@ -2,7 +2,7 @@
 
 - 状态：有效
 - 日期：2026-11-10
-- 决策者：agent（作者听了试验结果，觉得 GAME 转得不错、基本可用；接进应用的方式由 agent 设计）
+- 决策者：agent（作者听了试验结果，觉得 GAME 转得不错、基本可用；接进应用的方式由 agent 设计；节拍用原曲来测，作者确认没问题）
 - 服务于：
   - 作者预期：[`../README.md`](../README.md)「功能」里的 MIDI 转写；作者觉得 MuScriptor 转人声效果不理想、要找更厉害的人声转 MIDI 模型（[MuScriptor 想法](../../references/midi/muscriptor-thoughts.md)）；作者听了 GAME 的结果觉得基本可用（[GAME 想法](../../references/midi/game-thoughts.md)）
   - 上游决策：[66CCFF-0012](66CCFF-0012-muscriptor-in-app-transcription.md)（MuScriptor 转写）、[66CCFF-0015](66CCFF-0015-roll-on-player-timeline.md)（卷帘的小节线）、[66CCFF-0016](66CCFF-0016-midi-bar-offset.md)（MuScriptor 的小节对齐延后）
