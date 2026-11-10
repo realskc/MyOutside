@@ -83,6 +83,30 @@ describe("66CCFF backend", () => {
     expect(result.grid.bars.slice(0, 3)).toEqual([0, 2, 4]);
   });
 
+  it("readMidi 去掉 MuScriptor 为对齐小节线加的延后：音符和拍都回到原音频的时间（66CCFF-0016）", async () => {
+    const { kernel, dataDir } = setup();
+    const midi = new Midi();
+    midi.header.setTempo(120);
+    // MuScriptor 的写法：所有音符延后 0.4 秒让第一个强拍落在小节线上，并在第一轨记一个 marker
+    midi.header.meta.push({ type: "marker", text: "muscriptor:bar_offset=0.4000", ticks: 0 });
+    const track = midi.addTrack();
+    track.addNote({ midi: 60, time: 1.4, duration: 0.5, velocity: 0.8 });
+    track.addNote({ midi: 64, time: 4.4, duration: 0.5, velocity: 0.8 });
+    const file = join(dataDir, "muscriptor.mid");
+    writeFileSync(file, Buffer.from(midi.toArray()));
+    const result = await call<{
+      duration: number;
+      grid: { beats: number[]; bars: number[] };
+      tracks: Array<{ notes: Array<{ time: number; duration: number }> }>;
+    }>(kernel, "66CCFF.readMidi", { path: file });
+    expect(result.tracks[0]?.notes[0]?.time).toBeCloseTo(1, 6);
+    expect(result.tracks[0]?.notes[0]?.duration).toBeCloseTo(0.5, 6);
+    expect(result.tracks[0]?.notes[1]?.time).toBeCloseTo(4, 6);
+    expect(result.duration).toBeCloseTo(4.5, 6);
+    expect(result.grid.beats.slice(0, 3).map((value) => Math.round(value * 1000) / 1000)).toEqual([-0.4, 0.1, 0.6]);
+    expect(result.grid.bars[1]).toBeCloseTo(1.6, 6);
+  });
+
   it("引擎未安装时状态为 not ready", async () => {
     const { kernel } = setup();
     const status = await call<{ ready: boolean; pythonPath: string | null; setupCommand: string }>(

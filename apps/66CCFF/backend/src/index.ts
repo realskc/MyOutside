@@ -216,7 +216,23 @@ function midiGrid(midi: Midi): { beats: number[]; bars: number[] } {
   return { beats, bars };
 }
 
-/** 解析 MIDI 文件，转成钢琴卷帘需要的秒制音符数据 */
+const MUSCRIPTOR_BAR_OFFSET = "muscriptor:bar_offset=";
+
+/**
+ * MuScriptor 写的 MIDI 里，音符整体延后了几百毫秒：MIDI 没有弱起小节，为了让第一个强拍落在小节线上，
+ * 它把整段音乐往后推，并在第一轨记一个 marker `muscriptor:bar_offset=<秒>`（原音频从 MIDI 的这个时间开始）。
+ * 纯蓝要拿 MIDI 和分轨对齐，读的时候要把它减回去（66CCFF-0016）。
+ */
+function audioOffset(midi: Midi): number {
+  for (const event of midi.header.meta) {
+    if (event.type !== "marker" || !event.text.startsWith(MUSCRIPTOR_BAR_OFFSET)) continue;
+    const value = Number(event.text.slice(MUSCRIPTOR_BAR_OFFSET.length));
+    if (Number.isFinite(value) && value > 0) return value;
+  }
+  return 0;
+}
+
+/** 解析 MIDI 文件，转成钢琴卷帘需要的秒制音符数据；时间都是原音频的时间（66CCFF-0016） */
 function parseMidiFile(file: string, name: string): X66CCFFMidiData {
   let midi: Midi;
   try {
@@ -224,10 +240,12 @@ function parseMidiFile(file: string, name: string): X66CCFFMidiData {
   } catch {
     throw new KernelError("VALIDATION", "无法解析 MIDI 文件");
   }
+  const offset = audioOffset(midi);
+  const grid = midiGrid(midi);
   return {
     name,
-    duration: midi.duration,
-    grid: midiGrid(midi),
+    duration: Math.max(0, midi.duration - offset),
+    grid: { beats: grid.beats.map((time) => time - offset), bars: grid.bars.map((time) => time - offset) },
     tracks: midi.tracks
       .map((track, index) => ({
         index,
@@ -235,7 +253,7 @@ function parseMidiFile(file: string, name: string): X66CCFFMidiData {
         instrument: track.instrument?.name ?? null,
         percussion: track.instrument?.percussion ?? false,
         notes: track.notes.map((note) => ({
-          time: note.time,
+          time: note.time - offset,
           duration: note.duration,
           midi: note.midi,
           velocity: note.velocity,

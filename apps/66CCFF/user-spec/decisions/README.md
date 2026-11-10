@@ -29,3 +29,4 @@
 | [66CCFF-0013](66CCFF-0013-setup-command-from-backend.md) | 引擎安装命令由后端按平台给出，页面里不写死（修复 Mac 上显示 Windows 命令） | 有效 |
 | [66CCFF-0014](66CCFF-0014-note-count-from-midi.md) | 转写结果的音符数从写好的 MIDI 里数（修复音符数多算） | 有效 |
 | [66CCFF-0015](66CCFF-0015-roll-on-player-timeline.md) | 钢琴卷帘放进曲目页，和分轨播放器共用一条时间线；加竖着的沉浸模式 | 有效 |
+| [66CCFF-0016](66CCFF-0016-midi-bar-offset.md) | 读 MIDI 时去掉 MuScriptor 为对齐小节线加的延后（修复卷帘里 MuScriptor 的音比分轨晚） | 有效 |

@@ -32,7 +32,7 @@ app_66CCFF__transcription(id, track_id, stems, instrument, model, status, progre
 | `66CCFF.listTracks` | 只读 | 曲目列表 + 最新任务状态 / 轨数 |
 | `66CCFF.getTrack` | 只读 | 曲目详情 + stems + 最新任务 |
 | `66CCFF.getEngineStatus` | 只读 | 引擎目录 / Python / 安装提示 |
-| `66CCFF.readMidi` | 只读 | 读取本地 `.mid` / `.midi`，返回秒制音符、轨道（含是否鼓轨 `percussion`）和按速度表算好的拍 / 小节 `grid`；供钢琴卷帘使用 |
+| `66CCFF.readMidi` | 只读 | 读取本地 `.mid` / `.midi`，返回秒制音符、轨道（含是否鼓轨 `percussion`）和按速度表算好的拍 / 小节 `grid`；时间都是原音频的时间（MuScriptor 的 `bar_offset` 延后已减掉，66CCFF-0016）；供钢琴卷帘使用 |
 | `66CCFF.readTranscription` | 只读 | 读取一次转写的 MIDI，格式同 `readMidi` |
 | `66CCFF.getTranscriptionEngineStatus` | 只读 | 转 MIDI 引擎是否安装、是否已登录 HuggingFace、安装 / 登录命令、可选乐器 |
 | `66CCFF.startTranscription` | 内部异步 | 所选 stem（多条先混合）→ MuScriptor（一个乐器）→ 单轨 MIDI；进度事件 + 写进记录 |
