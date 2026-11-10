@@ -31,3 +31,4 @@
 | [66CCFF-0015](66CCFF-0015-roll-on-player-timeline.md) | 钢琴卷帘放进曲目页，和分轨播放器共用一条时间线；加竖着的沉浸模式 | 有效 |
 | [66CCFF-0016](66CCFF-0016-midi-bar-offset.md) | 读 MIDI 时去掉 MuScriptor 为对齐小节线加的延后（修复卷帘里 MuScriptor 的音比分轨晚） | 有效 |
 | [66CCFF-0017](66CCFF-0017-game-vocal-midi.md) | 人声旋律转 MIDI 用 GAME；转 MIDI 的节拍都在整首歌上检测 | 有效 |
+| [66CCFF-0018](66CCFF-0018-train-own-duet-models.md) | 对唱：自己训练天依 / 阿绫的识别模型和分离模型（串联、单输出头 + 减法） | 有效（未实现） |
