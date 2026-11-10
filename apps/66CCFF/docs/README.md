@@ -32,7 +32,7 @@ app_66CCFF__transcription(id, track_id, stems, instrument, model, status, progre
 | `66CCFF.listTracks` | 只读 | 曲目列表 + 最新任务状态 / 轨数 |
 | `66CCFF.getTrack` | 只读 | 曲目详情 + stems + 最新任务 |
 | `66CCFF.getEngineStatus` | 只读 | 引擎目录 / Python / 安装提示 |
-| `66CCFF.readMidi` | 只读 | 读取本地 `.mid` / `.midi`，返回秒制音符和轨道；供 MIDI 卷帘使用 |
+| `66CCFF.readMidi` | 只读 | 读取本地 `.mid` / `.midi`，返回秒制音符、轨道（含是否鼓轨 `percussion`）和按速度表算好的拍 / 小节 `grid`；供钢琴卷帘使用 |
 | `66CCFF.readTranscription` | 只读 | 读取一次转写的 MIDI，格式同 `readMidi` |
 | `66CCFF.getTranscriptionEngineStatus` | 只读 | 转 MIDI 引擎是否安装、是否已登录 HuggingFace、安装 / 登录命令、可选乐器 |
 | `66CCFF.startTranscription` | 内部异步 | 所选 stem（多条先混合）→ MuScriptor（一个乐器）→ 单轨 MIDI；进度事件 + 写进记录 |
@@ -83,13 +83,18 @@ app_66CCFF__transcription(id, track_id, stems, instrument, model, status, progre
 - 播放 / 暂停按钮用图标切换（播放三角 / 暂停条），播放中按钮颜色加深；进度条、速度 50%–100%（保持音高）、循环与 AB 段、清除；空格键暂停 / 继续（文字输入框聚焦时除外）；
 - 播放用多个 `<audio>` 元素同步，主轨 `timeupdate` 定期校正其它轨；无波形（v1）。
 - 每个 `<audio>` 经 `createMediaElementSource` 接进同一个 `AudioContext` + `GainNode`；静音 / 独奏 / 音量只改音量节点，`<audio>` 本身永远不静音（66CCFF-0011：浏览器会在窗口隐藏时暂停一直静音的 `<audio>`，主轨一停，切回来进度会回退）。冒烟检查 `66CCFF background` / `66CCFF web audio` 守着这两点。
-- MIDI 卷帘：从曲目详情打开；通过系统文件选择器加载一个或多个 MIDI，Canvas 叠加显示多文件/多轨；支持缩放、拖动、悬停查看音符信息和轨道开关；可用简单 Web Audio 合成器播放可见轨道，带播放头；不编辑（66CCFF-0010）。
-- 转 MIDI 面板（有分轨时出现）：选 stem（勾选）、选乐器、「转 MIDI」/「取消」；引擎没装或没登录时显示对应命令与「重新检查」；下面列出这首曲目的所有转写结果（乐器 ← 所选的轨、时间、音符数、BPM、进度或失败原因），可以「在卷帘中打开」或删除（66CCFF-0012）。冒烟检查 `66CCFF transcribe panel` 确认面板出现。
+- 钢琴卷帘（66CCFF-0015）：播放器下面的一块面板（`ui/roll.js`，Canvas 2D），时间完全跟着分轨播放器走（跳转、慢放、AB 循环都是播放器的）。自动读这首曲目所有成功的转写结果，也可以手动添加 MIDI 文件（不存）；多轨叠加、每轨一色、图例里开关。
+  - 卷帘模式：左边琴键、小节线 / 拍线 / 小节号（后端 `grid`）、块够大时显示音名、悬停信息、点击试听；滚动移动，捏合或 ⌘ + 滚动缩放时间（琴键上缩放音高），⌥ + 滚动缩放音高，工具栏「时间 / 音高 − +」「适应」（大部分音符放进画面）「跟随」。
+  - 沉浸模式：铺满窗口，音符往下落到琴键上，小节横线，顶上进度条；Esc 退出。
+  - 声音：`ui/midi-synth.js` 合成音，接在混音同一个 `AudioContext` 上，混音里是「MIDI」一轨；按播放器时间每 25 毫秒往后排 0.3 秒（隐藏时 1.6 秒），跳转 / 换速度时重排，等播放器时间走起来再排；鼓轨不发声。
+  - 冒烟检查 `66CCFF roll`（读出转写结果、混音里有「MIDI」、进出沉浸模式，截图）和 `66CCFF roll synth`（窗口静音，50% 速度下两个和弦的开始时间相差约 2 秒）。
+- 转 MIDI 面板（有分轨时出现）：选 stem（勾选）、选乐器、「转 MIDI」/「取消」；引擎没装或没登录时显示对应命令与「重新检查」；下面列出这首曲目的所有转写结果（乐器 ← 所选的轨、时间、音符数、BPM、进度或失败原因），可以「在卷帘中显示 / 从卷帘隐藏」或删除（66CCFF-0012）。冒烟检查 `66CCFF transcribe panel` 确认面板出现。
 
 ## 7. 已知限制
 
-- 转 MIDI 每次只能选一个乐器（单轨 MIDI）；卷帘还没有真实钢琴音色、音频同步或编辑。
-- MIDI 卷帘的文件选择器只在 Electron 宿主可用；LAN / 浏览器版暂不支持。
+- 转 MIDI 每次只能选一个乐器（单轨 MIDI）；卷帘的声音是合成音，不是真实钢琴；不能编辑。
+- 卷帘的小节线用第一条显示中的轨的 MIDI 速度；不同 stem 转出来的速度不同时只对得上一个（66CCFF-0015）。
+- 卷帘的「添加 MIDI 文件」只在 Electron 宿主可用；LAN / 浏览器版暂不支持。
 - 取消只对当前页面发起的任务有效；刷新后正在运行的任务无法从界面取消（会继续并靠轮询显示）。
 - 没有导出、变调、两轨快捷预设、波形；这些见应用 user spec 的「未定 / 非目标」。
 - `media://` 没有跨应用权限：目前任意子应用理论上能猜到并读取其它应用的 media 路径；builder / 不可信应用出现前必须收紧（66CCFF-0004）。

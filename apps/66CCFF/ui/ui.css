@@ -576,208 +576,271 @@ button {
   gap: 8px;
 }
 
-.midi-modal-backdrop {
-  position: fixed;
-  inset: 0;
-  z-index: 100;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 24px;
-  background: rgba(15, 23, 42, 0.45);
-}
+/* ---- 钢琴卷帘（66CCFF-0015） ---- */
 
-.midi-modal {
+.roll-panel {
+  margin-top: 18px;
   display: flex;
   flex-direction: column;
-  width: min(1400px, calc(100vw - 48px));
-  height: min(820px, calc(100vh - 48px));
+  height: 520px;
+  min-height: 260px;
+  resize: vertical;
   overflow: hidden;
   background: var(--panel);
   border: 1px solid var(--border);
-  border-radius: 16px;
-  box-shadow: 0 24px 70px rgba(15, 23, 42, 0.25);
+  border-radius: 14px;
 }
 
-.midi-modal-head,
-.midi-modal-foot {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 16px;
-  padding: 12px 16px;
-  border-bottom: 1px solid var(--border);
-}
-
-.midi-modal-foot {
-  border-top: 1px solid var(--border);
-  border-bottom: 0;
-}
-
-.midi-modal-head h2 {
-  margin: 0;
-  font-size: 18px;
-}
-
-.midi-modal-actions {
+.roll-toolbar {
   display: flex;
   align-items: center;
   gap: 8px;
-}
-
-.icon-btn {
-  width: 34px;
-  height: 34px;
-  padding: 0;
-  background: transparent;
-  border: 1px solid transparent;
-  border-radius: 8px;
-  color: var(--muted);
-  font-size: 24px;
-  line-height: 1;
-}
-
-.icon-btn:hover {
-  color: var(--fg);
-  background: #f1f5f9;
-}
-
-.midi-legend {
-  display: flex;
+  padding: 10px 12px 8px;
   flex-wrap: wrap;
-  gap: 6px;
-  min-height: 33px;
-  padding: 6px 16px;
-  border-bottom: 1px solid var(--border);
 }
 
-.midi-legend:empty {
+.roll-modes {
+  display: inline-flex;
+  border: 1px solid var(--border);
+  border-radius: 9px;
+  overflow: hidden;
+}
+
+.roll-mode {
+  border: 0;
+  background: #fff;
+  color: var(--muted);
+  font: inherit;
+  font-size: 13px;
+  padding: 5px 12px;
+  cursor: pointer;
+}
+
+.roll-mode.active {
+  background: #eef9ff;
+  color: var(--accent-strong);
+  font-weight: 600;
+}
+
+.roll-play {
+  width: 32px;
+  height: 32px;
+  border-radius: 999px;
+  border: 0;
+  background: var(--accent);
+  color: #fff;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.roll-time {
+  font-variant-numeric: tabular-nums;
+  font-size: 12px;
+  color: var(--muted);
+  min-width: 96px;
+}
+
+.roll-toolbar .ghost {
+  padding: 5px 10px;
+  font-size: 13px;
+}
+
+.roll-toolbar .ghost.active,
+.transcription-actions .ghost.active {
+  border-color: var(--brand);
+  background: #eef9ff;
+  color: var(--accent-strong);
+}
+
+.roll-zoom {
+  min-width: 32px;
+}
+
+.roll-zoom-group {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.roll-zoom-label {
+  font-size: 12px;
+  color: var(--muted);
+  margin-right: 2px;
+}
+
+.roll-extras {
+  display: inline-flex;
+  gap: 8px;
+}
+
+.roll-exit {
   display: none;
 }
 
-.midi-track-chip {
+.roll-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 14px;
+  padding: 0 12px 8px;
+}
+
+.roll-legend:empty {
+  display: none;
+}
+
+.roll-legend-group {
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  padding: 4px 8px;
-  border: 1px solid var(--border);
-  border-radius: 999px;
-  background: #fff;
-  color: var(--fg);
+  flex-wrap: wrap;
+}
+
+.roll-legend-name {
   font-size: 12px;
-}
-
-.midi-track-chip.off {
-  opacity: 0.4;
-}
-
-.midi-color-dot {
-  width: 9px;
-  height: 9px;
-  border-radius: 50%;
-}
-
-.midi-track-chip span:last-child {
-  max-width: 360px;
+  color: var(--muted);
+  max-width: 240px;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
-.midi-stage {
+.roll-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: #fff;
+  font: inherit;
+  font-size: 12px;
+  padding: 3px 10px 3px 8px;
+  cursor: pointer;
+}
+
+.roll-chip.off {
+  opacity: 0.45;
+}
+
+.roll-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 999px;
+  flex-shrink: 0;
+}
+
+.roll-remove {
+  border: 0;
+  background: none;
+  color: var(--muted);
+  cursor: pointer;
+  font-size: 14px;
+  padding: 0 4px;
+}
+
+.roll-stage {
   position: relative;
   flex: 1;
   min-height: 0;
-  overflow: hidden;
-  background: #fbfdff;
+  border-top: 1px solid var(--border);
 }
 
-#midi-canvas {
+.roll-canvas {
   display: block;
-  width: 100%;
-  height: 100%;
   cursor: grab;
-  touch-action: none;
 }
 
-#midi-canvas.dragging {
+.roll-canvas.dragging {
   cursor: grabbing;
 }
 
-.midi-empty {
+.roll-tip {
+  position: absolute;
+  pointer-events: none;
+  background: rgba(15, 23, 42, 0.9);
+  color: #fff;
+  font-size: 12px;
+  padding: 5px 8px;
+  border-radius: 6px;
+  white-space: nowrap;
+  z-index: 2;
+}
+
+.roll-empty {
   position: absolute;
   inset: 0;
   display: flex;
   align-items: center;
   justify-content: center;
   color: var(--muted);
-  font-size: 14px;
+  font-size: 13px;
   pointer-events: none;
 }
 
-.midi-modal-foot {
-  min-height: 52px;
+.roll-hint {
+  padding: 6px 12px 8px;
+  font-size: 11px;
+  color: var(--muted);
+  border-top: 1px solid var(--border);
 }
 
-.midi-note-info {
-  min-width: 0;
+/* 沉浸模式：铺满整个窗口，深色 */
+.roll-panel.immersive {
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  height: auto;
+  margin: 0;
+  border: 0;
+  border-radius: 0;
+  resize: none;
+  background: #0b1220;
+}
+
+.roll-panel.immersive .roll-toolbar {
+  background: #0f172a;
+}
+
+.roll-panel.immersive .roll-mode {
+  background: #1e293b;
+  color: #94a3b8;
+}
+
+.roll-panel.immersive .roll-mode.active {
+  background: #0f3a52;
+  color: #66ccff;
+}
+
+.roll-panel.immersive .roll-time {
+  color: #94a3b8;
+}
+
+.roll-panel.immersive .roll-toolbar .ghost {
+  background: #1e293b;
+  border-color: #334155;
+  color: #cbd5e1;
+}
+
+.roll-panel.immersive .roll-follow,
+.roll-panel.immersive .roll-pitch-zoom,
+.roll-panel.immersive .roll-zoom-label,
+.roll-panel.immersive .roll-extras,
+.roll-panel.immersive .roll-legend,
+.roll-panel.immersive .roll-hint {
+  display: none;
+}
+
+.roll-panel.immersive .roll-exit {
+  display: inline-flex;
+}
+
+.roll-panel.immersive .roll-stage {
+  border-top: 0;
+}
+
+.roll-panel.immersive .roll-empty {
+  color: #94a3b8;
+}
+
+body.roll-immersive {
   overflow: hidden;
-  color: var(--muted);
-  font-size: 12px;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.midi-controls {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  flex-shrink: 0;
-}
-
-.midi-controls button {
-  min-width: 34px;
-  padding: 6px 10px;
-}
-
-.midi-controls .midi-play {
-  min-width: 44px;
-  font-size: 15px;
-  font-weight: 600;
-}
-
-.midi-zoom-label {
-  min-width: 44px;
-  color: var(--muted);
-  font-size: 12px;
-  text-align: center;
-}
-
-@media (max-width: 720px) {
-  .midi-modal-backdrop {
-    padding: 8px;
-  }
-
-  .midi-modal {
-    width: calc(100vw - 16px);
-    height: calc(100vh - 16px);
-  }
-
-  .midi-modal-head {
-    align-items: flex-start;
-    flex-direction: column;
-  }
-
-  .midi-modal-actions {
-    width: 100%;
-  }
-
-  .midi-modal-actions .primary,
-  .midi-modal-actions .ghost {
-    flex: 1;
-  }
-
-  .midi-note-info {
-    display: none;
-  }
 }

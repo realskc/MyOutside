@@ -54,13 +54,29 @@
       stemOther: "其他",
       stemGuitar: "吉他",
       stemPiano: "钢琴",
-      midiRoll: "MIDI 卷帘",
-      addMidi: "添加 MIDI",
-      clearMidi: "清空",
-      midiEmpty: "添加 MIDI 文件查看钢琴卷帘",
-      fit: "适应",
       pickerUnavailable: "文件选择器不可用",
       midiLoadFailed: "MIDI 加载失败：",
+      rollModeRoll: "卷帘",
+      rollModeFall: "沉浸",
+      rollFollow: "跟随",
+      rollFollowHint: "播放时画面跟着走",
+      rollFit: "适应",
+      rollFitHint: "让大部分音符上下都放得下，回到播放头",
+      rollZoomIn: "放大",
+      rollZoomOut: "缩小",
+      rollZoomTime: "时间",
+      rollZoomPitch: "音高",
+      rollExit: "退出沉浸（Esc）",
+      rollEmpty: "转一个 MIDI，或者添加 MIDI 文件，这里就会显示钢琴卷帘",
+      rollHideTrack: "点一下隐藏这条轨",
+      rollShowTrack: "点一下显示这条轨",
+      rollRemoveLayer: "从卷帘移除",
+      rollVelocity: "力度",
+      rollAddMidi: "添加 MIDI 文件",
+      rollHint: "滚动 / 拖动：上下左右移动 · 双指捏合或 ⌘ / Ctrl + 滚动：时间缩放（在琴键上则是音高缩放） · ⌥ / Alt + 滚动：音高缩放 · 点标尺：跳转 · 点琴键或音符：试听",
+      stemMidi: "MIDI",
+      showInRoll: "在卷帘中显示",
+      hideInRoll: "从卷帘隐藏",
       transcribeTitle: "转 MIDI",
       transcribeHint: "把选中的轨转成一个 MIDI（MuScriptor）",
       transcribeAs: "转成",
@@ -72,7 +88,6 @@
       transcribeCancelled: "已取消转写",
       transcriptionFailed: "转写失败",
       pickStem: "至少选一条轨",
-      openInRoll: "在卷帘中打开",
       noTranscriptions: "还没有转写结果",
       notes: (n) => `${n} 个音符`,
       deleteTranscriptionConfirm: "删除这个 MIDI？",
@@ -144,13 +159,29 @@
       stemOther: "Other",
       stemGuitar: "Guitar",
       stemPiano: "Piano",
-      midiRoll: "MIDI roll",
-      addMidi: "Add MIDI",
-      clearMidi: "Clear",
-      midiEmpty: "Add MIDI files to view the piano roll",
-      fit: "Fit",
       pickerUnavailable: "File picker unavailable",
       midiLoadFailed: "Failed to load MIDI: ",
+      rollModeRoll: "Roll",
+      rollModeFall: "Immersive",
+      rollFollow: "Follow",
+      rollFollowHint: "Keep the playhead in view while playing",
+      rollFit: "Fit",
+      rollFitHint: "Fit most notes vertically and jump to the playhead",
+      rollZoomIn: "Zoom in",
+      rollZoomOut: "Zoom out",
+      rollZoomTime: "Time",
+      rollZoomPitch: "Pitch",
+      rollExit: "Exit immersive (Esc)",
+      rollEmpty: "Transcribe a MIDI or add a MIDI file to see the piano roll here",
+      rollHideTrack: "Click to hide this track",
+      rollShowTrack: "Click to show this track",
+      rollRemoveLayer: "Remove from the roll",
+      rollVelocity: "velocity",
+      rollAddMidi: "Add MIDI file",
+      rollHint: "Scroll / drag: move · Pinch or ⌘ / Ctrl + scroll: zoom time (over the keys: zoom pitch) · ⌥ / Alt + scroll: zoom pitch · Click the ruler: seek · Click a key or note: listen",
+      stemMidi: "MIDI",
+      showInRoll: "Show in roll",
+      hideInRoll: "Hide from roll",
       transcribeTitle: "To MIDI",
       transcribeHint: "Transcribe the selected stems into one MIDI (MuScriptor)",
       transcribeAs: "As",
@@ -162,7 +193,6 @@
       transcribeCancelled: "Transcription cancelled",
       transcriptionFailed: "Failed",
       pickStem: "Select at least one stem",
-      openInRoll: "Open in piano roll",
       noTranscriptions: "No transcriptions yet",
       notes: (n) => `${n} notes`,
       deleteTranscriptionConfirm: "Delete this MIDI?",
@@ -234,20 +264,6 @@
   const clearLoopBtn = document.getElementById("btn-clear-loop");
   const loopLabel = document.getElementById("loop-label");
   const mixerEl = document.getElementById("mixer");
-  const midiBtn = document.getElementById("btn-midi");
-  const midiModal = document.getElementById("midi-modal");
-  const midiCanvas = document.getElementById("midi-canvas");
-  const midiEmptyEl = document.getElementById("midi-empty");
-  const midiLegendEl = document.getElementById("midi-legend");
-  const midiNoteInfoEl = document.getElementById("midi-note-info");
-  const midiZoomLabel = document.getElementById("midi-zoom-label");
-  const midiAddBtn = document.getElementById("btn-midi-add");
-  const midiClearBtn = document.getElementById("btn-midi-clear");
-  const midiCloseBtn = document.getElementById("btn-midi-close");
-  const midiPlayBtn = document.getElementById("btn-midi-play");
-  const midiZoomInBtn = document.getElementById("btn-midi-zoom-in");
-  const midiZoomOutBtn = document.getElementById("btn-midi-zoom-out");
-  const midiFitBtn = document.getElementById("btn-midi-fit");
   const toastEl = document.getElementById("toast");
   const audioHolder = document.getElementById("audio-holder");
   const transcribePanel = document.getElementById("transcribe-panel");
@@ -260,6 +276,7 @@
   const transcribeHelpCommand = document.getElementById("transcribe-help-command");
   const transcribeRecheckBtn = document.getElementById("btn-transcribe-recheck");
   const transcriptionsEl = document.getElementById("transcriptions");
+  const rollPanel = document.getElementById("roll-panel");
 
   // ---- 状态 ----
   let tracks = [];
@@ -281,6 +298,16 @@
   /** 作者手动选过乐器后，不再按所选的轨自动换 */
   let instrumentTouched = false;
 
+  // 钢琴卷帘（66CCFF-0015）
+  let roll = null;
+  /** 卷帘里的图层：这首曲目的转写结果（id 以 t: 开头）和手动添加的 MIDI 文件（f: 开头） */
+  let rollLayers = [];
+  let rollTrackId = null;
+  /** 正在读的转写结果：曲目页一刷新就会再调一次 loadRollLayers，不能读两遍 */
+  const rollLoading = new Set();
+  let synth = null;
+  let synthTimer = null;
+
   const audioMap = new Map();
   const stemParams = new Map();
   /**
@@ -292,32 +319,6 @@
   let master = null;
   let playing = false;
   let loop = { enabled: false, a: null, b: null };
-
-  const MIDI_PAD = { left: 46, right: 14, top: 26, bottom: 20 };
-  const MIDI_COLORS = [
-    ["#1596cc", "#56b4df", "#0b6d93", "#8bd8f4"],
-    ["#d97706", "#efa24b", "#a84f05", "#ffc98c"],
-    ["#7c3aed", "#a78bfa", "#5b21b6", "#c4b5fd"],
-    ["#0f766e", "#2dd4bf", "#115e59", "#99f6e4"],
-  ];
-  let midiLayers = [];
-  let midiView = { start: 0, pps: 80, pitchMin: 21, pitchMax: 108 };
-  let midiFitPps = 80;
-  let midiCanvasSize = { w: 0, h: 0 };
-  let midiDragging = null;
-  let midiHover = null;
-  let midiNeedsFit = true;
-  let midiPlaying = false;
-  let midiPausedAt = 0;
-  let midiAudioContext = null;
-  let midiPlayStart = 0;
-  let midiPlayFrom = 0;
-  let midiPlayEnd = 0;
-  let midiMasterGain = null;
-  let midiScheduledIndex = 0;
-  let midiNoteEvents = [];
-  let midiScheduleTimer = null;
-  let midiAnimationFrame = null;
 
   const STEM_ORDER = ["vocals", "drums", "bass", "other", "guitar", "piano"];
   const STEM_LABEL_KEY = {
@@ -381,565 +382,7 @@
     renderTrackList();
     renderDetail();
     updatePlayButton();
-    updateMidiPlayButton();
-  }
-
-  // ---- MIDI 钢琴卷帘 ----
-
-  function midiNoteName(value) {
-    const names = ["C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"];
-    const note = Math.round(value);
-    return `${names[((note % 12) + 12) % 12]}${Math.floor(note / 12) - 1}`;
-  }
-
-  function midiColor(layerIndex, trackIndex) {
-    const palette = MIDI_COLORS[layerIndex % MIDI_COLORS.length];
-    return palette[trackIndex % palette.length];
-  }
-
-  function allMidiNotes(visibleOnly) {
-    const notes = [];
-    midiLayers.forEach((layer, layerIndex) => {
-      layer.tracks.forEach((track, trackIndex) => {
-        if (visibleOnly && !track.visible) return;
-        for (const note of track.notes) notes.push({ note, layer, layerIndex, track, trackIndex });
-      });
-    });
-    return notes;
-  }
-
-  function midiPlot() {
-    const left = MIDI_PAD.left;
-    const top = MIDI_PAD.top;
-    const plotW = Math.max(1, midiCanvasSize.w - left - MIDI_PAD.right);
-    const plotH = Math.max(1, midiCanvasSize.h - top - MIDI_PAD.bottom);
-    const pitchCount = Math.max(1, midiView.pitchMax - midiView.pitchMin + 1);
-    return { left, top, plotW, plotH, pitchCount, rowH: plotH / pitchCount };
-  }
-
-  function midiNoteRect(note, plot) {
-    const x = plot.left + (note.time - midiView.start) * midiView.pps;
-    const y = plot.top + (midiView.pitchMax - note.midi) * plot.rowH;
-    return {
-      x,
-      y,
-      w: Math.max(2, note.duration * midiView.pps),
-      h: Math.max(2, plot.rowH - 1),
-    };
-  }
-
-  function chooseTimeStep(pps) {
-    const steps = [0.25, 0.5, 1, 2, 5, 10, 15, 30, 60, 120, 300, 600];
-    const minimumPixels = 74;
-    return steps.find((step) => step * pps >= minimumPixels) ?? steps[steps.length - 1];
-  }
-
-  function updateMidiEmpty() {
-    midiEmptyEl.classList.toggle("hidden", midiLayers.length > 0);
-  }
-
-  function updateMidiZoomLabel() {
-    const percent = midiFitPps > 0 ? Math.round((midiView.pps / midiFitPps) * 100) : 100;
-    midiZoomLabel.textContent = `${percent}%`;
-  }
-
-  function renderMidiLegend() {
-    midiLegendEl.innerHTML = "";
-    midiLayers.forEach((layer, layerIndex) => {
-      layer.tracks.forEach((track, trackIndex) => {
-        const chip = document.createElement("button");
-        chip.type = "button";
-        chip.className = "midi-track-chip" + (track.visible ? "" : " off");
-        chip.title = `${layer.name} · ${track.name}`;
-        const dot = document.createElement("span");
-        dot.className = "midi-color-dot";
-        dot.style.background = midiColor(layerIndex, trackIndex);
-        const label = document.createElement("span");
-        label.textContent = `${layer.name} · ${track.name} (${track.notes.length})`;
-        chip.appendChild(dot);
-        chip.appendChild(label);
-        chip.addEventListener("click", () => {
-          stopMidiPlayback(true);
-          track.visible = !track.visible;
-          chip.classList.toggle("off", !track.visible);
-          updateMidiHover(null);
-          drawMidi();
-        });
-        midiLegendEl.appendChild(chip);
-      });
-    });
-  }
-
-  function fitMidiView() {
-    if (!midiCanvasSize.w || !midiCanvasSize.h) return;
-    const notes = allMidiNotes(false);
-    if (notes.length === 0) {
-      midiView = { start: 0, pps: 80, pitchMin: 21, pitchMax: 108 };
-      midiFitPps = 80;
-      midiNeedsFit = false;
-      updateMidiZoomLabel();
-      drawMidi();
-      return;
-    }
-    let end = 1;
-    let minPitch = 127;
-    let maxPitch = 0;
-    for (const { note, layer } of notes) {
-      end = Math.max(end, note.time + note.duration, layer.duration || 0);
-      minPitch = Math.min(minPitch, note.midi);
-      maxPitch = Math.max(maxPitch, note.midi);
-    }
-    midiView.start = 0;
-    midiView.pitchMin = Math.max(0, minPitch - 2);
-    midiView.pitchMax = Math.min(127, maxPitch + 2);
-    midiView.pps = Math.max(1, (midiCanvasSize.w - MIDI_PAD.left - MIDI_PAD.right) / end);
-    midiFitPps = midiView.pps;
-    midiNeedsFit = false;
-    updateMidiZoomLabel();
-    drawMidi();
-  }
-
-  function zoomMidi(factor, clientX) {
-    if (midiLayers.length === 0) return;
-    const rect = midiCanvas.getBoundingClientRect();
-    const anchorX = clientX == null ? rect.left + rect.width / 2 : clientX;
-    const plotLeft = rect.left + MIDI_PAD.left;
-    const anchorTime = midiView.start + (anchorX - plotLeft) / midiView.pps;
-    const minPps = Math.max(1, midiFitPps * 0.15);
-    const maxPps = Math.max(1, midiFitPps * 25);
-    midiView.pps = Math.min(maxPps, Math.max(minPps, midiView.pps * factor));
-    midiView.start = Math.max(0, anchorTime - (anchorX - plotLeft) / midiView.pps);
-    updateMidiZoomLabel();
-    drawMidi();
-  }
-
-  function drawMidi() {
-    if (!midiCanvasSize.w || !midiCanvasSize.h) return;
-    const ctx = midiCanvas.getContext("2d");
-    const { w, h } = midiCanvasSize;
-    ctx.clearRect(0, 0, w, h);
-    ctx.fillStyle = "#fbfdff";
-    ctx.fillRect(0, 0, w, h);
-    if (midiLayers.length === 0) return;
-
-    const plot = midiPlot();
-    const start = midiView.start;
-    const end = start + plot.plotW / midiView.pps;
-
-    ctx.save();
-    ctx.font = '11px "Segoe UI", "Microsoft YaHei", system-ui, sans-serif';
-    ctx.textBaseline = "top";
-
-    const step = chooseTimeStep(midiView.pps);
-    for (let time = Math.ceil(start / step) * step; time <= end; time += step) {
-      const x = plot.left + (time - start) * midiView.pps;
-      ctx.strokeStyle = "rgba(100, 116, 139, 0.18)";
-      ctx.lineWidth = 1;
-      ctx.beginPath();
-      ctx.moveTo(x, plot.top);
-      ctx.lineTo(x, plot.top + plot.plotH);
-      ctx.stroke();
-      ctx.fillStyle = "#94a3b8";
-      ctx.textAlign = "left";
-      ctx.fillText(formatTime(time), x + 3, 5);
-    }
-
-    for (let pitch = midiView.pitchMin; pitch <= midiView.pitchMax; pitch += 1) {
-      const y = plot.top + (midiView.pitchMax - pitch) * plot.rowH;
-      const octave = pitch % 12 === 0;
-      ctx.strokeStyle = octave ? "rgba(100, 116, 139, 0.24)" : "rgba(148, 163, 184, 0.11)";
-      ctx.lineWidth = 1;
-      ctx.beginPath();
-      ctx.moveTo(plot.left, y);
-      ctx.lineTo(plot.left + plot.plotW, y);
-      ctx.stroke();
-      if (octave) {
-        ctx.fillStyle = "#94a3b8";
-        ctx.textAlign = "right";
-        ctx.fillText(midiNoteName(pitch), plot.left - 6, y - 6);
-      }
-    }
-
-    ctx.globalAlpha = 0.82;
-    for (const layer of midiLayers) {
-      const layerIndex = midiLayers.indexOf(layer);
-      layer.tracks.forEach((track, trackIndex) => {
-        if (!track.visible) return;
-        ctx.fillStyle = midiColor(layerIndex, trackIndex);
-        for (const note of track.notes) {
-          if (note.time + note.duration < start || note.time > end) continue;
-          const rect = midiNoteRect(note, plot);
-          ctx.fillRect(rect.x, rect.y, rect.w, rect.h);
-        }
-      });
-    }
-    ctx.globalAlpha = 1;
-
-    if (midiHover) {
-      const rect = midiNoteRect(midiHover.note, plot);
-      ctx.strokeStyle = "#0f172a";
-      ctx.lineWidth = 1.5;
-      ctx.strokeRect(rect.x, rect.y, rect.w, rect.h);
-    }
-
-    const currentTime = midiCurrentTime();
-    if (midiPlaying || midiPausedAt > 0) {
-      const playheadX = plot.left + (currentTime - start) * midiView.pps;
-      if (playheadX >= plot.left && playheadX <= plot.left + plot.plotW) {
-        ctx.strokeStyle = "#e04b4b";
-        ctx.lineWidth = 1.5;
-        ctx.beginPath();
-        ctx.moveTo(playheadX, plot.top);
-        ctx.lineTo(playheadX, plot.top + plot.plotH);
-        ctx.stroke();
-        ctx.fillStyle = "#e04b4b";
-        ctx.beginPath();
-        ctx.moveTo(playheadX - 4, plot.top);
-        ctx.lineTo(playheadX + 4, plot.top);
-        ctx.lineTo(playheadX, plot.top + 7);
-        ctx.closePath();
-        ctx.fill();
-      }
-    }
-
-    ctx.strokeStyle = "rgba(100, 116, 139, 0.35)";
-    ctx.lineWidth = 1;
-    ctx.strokeRect(plot.left, plot.top, plot.plotW, plot.plotH);
-    ctx.restore();
-  }
-
-  function noteAt(clientX, clientY) {
-    if (midiLayers.length === 0) return null;
-    const rect = midiCanvas.getBoundingClientRect();
-    const x = clientX - rect.left;
-    const y = clientY - rect.top;
-    const plot = midiPlot();
-    if (x < plot.left || x > plot.left + plot.plotW || y < plot.top || y > plot.top + plot.plotH) {
-      return null;
-    }
-    for (let layerIndex = midiLayers.length - 1; layerIndex >= 0; layerIndex -= 1) {
-      const layer = midiLayers[layerIndex];
-      for (let trackIndex = layer.tracks.length - 1; trackIndex >= 0; trackIndex -= 1) {
-        const track = layer.tracks[trackIndex];
-        if (!track.visible) continue;
-        for (let i = track.notes.length - 1; i >= 0; i -= 1) {
-          const note = track.notes[i];
-          const noteRect = midiNoteRect(note, plot);
-          if (
-            x >= noteRect.x &&
-            x <= noteRect.x + noteRect.w &&
-            y >= noteRect.y &&
-            y <= noteRect.y + noteRect.h
-          ) {
-            return { note, layer, layerIndex, track, trackIndex };
-          }
-        }
-      }
-    }
-    return null;
-  }
-
-  function updateMidiHover(hit) {
-    midiHover = hit;
-    if (!hit) {
-      midiNoteInfoEl.textContent = "";
-      return;
-    }
-    const { note, layer, track } = hit;
-    midiNoteInfoEl.textContent =
-      `${layer.name} · ${track.name} · ${midiNoteName(note.midi)} · ` +
-      `${note.time.toFixed(2)}s + ${note.duration.toFixed(2)}s · ` +
-      `vel ${Math.round(note.velocity * 127)}`;
-  }
-
-  function resizeMidiCanvas() {
-    if (!midiCanvas) return;
-    const rect = midiCanvas.getBoundingClientRect();
-    const dpr = window.devicePixelRatio || 1;
-    const w = Math.max(1, rect.width);
-    const h = Math.max(1, rect.height);
-    midiCanvas.width = Math.round(w * dpr);
-    midiCanvas.height = Math.round(h * dpr);
-    const ctx = midiCanvas.getContext("2d");
-    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-    midiCanvasSize = { w, h };
-    if (midiNeedsFit) fitMidiView();
-    else drawMidi();
-  }
-
-  function midiNoteFrequency(note) {
-    return 440 * 2 ** ((note - 69) / 12);
-  }
-
-  function midiCurrentTime() {
-    if (midiPlaying && midiAudioContext) {
-      return midiPlayFrom + Math.max(0, midiAudioContext.currentTime - midiPlayStart);
-    }
-    return midiPausedAt;
-  }
-
-  function updateMidiPlayButton() {
-    midiPlayBtn.textContent = midiPlaying ? "❚❚" : "▶";
-    midiPlayBtn.setAttribute("aria-label", midiPlaying ? t("pause") : t("play"));
-    midiPlayBtn.title = midiPlaying ? t("pause") : t("play");
-  }
-
-  function scheduleMidiNote(item, at) {
-    const ctx = midiAudioContext;
-    if (!ctx || !midiMasterGain) return;
-    const note = item.note;
-    const duration = Math.max(0.06, Math.min(note.duration, 8));
-    const velocity = Math.max(0.05, Math.min(1, note.velocity));
-    const oscillator = ctx.createOscillator();
-    const gain = ctx.createGain();
-    oscillator.type = "triangle";
-    oscillator.frequency.setValueAtTime(midiNoteFrequency(note.midi), at);
-    const peak = 0.06 * (0.35 + 0.65 * velocity);
-    gain.gain.setValueAtTime(0.0001, at);
-    gain.gain.exponentialRampToValueAtTime(peak, at + 0.012);
-    gain.gain.exponentialRampToValueAtTime(0.0001, at + duration);
-    oscillator.connect(gain);
-    gain.connect(midiMasterGain);
-    oscillator.start(at);
-    oscillator.stop(at + duration + 0.03);
-    oscillator.addEventListener("ended", () => {
-      oscillator.disconnect();
-      gain.disconnect();
-    });
-  }
-
-  function scheduleMidiNotes() {
-    if (!midiPlaying || !midiAudioContext) return;
-    const now = midiCurrentTime();
-    while (midiScheduledIndex < midiNoteEvents.length) {
-      const item = midiNoteEvents[midiScheduledIndex];
-      if (item.note.time > now + 0.35) break;
-      midiScheduledIndex += 1;
-      const at = midiPlayStart + (item.note.time - midiPlayFrom);
-      if (at < midiAudioContext.currentTime - 0.1) continue;
-      scheduleMidiNote(item, at);
-    }
-    if (now > midiPlayEnd + 0.15) stopMidiPlayback(true);
-  }
-
-  function midiAnimationLoop() {
-    if (!midiPlaying) return;
-    drawMidi();
-    midiAnimationFrame = requestAnimationFrame(midiAnimationLoop);
-  }
-
-  async function startMidiPlayback(from) {
-    if (!midiLayers.length || midiPlaying) return;
-    const startAt = Math.max(0, Number.isFinite(from) ? from : 0);
-    const events = allMidiNotes(true)
-      .filter(({ note }) => note.time >= startAt - 0.02)
-      .sort((a, b) => a.note.time - b.note.time);
-    if (events.length === 0) return;
-    const end = Math.max(...events.map(({ note }) => note.time + note.duration), startAt);
-    const context = new AudioContext({ latencyHint: "interactive" });
-    if (context.state === "suspended") await context.resume();
-    midiAudioContext = context;
-    midiPlayFrom = startAt;
-    midiPlayStart = context.currentTime + 0.08;
-    midiPlayEnd = end;
-    midiNoteEvents = events;
-    midiScheduledIndex = 0;
-    midiMasterGain = context.createGain();
-    midiMasterGain.gain.value = 0.18;
-    const compressor = context.createDynamicsCompressor();
-    compressor.threshold.value = -18;
-    compressor.knee.value = 20;
-    compressor.ratio.value = 4;
-    midiMasterGain.connect(compressor);
-    compressor.connect(context.destination);
-    midiPlaying = true;
-    updateMidiPlayButton();
-    midiScheduleTimer = setInterval(scheduleMidiNotes, 30);
-    scheduleMidiNotes();
-    midiAnimationLoop();
-  }
-
-  function stopMidiPlayback(reset) {
-    const current = midiCurrentTime();
-    if (midiScheduleTimer) {
-      clearInterval(midiScheduleTimer);
-      midiScheduleTimer = null;
-    }
-    if (midiAnimationFrame) {
-      cancelAnimationFrame(midiAnimationFrame);
-      midiAnimationFrame = null;
-    }
-    const wasPlaying = midiPlaying;
-    midiPlaying = false;
-    midiPausedAt = reset ? 0 : Math.max(0, Math.min(current, midiPlayEnd || current));
-    if (midiAudioContext) {
-      const context = midiAudioContext;
-      midiAudioContext = null;
-      void context.close();
-    }
-    midiMasterGain = null;
-    midiNoteEvents = [];
-    midiScheduledIndex = 0;
-    if (wasPlaying) updateMidiPlayButton();
-    drawMidi();
-  }
-
-  function toggleMidiPlayback() {
-    if (midiPlaying) {
-      stopMidiPlayback(false);
-      return;
-    }
-    const from = midiPausedAt >= midiPlayEnd - 0.05 ? 0 : midiPausedAt;
-    void startMidiPlayback(from);
-  }
-
-  function openMidiModal() {
-    midiModal.classList.remove("hidden");
-    midiNeedsFit = true;
-    requestAnimationFrame(resizeMidiCanvas);
-  }
-
-  function closeMidiModal() {
-    stopMidiPlayback(true);
-    midiModal.classList.add("hidden");
-    midiDragging = null;
-    midiCanvas.classList.remove("dragging");
-    updateMidiHover(null);
-  }
-
-  async function addMidiFiles() {
-    if (typeof bridge.pickMidiFiles !== "function") {
-      toast(t("pickerUnavailable"), true);
-      return;
-    }
-    let paths = [];
-    try {
-      paths = await bridge.pickMidiFiles();
-    } catch (error) {
-      toast(String(error), true);
-      return;
-    }
-    if (!Array.isArray(paths) || paths.length === 0) return;
-
-    stopMidiPlayback(true);
-    midiAddBtn.disabled = true;
-    try {
-      for (const path of paths) {
-        try {
-          const data = await callOrThrow("66CCFF.readMidi", { path });
-          midiLayers.push({
-            name: data.name,
-            path,
-            duration: data.duration,
-            tracks: data.tracks.map((track) => ({ ...track, visible: true })),
-          });
-        } catch (error) {
-          toast(`${t("midiLoadFailed")}${error.message}`, true);
-        }
-      }
-      midiNeedsFit = true;
-      renderMidiLegend();
-      updateMidiEmpty();
-      resizeMidiCanvas();
-    } finally {
-      midiAddBtn.disabled = false;
-    }
-  }
-
-  function clearMidiLayers() {
-    stopMidiPlayback(true);
-    midiLayers = [];
-    midiNeedsFit = true;
-    midiView = { start: 0, pps: 80, pitchMin: 21, pitchMax: 108 };
-    midiFitPps = 80;
-    renderMidiLegend();
-    updateMidiEmpty();
-    updateMidiZoomLabel();
-    drawMidi();
-  }
-
-  function initMidi() {
-    midiBtn.addEventListener("click", openMidiModal);
-    midiCloseBtn.addEventListener("click", closeMidiModal);
-    midiModal.addEventListener("click", (event) => {
-      if (event.target === midiModal) closeMidiModal();
-    });
-    midiAddBtn.addEventListener("click", () => void addMidiFiles());
-    midiClearBtn.addEventListener("click", clearMidiLayers);
-    midiPlayBtn.addEventListener("click", toggleMidiPlayback);
-    midiFitBtn.addEventListener("click", () => {
-      midiNeedsFit = true;
-      fitMidiView();
-    });
-    midiZoomInBtn.addEventListener("click", () => zoomMidi(1.25));
-    midiZoomOutBtn.addEventListener("click", () => zoomMidi(0.8));
-
-    midiCanvas.addEventListener("mousedown", (event) => {
-      if (midiLayers.length === 0) return;
-      midiDragging = { clientX: event.clientX, start: midiView.start };
-      midiCanvas.classList.add("dragging");
-      event.preventDefault();
-    });
-
-    window.addEventListener("mousemove", (event) => {
-      if (!midiDragging) return;
-      const dx = event.clientX - midiDragging.clientX;
-      midiView.start = Math.max(0, midiDragging.start - dx / midiView.pps);
-      drawMidi();
-    });
-
-    window.addEventListener("mouseup", () => {
-      if (!midiDragging) return;
-      midiDragging = null;
-      midiCanvas.classList.remove("dragging");
-      drawMidi();
-    });
-
-    midiCanvas.addEventListener("mousemove", (event) => {
-      if (midiDragging) return;
-      updateMidiHover(noteAt(event.clientX, event.clientY));
-      drawMidi();
-    });
-
-    midiCanvas.addEventListener("mouseleave", () => {
-      if (!midiDragging) {
-        updateMidiHover(null);
-        drawMidi();
-      }
-    });
-
-    midiCanvas.addEventListener(
-      "wheel",
-      (event) => {
-        if (midiLayers.length === 0) return;
-        event.preventDefault();
-        if (event.shiftKey) {
-          midiView.start = Math.max(
-            0,
-            midiView.start + (event.deltaY || event.deltaX) / midiView.pps,
-          );
-          drawMidi();
-        } else {
-          zoomMidi(event.deltaY < 0 ? 1.15 : 0.87, event.clientX);
-        }
-      },
-      { passive: false },
-    );
-
-    window.addEventListener("resize", () => {
-      if (midiModal.classList.contains("hidden")) return;
-      midiNeedsFit = true;
-      resizeMidiCanvas();
-    });
-
-    window.addEventListener(
-      "keydown",
-      (event) => {
-        if (event.key !== "Escape" || midiModal.classList.contains("hidden")) return;
-        closeMidiModal();
-      },
-      true,
-    );
+    if (roll) roll.refreshText();
   }
 
   // ---- 引擎 ----
@@ -1083,6 +526,7 @@
       emptyEl.classList.remove("hidden");
       detailEl.classList.add("hidden");
       playerEl.classList.add("hidden");
+      rollPanel.classList.add("hidden");
       return;
     }
     emptyEl.classList.add("hidden");
@@ -1131,6 +575,9 @@
       stopPlayback();
     }
     renderTranscribePanel();
+    // 卷帘跟着播放器走，有分轨才有播放器（66CCFF-0015）
+    rollPanel.classList.toggle("hidden", detail.stems.length === 0);
+    if (detail.stems.length > 0) void loadRollLayers(detail);
   }
 
   // ---- 转 MIDI（66CCFF-0012） ----
@@ -1262,12 +709,13 @@
       const actions = document.createElement("div");
       actions.className = "transcription-actions";
       if (item.status === "succeeded") {
-        const open = document.createElement("button");
-        open.type = "button";
-        open.className = "ghost";
-        open.textContent = t("openInRoll");
-        open.addEventListener("click", () => void openTranscriptionInRoll(item.id));
-        actions.appendChild(open);
+        const shown = layerVisible(`t:${item.id}`);
+        const toggle = document.createElement("button");
+        toggle.type = "button";
+        toggle.className = "ghost" + (shown ? " active" : "");
+        toggle.textContent = shown ? t("hideInRoll") : t("showInRoll");
+        toggle.addEventListener("click", () => setLayerVisible(`t:${item.id}`, !shown));
+        actions.appendChild(toggle);
       }
       if (item.status !== "running") {
         const remove = document.createElement("button");
@@ -1321,38 +769,201 @@
     }
   }
 
-  async function openTranscriptionInRoll(transcriptionId) {
-    try {
-      const data = await callOrThrow("66CCFF.readTranscription", { transcriptionId });
-      stopMidiPlayback(true);
-      if (!midiLayers.some((layer) => layer.transcriptionId === transcriptionId)) {
-        midiLayers.push({
-          name: data.name,
-          transcriptionId,
-          duration: data.duration,
-          tracks: data.tracks.map((track) => ({ ...track, visible: true })),
-        });
-      }
-      midiNeedsFit = true;
-      renderMidiLegend();
-      updateMidiEmpty();
-      openMidiModal();
-    } catch (error) {
-      toast(`${t("midiLoadFailed")}${error.message}`, true);
-    }
-  }
-
   async function deleteTranscription(transcriptionId) {
     if (!window.confirm(t("deleteTranscriptionConfirm"))) return;
     try {
       await callOrThrow("66CCFF.deleteTranscription", { transcriptionId });
-      midiLayers = midiLayers.filter((layer) => layer.transcriptionId !== transcriptionId);
-      renderMidiLegend();
-      updateMidiEmpty();
+      rollLayers = rollLayers.filter((layer) => layer.id !== `t:${transcriptionId}`);
+      applyRollLayers();
       await refreshDetail({ silent: true });
     } catch (error) {
       toast(error.message, true);
     }
+  }
+
+  // ---- 钢琴卷帘（66CCFF-0015） ----
+
+  function initRoll() {
+    roll = window.createPianoRoll(rollPanel, {
+      t,
+      getTime: () => (master ? master.currentTime : 0),
+      getDuration: () => currentDuration(),
+      isPlaying: () => playing,
+      onSeek: (time) => seekTo(time),
+      onTogglePlay: () => togglePlayback(),
+      onAudition: (midi, velocity) => {
+        const ready = ensureSynth();
+        if (!ready) return;
+        if (mixContext.state !== "running") void mixContext.resume();
+        synth.audition(midi, velocity);
+      },
+      onVisibilityChange: () => {
+        syncSynthNotes();
+        renderMixer();
+        applyStemParams();
+        renderTranscriptions();
+      },
+      onRemoveLayer: (id) => {
+        rollLayers = rollLayers.filter((layer) => layer.id !== id);
+        applyRollLayers();
+      },
+    });
+    const addFile = document.createElement("button");
+    addFile.type = "button";
+    addFile.className = "ghost";
+    addFile.dataset.i18n = "rollAddMidi";
+    addFile.textContent = t("rollAddMidi");
+    addFile.addEventListener("click", () => void addMidiFiles());
+    roll.extras.appendChild(addFile);
+    const hint = document.createElement("div");
+    hint.className = "roll-hint";
+    hint.dataset.i18n = "rollHint";
+    hint.textContent = t("rollHint");
+    rollPanel.appendChild(hint);
+  }
+
+  /** 卷帘里的一个图层：单轨的转写结果，轨名用乐器名，比 MIDI 里的 GM 音色名好认 */
+  function layerFromMidi(id, name, data, { visible, removable, instrument }) {
+    return {
+      id,
+      name,
+      removable,
+      duration: data.duration,
+      grid: data.grid,
+      tracks: data.tracks.map((track) => ({
+        name: data.tracks.length === 1 && instrument ? instrumentLabel(instrument) : track.name,
+        notes: track.notes,
+        percussion: track.percussion,
+        visible,
+      })),
+    };
+  }
+
+  function transcriptionLabel(item) {
+    return `${instrumentLabel(item.instrument)} ← ${item.stems.map(stemLabel).join(" + ")}`;
+  }
+
+  /**
+   * 换曲目时清空图层；之后把这首曲目所有成功的转写结果读进来（第一次打开时只显示最新的一个），
+   * 删掉的转写对应的图层去掉；手动添加的文件保留到换曲目为止。
+   */
+  async function loadRollLayers(nextDetail) {
+    if (rollTrackId !== nextDetail.id) {
+      rollTrackId = nextDetail.id;
+      rollLayers = [];
+      applyRollLayers();
+    }
+    const trackId = nextDetail.id;
+    const succeeded = nextDetail.transcriptions.filter((item) => item.status === "succeeded");
+    const wanted = new Set(succeeded.map((item) => `t:${item.id}`));
+    const before = rollLayers.length;
+    rollLayers = rollLayers.filter((layer) => !layer.id.startsWith("t:") || wanted.has(layer.id));
+    let changed = rollLayers.length !== before;
+    const firstLoad = !rollLayers.some((layer) => layer.id.startsWith("t:"));
+    for (const [index, item] of succeeded.entries()) {
+      const id = `t:${item.id}`;
+      if (rollLoading.has(id) || rollLayers.some((layer) => layer.id === id)) continue;
+      rollLoading.add(id);
+      try {
+        const data = await callOrThrow("66CCFF.readTranscription", { transcriptionId: item.id });
+        if (rollTrackId !== trackId || rollLayers.some((layer) => layer.id === id)) continue;
+        // 第一次打开只显示最新的一个；之后新转出来的直接显示
+        const visible = firstLoad ? index === 0 : true;
+        rollLayers.push(layerFromMidi(id, transcriptionLabel(item), data, { visible, removable: false, instrument: item.instrument }));
+        changed = true;
+      } catch (error) {
+        toast(`${t("midiLoadFailed")}${error.message}`, true);
+      } finally {
+        rollLoading.delete(id);
+      }
+    }
+    if (rollTrackId !== trackId) return;
+    if (changed) {
+      const order = new Map(succeeded.map((item, index) => [`t:${item.id}`, index]));
+      rollLayers.sort((a, b) => (order.get(a.id) ?? 999) - (order.get(b.id) ?? 999));
+      applyRollLayers();
+    }
+  }
+
+  function applyRollLayers() {
+    if (!roll) return;
+    roll.setLayers(rollLayers);
+    syncSynthNotes();
+    renderMixer();
+    applyStemParams();
+    renderTranscriptions();
+  }
+
+  function layerVisible(id) {
+    const layer = rollLayers.find((item) => item.id === id);
+    return !!layer && layer.tracks.some((track) => track.visible);
+  }
+
+  function setLayerVisible(id, visible) {
+    const layer = rollLayers.find((item) => item.id === id);
+    if (!layer) return;
+    for (const track of layer.tracks) track.visible = visible;
+    applyRollLayers();
+    if (visible) rollPanel.scrollIntoView({ behavior: "smooth", block: "nearest" });
+  }
+
+  async function addMidiFiles() {
+    if (typeof bridge.pickMidiFiles !== "function") {
+      toast(t("pickerUnavailable"), true);
+      return;
+    }
+    let paths = [];
+    try {
+      paths = await bridge.pickMidiFiles();
+    } catch (error) {
+      toast(String(error), true);
+      return;
+    }
+    if (!Array.isArray(paths) || paths.length === 0) return;
+    for (const path of paths) {
+      try {
+        const data = await callOrThrow("66CCFF.readMidi", { path });
+        const id = `f:${path}`;
+        rollLayers = rollLayers.filter((layer) => layer.id !== id);
+        rollLayers.push(layerFromMidi(id, data.name, data, { visible: true, removable: true }));
+      } catch (error) {
+        toast(`${t("midiLoadFailed")}${error.message}`, true);
+      }
+    }
+    applyRollLayers();
+  }
+
+  /** MIDI 合成器和混音用同一个 AudioContext；在混音里是「MIDI」这一轨 */
+  function ensureSynth() {
+    if (!mixContext) return false;
+    if (!synth) synth = window.createMidiSynth(mixContext);
+    if (!gainMap.has("midi")) {
+      const gain = mixContext.createGain();
+      synth.output.disconnect();
+      synth.output.connect(gain).connect(mixContext.destination);
+      gainMap.set("midi", gain);
+    }
+    if (!stemParams.has("midi")) stemParams.set("midi", { muted: false, solo: false, volume: 0.8 });
+    return true;
+  }
+
+  function syncSynthNotes() {
+    if (!roll || !ensureSynth()) return;
+    synth.setNotes(roll.audibleNotes());
+  }
+
+  function startSynthClock() {
+    clearInterval(synthTimer);
+    if (!synth || !master) return;
+    const tick = () => synth.tick({ playing, time: master.currentTime, rate: master.playbackRate || 1 });
+    tick();
+    synthTimer = setInterval(tick, 25);
+  }
+
+  function stopSynthClock() {
+    clearInterval(synthTimer);
+    synthTimer = null;
+    if (synth) synth.stop();
   }
 
   // ---- 播放器 ----
@@ -1396,6 +1007,8 @@
         if (audio === master) {
           playing = false;
           updatePlayButton();
+          stopSynthClock();
+          if (roll) roll.invalidate();
         }
       });
       audioHolder.appendChild(audio);
@@ -1413,16 +1026,17 @@
 
   function renderMixer() {
     mixerEl.innerHTML = "";
-    for (const kind of STEM_ORDER) {
-      const audio = audioMap.get(kind);
-      if (!audio) continue;
+    // 卷帘里有显示中的 MIDI 时，混音里多一轨「MIDI」：和分轨一样可以静音、独奏、调音量（66CCFF-0015）
+    const kinds = STEM_ORDER.filter((kind) => audioMap.has(kind));
+    if (roll && roll.hasVisible() && ensureSynth()) kinds.push("midi");
+    for (const kind of kinds) {
       const params = stemParams.get(kind) ?? { muted: false, solo: false, volume: 1 };
       const row = document.createElement("div");
       row.className = "stem-row";
 
       const name = document.createElement("span");
       name.className = "stem-name";
-      name.textContent = stemLabel(kind);
+      name.textContent = kind === "midi" ? t("stemMidi") : stemLabel(kind);
 
       const mute = document.createElement("button");
       mute.type = "button";
@@ -1523,12 +1137,16 @@
     playing = results.some((result) => result.status === "fulfilled");
     if (!playing) toast(t("playFailed"), true);
     updatePlayButton();
+    if (playing) startSynthClock();
+    if (roll) roll.invalidate();
   }
 
   function pauseAll() {
     for (const audio of audioMap.values()) audio.pause();
     playing = false;
     updatePlayButton();
+    stopSynthClock();
+    if (roll) roll.invalidate();
   }
 
   function stopPlayback() {
@@ -1598,6 +1216,7 @@
       }
     }
     updateTransport();
+    if (roll) roll.invalidate();
   }
 
   function renderLoopLabel() {
@@ -1621,7 +1240,6 @@
     "keydown",
     (event) => {
       if (event.code !== "Space" || event.repeat || event.defaultPrevented) return;
-      if (!midiModal.classList.contains("hidden")) return;
       if (event.ctrlKey || event.metaKey || event.altKey || event.isComposing) return;
       const target = event.target;
       if (target instanceof HTMLElement) {
@@ -1809,7 +1427,7 @@
   // ---- 启动 ----
 
   async function init() {
-    initMidi();
+    initRoll();
     await initLanguage();
     await loadEngine();
     await loadTranscriptionEngine();

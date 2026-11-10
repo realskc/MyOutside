@@ -23,8 +23,9 @@
 | [66CCFF-0007](66CCFF-0007-basic-pitch-midi.md) | MIDI 转写：Basic Pitch，独立 Python 3.10 + ONNX，单音频输入 | 部分被取代（→ 66CCFF-0012） |
 | [66CCFF-0008](66CCFF-0008-bs-roformer-engine.md) | 六轨分离引擎：BS-RoFormer SW 6-stem，Windows CUDA / macOS CPU | 有效 |
 | [66CCFF-0009](66CCFF-0009-macos-source-install.md) | macOS 源码安装：分离走 CPU | 有效 |
-| [66CCFF-0010](66CCFF-0010-midi-roll-viewer.md) | MIDI 卷帘：只读对比 + 基础播放 | 有效 |
+| [66CCFF-0010](66CCFF-0010-midi-roll-viewer.md) | MIDI 卷帘：只读对比 + 基础播放 | 部分被取代（→ 66CCFF-0015） |
 | [66CCFF-0011](66CCFF-0011-mute-with-gain-nodes.md) | 分轨静音 / 独奏 / 音量用 Web Audio 音量节点，`<audio>` 本身永远不静音（修复切回窗口进度回退） | 有效 |
 | [66CCFF-0012](66CCFF-0012-muscriptor-in-app-transcription.md) | 转 MIDI 接进纯蓝：MuScriptor，所选 stem → 一个乐器 → 单轨 MIDI，结果存进曲目 | 有效 |
 | [66CCFF-0013](66CCFF-0013-setup-command-from-backend.md) | 引擎安装命令由后端按平台给出，页面里不写死（修复 Mac 上显示 Windows 命令） | 有效 |
 | [66CCFF-0014](66CCFF-0014-note-count-from-midi.md) | 转写结果的音符数从写好的 MIDI 里数（修复音符数多算） | 有效 |
+| [66CCFF-0015](66CCFF-0015-roll-on-player-timeline.md) | 钢琴卷帘放进曲目页，和分轨播放器共用一条时间线；加竖着的沉浸模式 | 有效 |

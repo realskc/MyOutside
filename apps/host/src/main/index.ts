@@ -368,6 +368,29 @@ async function captureWindow(win: BrowserWindow, attempts: number, delayMs: numb
   return Buffer.alloc(0);
 }
 
+/** 冒烟用：一段 120 BPM 的小 MIDI（C 大调音阶 + 两个和弦），给卷帘检查用 */
+function makeSmokeMidi(): Buffer {
+  const vlq = (value: number) => {
+    const bytes = [value & 0x7f];
+    for (let rest = value >> 7; rest > 0; rest >>= 7) bytes.unshift((rest & 0x7f) | 0x80);
+    return bytes;
+  };
+  const events: number[] = [0x00, 0xff, 0x51, 0x03, 0x07, 0xa1, 0x20]; // 120 BPM
+  const notes = [60, 62, 64, 65, 67, 69, 71, 72];
+  notes.forEach((note) => events.push(...vlq(0), 0x90, note, 90, ...vlq(240), 0x80, note, 64));
+  for (const chord of [[60, 64, 67], [65, 69, 72]]) {
+    chord.forEach((note, i) => events.push(...vlq(0), 0x90, note, 80));
+    chord.forEach((note, i) => events.push(...vlq(i === 0 ? 960 : 0), 0x80, note, 64));
+  }
+  events.push(0x00, 0xff, 0x2f, 0x00);
+  const header = Buffer.from([0x4d, 0x54, 0x68, 0x64, 0, 0, 0, 6, 0, 0, 0, 1, 0x01, 0xe0]);
+  const track = Buffer.alloc(8 + events.length);
+  track.write("MTrk", 0);
+  track.writeUInt32BE(events.length, 4);
+  Buffer.from(events).copy(track, 8);
+  return Buffer.concat([header, track]);
+}
+
 /** 冒烟用：生成一小段合法 WAV（静音），验证 media:// 音频链路 */
 function makeSilentWav(seconds: number): Buffer {
   const sampleRate = 44100;
@@ -622,6 +645,111 @@ async function smokeX66ccffBackground(kernel: Kernel, appDir: string, trackId: s
     console.log(
       "[smoke] 66CCFF transcribe panel:",
       JSON.stringify({ ok: transcribe.visible && transcribe.stems === 6 && transcribe.instruments > 30, ...transcribe }),
+    );
+
+    // 钢琴卷帘（66CCFF-0015）：给测试曲目一个转写结果，卷帘应读出来、能切到沉浸模式；这一段只跳转不播放，后面的合成器检查先把窗口静音再播
+    const transcriptionId = randomUUID();
+    const midiFile = `tracks/${trackId}/midi/${transcriptionId}.mid`;
+    mkdirSync(join(appDir, "tracks", trackId, "midi"), { recursive: true });
+    writeFileSync(join(appDir, midiFile), makeSmokeMidi());
+    for (const [call, payload] of [
+      ["66CCFF.insertTranscription", { id: transcriptionId, trackId, stems: ["piano"], instrument: "acoustic_piano", model: "medium" }],
+      ["66CCFF.finishTranscription", { transcriptionId, file: midiFile, noteCount: 16, bpm: 120 }],
+    ] as const) {
+      const result = await kernel.handle({ call, payload }, { caller: "66CCFF" });
+      if (!result.ok) throw new Error(`${call}: ${result.error.message}`);
+    }
+    probe.setSize(1280, 900);
+    await probe.loadURL("app://66ccff/index.html");
+    // 记下合成器每个振荡器的开始时间（AudioContext 的时间），用来检查 MIDI 跟播放器对得上
+    await probe.webContents.executeJavaScript(
+      `(() => {
+        window.__smokeStarts = [];
+        const start = OscillatorNode.prototype.start;
+        OscillatorNode.prototype.start = function (when) {
+          window.__smokeStarts.push(when);
+          return start.apply(this, arguments);
+        };
+        return true;
+      })()`,
+    );
+    await waitFor(probe, `[...document.querySelectorAll(".track-item .title")].some((el) => el.textContent === "smoke")`);
+    await probe.webContents.executeJavaScript(
+      `[...document.querySelectorAll(".track-item")].find((item) => item.querySelector(".title").textContent === "smoke").click(); true`,
+    );
+    const rollReady = await waitFor(probe, `document.querySelectorAll("#roll-panel .roll-chip").length > 0`);
+    await probe.webContents.executeJavaScript(
+      `(() => {
+        const seek = document.getElementById("seek");
+        seek.value = "100"; // 20 秒的 10%：第 2 秒
+        seek.dispatchEvent(new Event("input"));
+        seek.dispatchEvent(new Event("change"));
+        document.getElementById("roll-panel").scrollIntoView();
+        return true;
+      })()`,
+    );
+    await sleep(500);
+    const rollState = await probe.webContents.executeJavaScript(
+      `(() => {
+        const panel = document.getElementById("roll-panel");
+        const canvas = panel.querySelector("canvas");
+        return {
+          visible: !panel.classList.contains("hidden"),
+          chips: panel.querySelectorAll(".roll-chip").length,
+          canvas: [canvas.width, canvas.height],
+          mixerMidi: [...document.querySelectorAll("#mixer .stem-name")].some((el) => el.textContent === "MIDI"),
+          toggle: [...document.querySelectorAll(".transcription-actions .ghost")].map((el) => el.textContent),
+        };
+      })()`,
+    );
+    writeFileSync(join(app.getPath("temp"), "myoutside-66CCFF-roll.png"), (await probe.webContents.capturePage()).toPNG());
+    await probe.webContents.executeJavaScript(`[...document.querySelectorAll("#roll-panel .roll-mode")][1].click(); true`);
+    await sleep(600);
+    const immersive = await probe.webContents.executeJavaScript(
+      `document.getElementById("roll-panel").classList.contains("immersive")`,
+    );
+    writeFileSync(join(app.getPath("temp"), "myoutside-66CCFF-fall.png"), (await probe.webContents.capturePage()).toPNG());
+    await probe.webContents.executeJavaScript(`document.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape" })); window.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape" })); true`);
+    await sleep(200);
+    const exited = await probe.webContents.executeJavaScript(`!document.getElementById("roll-panel").classList.contains("immersive")`);
+
+    // 合成器：静音整个窗口（不出声）后，从第 2 秒用 50% 速度播约 2.6 秒。
+    // 冒烟 MIDI 第 2、3 秒各有一个三和弦，慢放一半后两组开始时间应相差约 2 秒；暂停后不再排新的音
+    probe.webContents.setAudioMuted(true);
+    await probe.webContents.executeJavaScript(
+      `(() => {
+        const speed = document.getElementById("speed");
+        speed.value = "0.5";
+        speed.dispatchEvent(new Event("change"));
+        const seek = document.getElementById("seek");
+        seek.value = "100";
+        seek.dispatchEvent(new Event("input"));
+        seek.dispatchEvent(new Event("change"));
+        window.__smokeStarts.length = 0;
+        document.getElementById("btn-play").click();
+        return true;
+      })()`,
+      true,
+    );
+    await sleep(2600);
+    await probe.webContents.executeJavaScript(`document.getElementById("btn-play").click(); true`);
+    const afterPause = (await probe.webContents.executeJavaScript(`window.__smokeStarts.length`)) as number;
+    await sleep(400);
+    const starts = (await probe.webContents.executeJavaScript(`window.__smokeStarts.slice()`)) as number[];
+    const onsets = [...new Set(starts.map((value) => Math.round(value * 100) / 100))].sort((a, b) => a - b);
+    const gap = onsets.length >= 2 ? Math.round((onsets[onsets.length - 1] - onsets[0]) * 100) / 100 : null;
+    console.log(
+      "[smoke] 66CCFF roll synth:",
+      JSON.stringify({ ok: starts.length === 12 && gap !== null && Math.abs(gap - 2) < 0.06 && afterPause === starts.length, oscillators: starts.length, gap }),
+    );
+    console.log(
+      "[smoke] 66CCFF roll:",
+      JSON.stringify({
+        ok: rollReady && rollState.visible && rollState.chips === 1 && rollState.canvas[0] > 0 && rollState.mixerMidi && immersive && exited,
+        ...rollState,
+        immersive,
+        exited,
+      }),
     );
   } finally {
     probe.destroy();

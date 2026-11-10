@@ -109,11 +109,15 @@ export type TranscriptionIdInput = z.infer<typeof TranscriptionIdInput>;
 export const X66CCFFMidiDataSchema = z.object({
   name: z.string(),
   duration: z.number(),
+  /** 拍和小节线的时间（秒），按 MIDI 的速度表算；没有拍号时按 4/4（66CCFF-0015） */
+  grid: z.object({ beats: z.array(z.number()), bars: z.array(z.number()) }),
   tracks: z.array(
     z.object({
       index: z.number().int(),
       name: z.string(),
       instrument: z.string().nullable(),
+      /** 鼓轨（MIDI 第 10 通道）：音高代表鼓件，不是音高 */
+      percussion: z.boolean(),
       notes: z.array(z.object({ time: z.number(), duration: z.number(), midi: z.number().int(), velocity: z.number() })),
     }),
   ),

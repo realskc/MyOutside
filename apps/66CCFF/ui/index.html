@@ -36,7 +36,6 @@
               <div id="track-meta" class="meta"></div>
             </div>
             <div class="detail-actions">
-              <button id="btn-midi" class="ghost" data-i18n="midiRoll">MIDI 卷帘</button>
               <button id="btn-delete" class="text-danger" data-i18n="delete">删除</button>
             </div>
           </div>
@@ -88,6 +87,8 @@
             <div id="mixer" class="mixer"></div>
           </div>
 
+          <section id="roll-panel" class="roll-panel hidden" aria-label="钢琴卷帘"></section>
+
           <div id="transcribe-panel" class="panel transcribe-panel hidden">
             <div class="panel-row">
               <span class="panel-title" data-i18n="transcribeTitle">转 MIDI</span>
@@ -115,37 +116,10 @@
       </section>
     </main>
 
-    <div id="midi-modal" class="midi-modal-backdrop hidden">
-      <section class="midi-modal" role="dialog" aria-modal="true" aria-labelledby="midi-title">
-        <header class="midi-modal-head">
-          <h2 id="midi-title" data-i18n="midiRoll">MIDI 卷帘</h2>
-          <div class="midi-modal-actions">
-            <button id="btn-midi-add" class="primary" data-i18n="addMidi">添加 MIDI</button>
-            <button id="btn-midi-clear" class="ghost" data-i18n="clearMidi">清空</button>
-            <button id="btn-midi-close" class="icon-btn" aria-label="关闭">×</button>
-          </div>
-        </header>
-        <div id="midi-legend" class="midi-legend"></div>
-        <div class="midi-stage">
-          <canvas id="midi-canvas" aria-label="MIDI 钢琴卷帘"></canvas>
-          <div id="midi-empty" class="midi-empty" data-i18n="midiEmpty">
-            添加 MIDI 文件查看钢琴卷帘
-          </div>
-        </div>
-        <footer class="midi-modal-foot">
-          <div id="midi-note-info" class="midi-note-info"></div>
-          <div class="midi-controls">
-            <button id="btn-midi-play" class="ghost midi-play" aria-label="播放">▶</button>
-            <button id="btn-midi-zoom-out" class="ghost" aria-label="缩小">−</button>
-            <span id="midi-zoom-label" class="midi-zoom-label">100%</span>
-            <button id="btn-midi-zoom-in" class="ghost" aria-label="放大">+</button>
-            <button id="btn-midi-fit" class="ghost" data-i18n="fit">适应</button>
-          </div>
-        </footer>
-      </section>
-    </div>
     <div id="toast" class="toast hidden"></div>
     <div id="audio-holder" class="audio-holder"></div>
+    <script src="roll.js"></script>
+    <script src="midi-synth.js"></script>
     <script src="ui.js"></script>
   </body>
 </html>

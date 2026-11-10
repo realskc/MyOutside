@@ -68,6 +68,21 @@ describe("66CCFF backend", () => {
     expect(result.tracks[0]?.notes[0]?.midi).toBe(60);
   });
 
+  it("readMidi 按速度表算出拍和小节线：没有拍号按 4/4，中途变速后拍距跟着变", async () => {
+    const { kernel, dataDir } = setup();
+    const midi = new Midi();
+    const ppq = midi.header.ppq;
+    midi.header.setTempo(120); // 每拍 0.5 秒
+    midi.header.tempos.push({ ticks: ppq * 8, bpm: 60 }); // 两小节后变成每拍 1 秒
+    midi.header.update();
+    midi.addTrack().addNote({ ticks: ppq * 11, durationTicks: ppq, midi: 60, velocity: 0.8 });
+    const file = join(dataDir, "tempo.mid");
+    writeFileSync(file, Buffer.from(midi.toArray()));
+    const result = await call<{ grid: { beats: number[]; bars: number[] } }>(kernel, "66CCFF.readMidi", { path: file });
+    expect(result.grid.beats.slice(0, 10)).toEqual([0, 0.5, 1, 1.5, 2, 2.5, 3, 3.5, 4, 5]);
+    expect(result.grid.bars.slice(0, 3)).toEqual([0, 2, 4]);
+  });
+
   it("引擎未安装时状态为 not ready", async () => {
     const { kernel } = setup();
     const status = await call<{ ready: boolean; pythonPath: string | null; setupCommand: string }>(

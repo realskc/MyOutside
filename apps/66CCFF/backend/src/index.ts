@@ -186,6 +186,36 @@ function transcriptionLoginCommand(engine: string): string {
     : `"${join(engine, "venv", "bin", "hf")}" auth login`;
 }
 
+/**
+ * MIDI 的拍和小节线（秒）：按速度表把每一拍的 tick 换成秒；没有拍号时按 4/4，从 tick 0 起算（和 GarageBand 等软件一致）。
+ * 最多算 20000 拍，防止异常文件。
+ */
+function midiGrid(midi: Midi): { beats: number[]; bars: number[] } {
+  const ppq = midi.header.ppq || 480;
+  const signatures = midi.header.timeSignatures.length
+    ? [...midi.header.timeSignatures].sort((a, b) => a.ticks - b.ticks)
+    : [{ ticks: 0, timeSignature: [4, 4] }];
+  const endTick = midi.durationTicks;
+  const beats: number[] = [];
+  const bars: number[] = [];
+  let tick = 0;
+  let index = 0;
+  let beatInBar = 0;
+  while (tick <= endTick && beats.length < 20000) {
+    while (index + 1 < signatures.length && signatures[index + 1]!.ticks <= tick) {
+      index += 1;
+      beatInBar = 0;
+    }
+    const [numerator = 4, denominator = 4] = signatures[index]!.timeSignature;
+    const seconds = midi.header.ticksToSeconds(tick);
+    beats.push(seconds);
+    if (beatInBar === 0) bars.push(seconds);
+    beatInBar = (beatInBar + 1) % Math.max(1, numerator);
+    tick += (ppq * 4) / Math.max(1, denominator);
+  }
+  return { beats, bars };
+}
+
 /** 解析 MIDI 文件，转成钢琴卷帘需要的秒制音符数据 */
 function parseMidiFile(file: string, name: string): X66CCFFMidiData {
   let midi: Midi;
@@ -197,11 +227,13 @@ function parseMidiFile(file: string, name: string): X66CCFFMidiData {
   return {
     name,
     duration: midi.duration,
+    grid: midiGrid(midi),
     tracks: midi.tracks
       .map((track, index) => ({
         index,
         name: track.name || track.instrument?.name || `Track ${index + 1}`,
         instrument: track.instrument?.name ?? null,
+        percussion: track.instrument?.percussion ?? false,
         notes: track.notes.map((note) => ({
           time: note.time,
           duration: note.duration,
