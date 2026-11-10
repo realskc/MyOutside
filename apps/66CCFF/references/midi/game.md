@@ -17,3 +17,13 @@ openvpi（DiffSinger / 中文虚拟歌手社区）做的**人声转 MIDI**模型
 - 命令行：`python infer.py extract <音频或目录> -m <模型>`，输出 MIDI，也可以输出 txt / csv（README）。
 - 社区工具 [Vocal2Midi](https://github.com/splinter21/Vocal2Midi)（MIT）基于 GAME，纯 ONNX 推理，带歌词识别与对齐（FunASR + HubertFA）和 Gradio 界面。
 - 只处理**单旋律**：两个人同时唱的地方不会分成两条。
+
+## 本机验证（Mac，2026-11-10）
+
+- 环境：GAME v1.0.3 代码 + GAME-1.0 large 权重（压缩包 349MB），Python 3.12 venv，PyTorch 2.15，Apple M4 Pro，MPS（Lightning 自动选择）。装在临时目录里试，没有接进纯蓝。
+- 命令：`python infer.py extract <人声> -m GAME-1.0-large/model.pt -l zh --output-dir <目录> --output-formats mid,csv`。不给 `--output-dir` 时结果写在音频旁边；MIDI 用固定速度（默认 120 BPM）。
+- 《白石溪》BS-RoFormer SW 分出的 vocals（5 分 34 秒）：用时 82 秒（含加载模型）；373 个音符，**没有重叠**（单旋律），音高 56–77（G♯3–F5），中位 F4。开头 F4 D4 C4 A♯3 C4 A♯3 C4 F4……
+- 同一条人声，MuScriptor（`voice`）是 538 个音符，音高 47–97，相邻音符重叠 104 处，39 个音高于 G5。
+- GAME 的 373 个音符里，277 个（74%）在同一时间有 MuScriptor 的同音高音符；5 个只差八度；91 个对不上。两边谁对，要作者听了才知道。
+- CSV 里音高带音分（如 `F4-6`、`C4-30`），写 MIDI 时取整。
+- 为了和 MuScriptor 的结果用同一套小节线，把 GAME 的音符按 MuScriptor 人声 MIDI 的速度表（128 个速度变化）重新换算成 tick，另存为 `~/Downloads/白石溪 MIDI/白石溪-人声-GAME.mid`（开始时间误差 < 1 毫秒）。
