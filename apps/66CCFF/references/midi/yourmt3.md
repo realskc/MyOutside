@@ -14,6 +14,7 @@
 - YourMT3+ 是 2024 年的后续版本（MLSP 2024，arXiv:2407.04822）；默认/常用变体是 `YPTF.MoE+Multi (noPS)`。
 - `mt3-infer` 记录 YourMT3 权重约 **536MB**，并称其支持 8-stem separation（多轨 MIDI，不是音频分轨）。
 - 论文/README 提到 PerceiverTF、MoE、跨数据集 stem augmentation；Gemini 说的「cross-channel attention」需要用论文/代码进一步确认，当前不作为已验证事实。
+- 词表里人声有两个：`Singing Voice (Main melody)`（100）和 `Singing Voice (Chorus)`（101），分的是主旋律和伴唱，不分具体是谁唱的（论文表 10，2026-11-10 核对）。
 - 许可证存在不一致：GitHub 仓库标 **GPL-3.0**，HuggingFace 权重标 **Apache-2.0**；分发前必须核对。
 
 ## 与纯蓝的关系
