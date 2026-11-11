@@ -25,6 +25,12 @@
   - 单个请求最大上传 100 MB（Free、Pro；Business 200 MB）；更大的要分块，或走 DNS only 的记录（[Default cache behavior](https://developers.cloudflare.com/cache/concepts/default-cache-behavior/)）；
   - 源站 125 秒内没有响应就报 524（Proxy Read Timeout，非企业版不能改）；连接空闲 900 秒断开（[Connection limits](https://developers.cloudflare.com/fundamentals/reference/connection-limits/)）。
 
+## R2（对象存储）
+
+- 价格（[R2 pricing](https://developers.cloudflare.com/r2/pricing/)，2026-11-11 查）：免费额度每月 10 GB 存储、100 万次写类操作、1000 万次读类操作，下载（流出流量）不收费；超出后标准存储 $0.015 / GB·月。
+- 推断：开通 R2 要求账号里有支付方式（没核实）。
+- 候选用途：MyOutside 服务器数据库的异地加密备份（还没定）。
+
 ## 后台给的建议（作者在 2026-11-11 看到的）
 
 - 「Visitors cannot reach www.myoutside.org」：建议给 `www` 加 A / AAAA / CNAME，并可以用跳转规则跳到主域名；
