@@ -46,7 +46,9 @@ RemoveIPC=yes
 RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX
 SystemCallArchitectures=native
 SystemCallFilter=@system-service
-SystemCallFilter=~@privileged @resources
+SystemCallFilter=~@privileged
+# 被挡的系统调用返回「没有权限」，而不是直接杀掉进程（Node 启动时会试着调高文件数上限）
+SystemCallErrorNumber=EPERM
 CapabilityBoundingSet=
 AmbientCapabilities=
 MemoryMax=2G
