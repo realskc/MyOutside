@@ -18,7 +18,7 @@
 |---|---|---|---|
 | `netease.getStatus` | 只读 | 内部 | 有没有读到官方客户端的登录状态（不联网）、下载文件夹、今天下了几首 / 上限、下一首最早开始时间、排队数 |
 | `netease.search` | 只读 | 内部 | 搜歌，每首带本账号能下的最高档位 `maxLevel` |
-| `netease.download` | 普通异步函数 | 内部 | 下载一首歌：在应用内部排队，一次一首，上一首结束后随机等 10–20 秒，每天最多 50 首（NETEASE-0002）；进度事件 `{ type: "progress", progress, message }`，排队时带 `queued`，等待时带 `waitUntil`；最后一条消息括号里说明歌词情况 |
+| `netease.download` | 普通异步函数 | **公开**（D-0086） | 下载一首歌：在应用内部排队，一次一首，上一首结束后随机等 10–20 秒，每天最多 50 首（NETEASE-0002），本应用和别的子应用发起的共用一个队、一份额度；契约（失败 / 取消后留下什么）见 `packages/contracts/src/netease.ts`；进度事件 `{ type: "progress", progress, message }`，排队时带 `queued`，等待时带 `waitUntil`；最后一条消息括号里说明歌词情况 |
 | `netease.insertDownload` | 事务 | 内部 | 记一条下载记录（`download` 调用） |
 | `netease.listHistory` | 只读 | 内部 | 最近 100 条下载记录（只有真正下载了的） |
 | `netease.setDownloadDir` | 事务 | 内部 | 改下载文件夹（绝对路径）；`null` 恢复默认 |
@@ -54,5 +54,5 @@
 
 - 下载：一次一首，相邻两首随机隔 10–20 秒（按上一首结束算），每天最多 50 首（本地时间零点起算）；
 - 只支持 macOS；
-- 下载不是公开 API（D-0063），纯蓝只能读下载文件夹；
+- 别的子应用（例如纯蓝）可以调用下载和读下载文件夹，要在清单 `uses` 里声明；搜索是内部的，别的子应用要自己拿到歌曲 id；
 - 没有批量下载、歌单、播放。

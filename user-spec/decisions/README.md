@@ -131,7 +131,7 @@
 | [D-0060](0060-tool-loop-ends-without-tool-calls.md) | 工具循环在模型不调用工具时结束 | 有效（暂时） |
 | [D-0061](0061-agent-structures-as-platform-base-classes.md) | 通用 agent 结构以平台基类提供，数据存在子应用自己的表空间 | 有效（未实现） |
 | [D-0062](0062-workflow-persistence-is-app-responsibility.md) | 工作流的暂停与恢复由子应用自己解决，平台不提供通用的重放机制 | 有效 |
-| [D-0063](0063-internal-apis-may-be-async-functions.md) | 写数据只能通过事务 API；公开 API 只能是只读或事务，内部 API 还可以是普通的异步函数 | 有效 |
+| [D-0063](0063-internal-apis-may-be-async-functions.md) | 写数据只能通过事务 API；公开 API 只能是只读或事务，内部 API 还可以是普通的异步函数 | 部分被取代（→ D-0086） |
 | [D-0064](0064-search-results-presentation.md) | 搜索结果的呈现：正文标注引用、下方列出来源、搜索过程折叠 | 弃用（→ DIALOG-0010） |
 | [D-0065](0065-streaming-output.md) | 对话回复逐字流式输出 | 弃用（→ DIALOG-0011） |
 | [D-0066](0066-regenerate-reply.md) | 支持重新生成助手回复（在回复这一层分叉） | 弃用（→ DIALOG-0012） |
@@ -154,6 +154,7 @@
 | [D-0083](0083-project-license.md) | 项目代码使用 Apache-2.0；第三方代码与模型权重单独处理 | 有效 |
 | [D-0084](0084-raw-ai-stop-while-reading-body.md) | 原始 AI 请求在读响应体时被停止，统一报「已取消」（修复实验室停止被记成失败） | 有效 |
 | [D-0085](0085-workflow-merged-into-agents-md.md) | 开发方式并入 AGENTS.md；AGENTS.md 属于 user spec | 有效 |
+| [D-0086](0086-public-async-functions.md) | 普通的异步函数也可以公开；被很多子应用调用时不乱，由所有者自己负责 | 有效 |
 
 ## 应用专属决策
 

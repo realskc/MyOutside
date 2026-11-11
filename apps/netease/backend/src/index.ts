@@ -235,42 +235,46 @@ export function createNeteaseApp(options: NeteaseAppOptions = {}): AppModule {
       search: defineRead(NeteaseSearchInput, async (ctx, input) => client().search(input.query, input.limit ?? 30, input.offset ?? 0, ctx.signal)),
 
       /**
-       * 下载一首歌（普通的异步函数，只能是内部 API，D-0063）。
+       * 公开 API：下载一首歌（公开的普通异步函数，D-0086；作者：最多向纯蓝开放「下载」）。契约见 contracts 的 NeteaseDownloadInput。
        * 硬性限制（作者，NETEASE-0002）：在应用内部排队，一次只下一首，上一首结束后随机等 10–20 秒才开始下一首；每天最多 50 首。
+       * 不论是本应用的界面还是别的子应用发起，都排同一个队、共用同一份额度。
        */
-      download: defineAsync(NeteaseDownloadInput, async (ctx, input): Promise<NeteaseDownloadOutput> => {
-        const api = client();
-        if (downloadsToday(ctx) >= dailyLimit) throw limitError();
-        const ahead = queued;
-        queued += 1;
-        const slot = takeSlot();
-        try {
-          if (ahead > 0) ctx.emit({ type: "progress", progress: 0, message: `排队中：前面还有 ${ahead} 首`, queued: ahead });
-          await untilReady(slot.ready, ctx.signal);
-          // 轮到时再查一次：前面排队的可能已经把今天的额度用完了
+      download: defineAsync(
+        NeteaseDownloadInput,
+        async (ctx, input): Promise<NeteaseDownloadOutput> => {
+          const api = client();
           if (downloadsToday(ctx) >= dailyLimit) throw limitError();
-          const wait = nextStartAt(ctx) - now();
-          if (wait > 0) {
-            ctx.emit({
-              type: "progress",
-              progress: 0,
-              message: `等 ${Math.ceil(wait / 1000)} 秒再开始（防止下得太频繁）`,
-              waitUntil: now() + wait,
-            });
-            await sleep(wait, ctx.signal);
-          }
+          const ahead = queued;
+          queued += 1;
+          const slot = takeSlot();
           try {
-            return await downloadFlow(ctx, api, input, downloadDirOf(ctx).dir, now);
+            if (ahead > 0) ctx.emit({ type: "progress", progress: 0, message: `排队中：前面还有 ${ahead} 首`, queued: ahead });
+            await untilReady(slot.ready, ctx.signal);
+            // 轮到时再查一次：前面排队的可能已经把今天的额度用完了
+            if (downloadsToday(ctx) >= dailyLimit) throw limitError();
+            const wait = nextStartAt(ctx) - now();
+            if (wait > 0) {
+              ctx.emit({
+                type: "progress",
+                progress: 0,
+                message: `等 ${Math.ceil(wait / 1000)} 秒再开始（防止下得太频繁）`,
+                waitUntil: now() + wait,
+              });
+              await sleep(wait, ctx.signal);
+            }
+            try {
+              return await downloadFlow(ctx, api, input, downloadDirOf(ctx).dir, now);
+            } finally {
+              // 不论成败都算一次：已经向网易云发了请求
+              nextAllowedAt = now() + randomGap();
+            }
           } finally {
-            // 不论成败都算一次：已经向网易云发了请求
-            nextAllowedAt = now() + randomGap();
+            queued -= 1;
+            slot.release();
           }
-        } finally {
-          queued -= 1;
-          slot.release();
-        }
-      }),
-
+        },
+        { visibility: "public" },
+      ),
 
       insertDownload: defineTx(InsertDownloadInput, (ctx, input): NeteaseDownload => {
         const row: DownloadRow = {

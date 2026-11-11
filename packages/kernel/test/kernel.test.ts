@@ -113,6 +113,28 @@ const notesApp: AppModule = {
       });
       return "unreachable";
     }),
+    /** 公开的异步函数（D-0086）：等一下外部，再经本应用的事务 API 写入；记下是谁请它办的 */
+    importPublic: defineAsync(
+      z.object({ title: z.string().min(1) }),
+      async (ctx, input) => {
+        await new Promise((resolve) => setTimeout(resolve, 5));
+        ctx.emit({ type: "progress", from: "notes" });
+        const note = (await ctx.call("notes.createNote", { title: `${input.title} by ${ctx.caller}` })) as { id: string };
+        return note;
+      },
+      { visibility: "public" },
+    ),
+    /** 公开的异步函数：一直等到发起方取消 */
+    waitPublic: defineAsync(
+      z.object({}),
+      async (ctx) => {
+        await new Promise((_resolve, reject) => {
+          ctx.signal.addEventListener("abort", () => reject(new Error("aborted")));
+        });
+        return "unreachable";
+      },
+      { visibility: "public" },
+    ),
   },
 };
 
@@ -145,6 +167,24 @@ const tasksApp: AppModule = {
     callSecret: defineRead(z.object({}), (ctx) => ctx.call("notes.secret", {})),
     callUndeclared: defineRead(z.object({}), (ctx) => ctx.call("seed.listItems", {})),
     callAi: defineRead(z.object({}), (ctx) => ctx.call("platform.ai.chat", { messages: [{ role: "user", content: "hi" }] })),
+    /** 异步函数调用其他子应用公开的异步函数，再写自己的数据 */
+    importViaNotes: defineAsync(z.object({ title: z.string().min(1) }), async (ctx, input) => {
+      const note = (await ctx.call("notes.importPublic", { title: input.title })) as { id: string };
+      ctx.emit({ type: "progress", from: "tasks" });
+      await ctx.call("tasks.insertTask", { title: input.title });
+      return { noteId: note.id };
+    }),
+    insertTask: defineTx(z.object({ title: z.string().min(1) }), (ctx, input) => {
+      ctx.db.insert("task", { id: randomUUID(), title: input.title, created_at: Date.now() });
+      return { ok: true };
+    }),
+    waitViaNotes: defineAsync(z.object({}), async (ctx) => ctx.call("notes.waitPublic", {})),
+    /** 异步函数直接调用其他子应用的事务 API：不允许（写别人的数据只能在事务 API 里，D-0063） */
+    asyncCallsOtherTx: defineAsync(z.object({}), async (ctx) => ctx.call("notes.createNote", { title: "x" })),
+    /** 只读 API 调用公开的异步函数：不允许（会间接写数据） */
+    readCallsPublicAsync: defineRead(z.object({}), (ctx) => ctx.call("notes.importPublic", { title: "x" })),
+    /** 事务 API 调用公开的异步函数：不允许（事务 API 必须同步） */
+    txCallsPublicAsync: defineTx(z.object({}), (ctx) => ctx.call("notes.importPublic", { title: "x" })),
   },
 };
 
@@ -152,7 +192,15 @@ const tasksManifest: AppManifest = {
   id: "tasks",
   name: "Tasks",
   protocolVersion: 1,
-  uses: ["notes.createNote", "notes.fail", "notes.listNotes", "notes.secret"],
+  uses: [
+    "notes.createNote",
+    "notes.fail",
+    "notes.listNotes",
+    "notes.secret",
+    "notes.importTwo",
+    "notes.importPublic",
+    "notes.waitPublic",
+  ],
 };
 
 const loopApp: AppModule = {
@@ -505,12 +553,62 @@ describe("kernel", () => {
     expect(storage.select<{ title: string }>("SELECT title FROM app_notes__note").map((row) => row.title)).toEqual(["kept"]);
   });
 
-  it("普通的异步函数只能是内部 API：其他子应用不能调用", async () => {
+  it("内部的异步函数：其他子应用不能调用（即使在清单里声明了）", async () => {
     const { kernel } = setup();
     const r = await kernel.handle({ call: "notes.importTwo", payload: { title: "x" } }, { caller: "tasks" });
     expect(r.ok).toBe(false);
     if (r.ok) return;
     expect(r.error.code).toBe("FORBIDDEN");
+  });
+
+  it("公开的异步函数（D-0086）：其他子应用的前端声明后可以调用；写的是所有者自己的数据；没声明的调不了", async () => {
+    const { storage, kernel } = setup();
+    const events: unknown[] = [];
+    const r = await kernel.handle(
+      { call: "notes.importPublic", payload: { title: "a" } },
+      { caller: "tasks", emit: (e) => events.push(e) },
+    );
+    expect(r.ok).toBe(true);
+    expect(storage.select<{ title: string }>("SELECT title FROM app_notes__note").map((row) => row.title)).toEqual(["a by tasks"]);
+    expect(events).toEqual([{ type: "progress", from: "notes" }]);
+
+    const undeclared = await kernel.handle({ call: "notes.importPublic", payload: { title: "b" } }, { caller: "seed" });
+    expect(undeclared.ok).toBe(false);
+    if (!undeclared.ok) expect(undeclared.error.code).toBe("FORBIDDEN");
+  });
+
+  it("公开的异步函数：其他子应用的异步函数可以调用，各自的写入是独立的短事务；子调用的事件原样推给发起方", async () => {
+    const { storage, kernel } = setup();
+    const events: unknown[] = [];
+    const r = await kernel.handle({ call: "tasks.importViaNotes", payload: { title: "c" } }, { emit: (e) => events.push(e) });
+    expect(r.ok).toBe(true);
+    expect(storage.select<{ title: string }>("SELECT title FROM app_notes__note").map((row) => row.title)).toEqual(["c by tasks"]);
+    expect(storage.select<{ title: string }>("SELECT title FROM app_tasks__task").map((row) => row.title)).toEqual(["c"]);
+    expect(kernel.dataVersion).toBe(2);
+    expect(events).toEqual([
+      { type: "progress", from: "notes" },
+      { type: "progress", from: "tasks" },
+    ]);
+  });
+
+  it("公开的异步函数：只读 API、事务 API 不能调用；异步函数仍不能直接调用其他子应用的事务 API", async () => {
+    const { storage, kernel } = setup();
+    for (const call of ["tasks.readCallsPublicAsync", "tasks.txCallsPublicAsync", "tasks.asyncCallsOtherTx"]) {
+      const r = await kernel.handle({ call, payload: {} });
+      expect(r.ok, call).toBe(false);
+      if (!r.ok) expect(r.error.code, call).toBe("TX_CALL_INVALID");
+    }
+    expect(storage.select<{ c: number }>("SELECT COUNT(*) AS c FROM app_notes__note")[0]?.c).toBe(0);
+  });
+
+  it("公开的异步函数：发起方取消，信号传到被调用的子应用", async () => {
+    const { kernel } = setup();
+    const controller = new AbortController();
+    const pending = kernel.handle({ call: "tasks.waitViaNotes", payload: {} }, { signal: controller.signal });
+    setTimeout(() => controller.abort(), 5);
+    const r = await pending;
+    expect(r.ok).toBe(false);
+    if (!r.ok) expect(r.error.code).toBe("ABORTED");
   });
 
   it("取消：发起方触发 signal → 调用以 ABORTED 结束", async () => {

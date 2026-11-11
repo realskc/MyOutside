@@ -386,11 +386,19 @@ describe("netease", () => {
     expect((await raw(kernel, "netease.download", { songId: "789" })).ok).toBe(true);
   });
 
-  it("别的子应用只能读下载文件夹；搜索和下载是内部 API，调不了", async () => {
+  it("别的子应用：声明后可以下载、读下载文件夹，和本应用共用排队与额度；搜索是内部 API，调不了（D-0086）", async () => {
     const dir = tempDir();
     const fake = fakeNetease();
     const kernel = createKernel({ storage: createNodeSqliteAdapter({ path: ":memory:" }) });
-    kernel.registerApp(createNeteaseApp({ cookiePaths: [writeCookieFile(dir)], defaultDownloadDir: join(dir, "dl"), fetch: fake.impl }));
+    kernel.registerApp(
+      createNeteaseApp({
+        cookiePaths: [writeCookieFile(dir)],
+        defaultDownloadDir: join(dir, "dl"),
+        fetch: fake.impl,
+        downloadGapMs: { min: 0, max: 0 },
+        dailyLimit: 1,
+      }),
+    );
     kernel.registerApp(
       { id: "reader", name: "reader", api: {} },
       {
@@ -400,14 +408,31 @@ describe("netease", () => {
         uses: ["netease.listDownloadedFiles", "netease.search", "netease.download"],
       },
     );
+    kernel.registerApp({ id: "stranger", name: "stranger", api: {} }, { id: "stranger", name: "stranger", protocolVersion: 1 });
     kernel.start();
-    const as = (name: string, payload: unknown) => kernel.handle({ call: name, payload }, { caller: "reader" });
-    expect((await as("netease.listDownloadedFiles", {})).ok).toBe(true);
-    for (const name of ["netease.search", "netease.download"]) {
-      const res = await as(name, name === "netease.search" ? { query: "x" } : { songId: "123" });
-      expect(res.ok).toBe(false);
-      if (!res.ok) expect(res.error.code).toBe("FORBIDDEN");
-    }
+    const as = (caller: string, name: string, payload: unknown) => kernel.handle({ call: name, payload }, { caller });
+
+    const search = await as("reader", "netease.search", { query: "x" });
+    expect(search.ok).toBe(false);
+    if (!search.ok) expect(search.error.code).toBe("FORBIDDEN");
+    const undeclared = await as("stranger", "netease.download", { songId: "123" });
+    expect(undeclared.ok).toBe(false);
+    if (!undeclared.ok) expect(undeclared.error.code).toBe("FORBIDDEN");
     expect(fake.calls).toHaveLength(0);
+
+    const events: unknown[] = [];
+    const downloaded = await kernel.handle(
+      { call: "netease.download", payload: { songId: "123" } },
+      { caller: "reader", emit: (event) => events.push(event) },
+    );
+    expect(downloaded.ok).toBe(true);
+    expect(events.some((event) => (event as { message?: string }).message === "下载完成")).toBe(true);
+    const files = await as("reader", "netease.listDownloadedFiles", {});
+    expect(files.ok && (files.result as { files: unknown[] }).files).toHaveLength(1);
+
+    // 额度和本应用的界面共用：别的子应用用掉了今天的 1 首，本应用自己也下不了
+    const own = await raw(kernel, "netease.download", { songId: "456" });
+    expect(own.ok).toBe(false);
+    if (!own.ok) expect(own.error.code).toBe("PRECONDITION");
   });
 });

@@ -3,6 +3,7 @@ import { z } from "zod";
 /**
  * 网易云下载（netease）：搜歌、下载（NETEASE-0001）。
  * 登录由本机官方网易云客户端负责，本应用只读它的登录状态；凭据只在后端内存里用，接口里不会出现。
+ * 公开 API：`netease.download`、`netease.listDownloadedFiles`（作者：最多向纯蓝开放「下载」和「访问下载的音乐文件夹」）；其余是内部 API。
  */
 
 /** 音质档位（网易云的 level），从低到高 */
@@ -56,12 +57,34 @@ export const NeteaseStatusOutput = z.object({
 });
 export type NeteaseStatusOutput = z.infer<typeof NeteaseStatusOutput>;
 
+/**
+ * 公开 API `netease.download`：下载一首歌（公开的普通异步函数，D-0086）。
+ * - 排队：一次只下一首；上一首结束后随机等 10–20 秒才开始下一首；每天最多真正下载 50 首（NETEASE-0002）。
+ *   本应用的界面和别的子应用发起的排同一个队、共用同一份额度，所以一次调用可能要等好几分钟；
+ *   今天的额度满了报 `PRECONDITION`。调用方要等它结束（或取消），不能发起后不管。
+ * - 进度事件见 `NeteaseDownloadEvent`，会原样推给发起调用的界面。
+ * - 文件夹里已有同名文件：不重复下载、不覆盖，`alreadyExisted = true`，不记下载记录、不占额度。
+ * - 中途失败或取消：不留下音频文件（只写 `.part`，出错时删掉），不记下载记录；已经向网易云发过请求的，照样算一次间隔。
+ *   歌词拿不到不算失败：`lyricFile = null`，下次再下同一首会补上。
+ */
 export const NeteaseDownloadInput = z.object({
   songId: z.string().regex(/^[0-9]{1,20}$/),
   /** 不给就用账号能下载的最高档位 */
   level: NeteaseLevel.optional(),
 });
 export type NeteaseDownloadInput = z.infer<typeof NeteaseDownloadInput>;
+
+/** `netease.download` 的进度事件 */
+export interface NeteaseDownloadEvent {
+  type: "progress";
+  /** 0–1；排队、等待时为 0 */
+  progress: number;
+  message: string;
+  /** 排队中：前面还有几首 */
+  queued?: number;
+  /** 等间隔中：什么时候开始（毫秒时间戳） */
+  waitUntil?: number;
+}
 
 export const NeteaseDownloadSchema = z.object({
   id: z.string(),

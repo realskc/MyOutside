@@ -35,14 +35,19 @@ export function defineRead<T>(
 }
 
 /**
- * 定义一个普通的异步函数（只能是内部 API，D-0063）：
+ * 定义一个普通的异步函数（D-0063）：
  * 可以等外部；写数据只能通过调用本子应用的事务 API，整体不保证原子。
+ * 也可以公开（D-0086）：契约里要写清进度事件的格式、中途失败或取消后本应用这边留下什么、会不会排队。
  */
-export function defineAsync<T>(input: ZodType<T>, handler: (ctx: AsyncContext, input: T) => Promise<unknown>): ApiDefinition {
+export function defineAsync<T>(
+  input: ZodType<T>,
+  handler: (ctx: AsyncContext, input: T) => Promise<unknown>,
+  options: ApiOptions = {},
+): ApiDefinition {
   return {
     kind: "async",
     input: input as ZodType<any>,
     handler: handler as (ctx: AsyncContext, input: any) => Promise<unknown>,
-    visibility: "internal",
+    visibility: options.visibility ?? "internal",
   };
 }

@@ -95,7 +95,7 @@ export interface AsyncContext extends RunContext {
   readonly appId: string;
   /** 只读句柄：写数据只能通过调用本子应用的事务 API */
   readonly db: AppDb;
-  /** 调用只读 API、本子应用的事务 API（各自是一个独立的短事务）或本子应用的异步函数 */
+  /** 调用只读 API、本子应用的事务 API（各自是一个独立的短事务）、本子应用的异步函数或其他子应用公开的异步函数（D-0086） */
   call(name: string, payload?: unknown): Promise<unknown>;
 }
 
@@ -109,7 +109,7 @@ export type ApiVisibility = "public" | "internal";
 export type ApiDefinition =
   | { kind: "read"; input: ZodType<any>; handler: ReadHandler; visibility: ApiVisibility }
   | { kind: "tx"; input: ZodType<any>; handler: TxHandler; visibility: ApiVisibility }
-  | { kind: "async"; input: ZodType<any>; handler: AsyncHandler; visibility: "internal" };
+  | { kind: "async"; input: ZodType<any>; handler: AsyncHandler; visibility: ApiVisibility };
 
 export interface AppModule {
   id: string;
