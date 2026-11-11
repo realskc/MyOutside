@@ -159,6 +159,7 @@
 | [D-0088](0088-domain-dns.md) | 域名 myoutside.org 的 DNS：不走 Cloudflare 代理，www 作别名，声明不发邮件 | 有效 |
 | [D-0089](0089-caddy-as-front.md) | 服务器的对外入口用 Caddy：自动 HTTPS，先放占位页 | 有效 |
 | [D-0090](0090-sandboxed-app-frames.md) | 浏览器里，子应用的界面放进沙箱 iframe；外壳按消息来自哪个 iframe 认出调用者 | 有效（未实现） |
+| [D-0091](0091-one-database-per-user.md) | 多用户：每个用户一个独立的数据库，服务器为每个用户各开一份内核 | 有效（未实现） |
 
 ## 应用专属决策
 
