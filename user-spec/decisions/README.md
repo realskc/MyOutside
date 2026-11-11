@@ -154,7 +154,7 @@
 | [D-0083](0083-project-license.md) | 项目代码使用 Apache-2.0；第三方代码与模型权重单独处理 | 有效 |
 | [D-0084](0084-raw-ai-stop-while-reading-body.md) | 原始 AI 请求在读响应体时被停止，统一报「已取消」（修复实验室停止被记成失败） | 有效 |
 | [D-0085](0085-workflow-merged-into-agents-md.md) | 开发方式并入 AGENTS.md；AGENTS.md 属于 user spec | 有效 |
-| [D-0086](0086-public-async-functions.md) | 普通的异步函数也可以公开；被很多子应用调用时不乱，由所有者自己负责 | 有效 |
+| [D-0086](0086-public-async-functions.md) | 普通的异步函数也可以公开；长事务式的流程，冲突由所有者自己挡 | 有效 |
 
 ## 应用专属决策
 

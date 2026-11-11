@@ -349,6 +349,17 @@ describe("netease", () => {
     expect(status.nextDownloadAt).not.toBeNull();
   });
 
+  it("同一首歌同时下两次：排队，后一次轮到时按「文件夹里已有」处理，只下一次", async () => {
+    const { kernel, fake } = setup();
+    const [first, second] = await Promise.all([
+      call<{ alreadyExisted: boolean }>(kernel, "netease.download", { songId: "123" }),
+      call<{ alreadyExisted: boolean }>(kernel, "netease.download", { songId: "123" }),
+    ]);
+    expect([first.alreadyExisted, second.alreadyExisted]).toEqual([false, true]);
+    expect(fake.calls.filter((item) => item.url.includes("/a/123.flac"))).toHaveLength(1);
+    expect((await call<{ downloadsToday: number }>(kernel, "netease.getStatus")).downloadsToday).toBe(1);
+  });
+
   it("重启 MyOutside 后也按最近一条下载记录等间隔；等待时取消马上返回，不发请求", async () => {
     const dir = tempDir();
     const dbPath = join(dir, "myoutside.db");
