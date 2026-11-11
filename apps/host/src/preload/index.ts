@@ -34,6 +34,10 @@ const outside = {
   pickAudioFile: () => ipcRenderer.invoke("host:pickAudioFile"),
   /** 选择一个或多个本地 MIDI 文件（取消返回空数组） */
   pickMidiFiles: () => ipcRenderer.invoke("host:pickMidiFiles") as Promise<string[]>,
+  /** 选择一个文件夹（返回绝对路径；取消返回 null） */
+  pickFolder: () => ipcRenderer.invoke("host:pickFolder") as Promise<string | null>,
+  /** 在访达 / 资源管理器里显示一个已存在的文件或文件夹 */
+  revealPath: (path: string) => ipcRenderer.invoke("host:revealPath", path) as Promise<boolean>,
   /** 用系统默认程序打开本应用目录下的一个文本文件（相对 apps/<id>/，仅 .md / .json / .txt） */
   openAppFile: (path: string) => ipcRenderer.invoke("host:openAppFile", path) as Promise<{ ok: boolean; error?: string }>,
 };

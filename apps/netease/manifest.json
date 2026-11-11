@@ -1,0 +1,9 @@
+{
+  "id": "netease",
+  "name": "网易云下载",
+  "protocolVersion": 1,
+  "ui": "ui/index.html",
+  "backend": "backend/src/index.ts",
+  "owns": ["setting", "download"],
+  "uses": ["platform.settings.get"]
+}

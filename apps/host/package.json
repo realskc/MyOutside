@@ -20,7 +20,8 @@
     "@myoutside/dialog": "workspace:*",
     "@myoutside/go": "workspace:*",
     "@myoutside/66ccff": "workspace:*",
-    "@myoutside/zheye": "workspace:*"
+    "@myoutside/zheye": "workspace:*",
+    "@myoutside/netease": "workspace:*"
   },
   "devDependencies": {
     "@types/node": "^24.0.0",

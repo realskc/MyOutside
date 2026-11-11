@@ -1,0 +1,72 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>网易云下载</title>
+    <link rel="stylesheet" href="ui.css" />
+  </head>
+  <body>
+    <header class="topbar">
+      <h1 data-i18n="appTitle">网易云下载</h1>
+      <span id="login-chip" class="chip"></span>
+      <div class="folder">
+        <span class="muted" data-i18n="folderLabel">下载到</span>
+        <code id="folder-path"></code>
+        <button id="btn-reveal-folder" class="link" data-i18n="openFolder">打开</button>
+        <button id="btn-change-folder" class="link" data-i18n="changeFolder">更改…</button>
+        <button id="btn-default-folder" class="link hidden" data-i18n="defaultFolder">恢复默认</button>
+      </div>
+    </header>
+
+    <main>
+      <p id="login-help" class="notice hidden"></p>
+
+      <form id="search-form" class="search">
+        <input id="search-input" type="search" autocomplete="off" data-i18n-placeholder="searchPlaceholder" placeholder="歌名、歌手、专辑" />
+        <label class="quality">
+          <span data-i18n="quality">音质</span>
+          <select id="quality">
+            <option value="max" data-i18n="qualityMax">账号能下的最高</option>
+            <option value="lossless" data-i18n="levelLossless">无损</option>
+            <option value="exhigh" data-i18n="levelExhigh">极高（320k）</option>
+            <option value="standard" data-i18n="levelStandard">标准（128k）</option>
+          </select>
+        </label>
+        <button id="btn-search" class="primary" type="submit" data-i18n="search">搜索</button>
+      </form>
+
+      <section id="results-section" class="hidden">
+        <div class="results-head">
+          <span id="results-summary" class="muted"></span>
+          <span class="pager">
+            <button id="btn-prev" data-i18n="prev">上一页</button>
+            <button id="btn-next" data-i18n="next">下一页</button>
+          </span>
+        </div>
+        <table class="songs">
+          <thead>
+            <tr>
+              <th data-i18n="colName">歌名</th>
+              <th data-i18n="colArtists">歌手</th>
+              <th data-i18n="colAlbum">专辑</th>
+              <th data-i18n="colDuration">时长</th>
+              <th data-i18n="colMax">最高音质</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody id="results"></tbody>
+        </table>
+      </section>
+
+      <section class="history">
+        <h2 data-i18n="history">最近下载</h2>
+        <ul id="history"></ul>
+        <p id="history-empty" class="muted" data-i18n="historyEmpty">还没有下载过</p>
+      </section>
+    </main>
+
+    <div id="toast" class="toast hidden"></div>
+    <script src="ui.js"></script>
+  </body>
+</html>

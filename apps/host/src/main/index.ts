@@ -26,6 +26,8 @@ import { createX66CCFFApp } from "@myoutside/66ccff";
 import x66ccffManifest from "@myoutside/66ccff/manifest.json";
 import { createZheyeApp } from "@myoutside/zheye";
 import zheyeManifest from "@myoutside/zheye/manifest.json";
+import { createNeteaseApp } from "@myoutside/netease";
+import neteaseManifest from "@myoutside/netease/manifest.json";
 import { startLanServer } from "./lan-server";
 import { runAiCheck } from "./ai-check";
 
@@ -426,6 +428,52 @@ async function waitFor(win: BrowserWindow, condition: string, attempts = 40, del
  * 哲野试验台（ZHEYE-0020）：流程页能读到配方；在临时数据副本里写一次演示试跑，看试跑页能显示；
  * MYOUTSIDE_SMOKE_ZHEYE_LIVE=1 时再经界面真跑一次（真实调用 DeepSeek，花费几毛钱，最多等 25 分钟）。
  */
+/**
+ * 网易云下载（NETEASE-0001）：冒烟检查不给登录信息的位置，应显示「未登录」、搜索按钮不可点、
+ * 下载文件夹在临时数据里；不发任何网络请求。
+ */
+async function smokeNetease(win: BrowserWindow): Promise<void> {
+  await win.loadURL("app://netease/index.html");
+  for (let i = 0; i < 24; i += 1) {
+    const ready = (await win.webContents.executeJavaScript(
+      'document.readyState === "complete" && typeof window.outside === "object" && (document.getElementById("folder-path") || {}).textContent !== ""',
+    )) as boolean;
+    if (ready) break;
+    await new Promise((resolve) => setTimeout(resolve, 250));
+  }
+  const check = await win.webContents.executeJavaScript(
+    `(async () => {
+      const status = await window.outside.call("netease.getStatus", {});
+      const files = await window.outside.call("netease.listDownloadedFiles", {});
+      return {
+        statusOk: status.ok,
+        loggedIn: status.ok ? status.result.loggedIn : null,
+        folder: document.getElementById("folder-path").textContent,
+        chipBad: document.getElementById("login-chip").classList.contains("bad"),
+        searchDisabled: document.getElementById("btn-search").disabled,
+        helpShown: !document.getElementById("login-help").classList.contains("hidden"),
+        pickFolder: typeof window.outside.pickFolder === "function",
+        revealPath: typeof window.outside.revealPath === "function",
+        filesOk: files.ok,
+      };
+    })()`,
+  );
+  const ok =
+    check.statusOk &&
+    check.loggedIn === false &&
+    check.chipBad &&
+    check.searchDisabled &&
+    check.helpShown &&
+    check.pickFolder &&
+    check.revealPath &&
+    check.filesOk &&
+    String(check.folder).includes("myoutside-smoke-data");
+  console.log("[smoke] netease:", JSON.stringify({ ok, ...check }));
+  const shot = join(app.getPath("temp"), "myoutside-netease.png");
+  writeFileSync(shot, await captureWindow(win, 8, 400));
+  console.log("[smoke] netease screenshot:", shot);
+}
+
 async function smokeZheye(win: BrowserWindow): Promise<void> {
   await win.loadURL("app://zheye/index.html");
   await waitFor(win, 'typeof window.outside === "object" && document.querySelectorAll("#view-flow .node").length > 0');
@@ -1125,6 +1173,8 @@ async function runSmoke(win: BrowserWindow, kernel: Kernel): Promise<void> {
     );
     await smokeX66ccffBackground(kernel, smokeAppDir, x66ccffImport.ok ? x66ccffImport.id : null);
 
+    await smokeNetease(win);
+
     await smokeZheye(win);
   } catch (error) {
     console.error("[smoke] 失败：", error);
@@ -1169,6 +1219,13 @@ app.whenReady().then(async () => {
   );
   // 哲野的配方从仓库里的 apps/zheye/recipes 读：改了提示词，下一次试跑就生效（ZHEYE-0021）
   kernel.registerApp(createZheyeApp({ recipesDir: join(appDir("zheye"), "recipes") }), zheyeManifest);
+  kernel.registerApp(
+    // 冒烟检查不碰作者的网易云账号：不给登录信息的位置，下载文件夹放在临时数据里（NETEASE-0001）
+    createNeteaseApp(
+      process.env.MYOUTSIDE_SMOKE === "1" ? { cookiePaths: [], defaultDownloadDir: join(dataDir, "apps", "netease", "downloads") } : {},
+    ),
+    neteaseManifest,
+  );
   kernel.start();
 
   // pnpm ai:check：在临时数据副本上用真实接口检查平台 AI / 搜索 / 抓取，不打开窗口，结束即退出
@@ -1300,6 +1357,23 @@ app.whenReady().then(async () => {
       filters: [{ name: "MIDI", extensions: ["mid", "midi"] }],
     });
     return result.canceled ? [] : result.filePaths;
+  });
+
+  // 子应用请求选择一个文件夹（例如网易云下载的下载位置）；返回绝对路径，取消返回 null
+  ipcMain.handle("host:pickFolder", async (event) => {
+    const caller = callerOf(event.senderFrame);
+    if (!caller || caller === SHELL_CALLER) return null;
+    const result = await dialog.showOpenDialog({ title: "选择文件夹", properties: ["openDirectory", "createDirectory"] });
+    return result.canceled ? null : (result.filePaths[0] ?? null);
+  });
+
+  // 在访达 / 资源管理器里显示一个已存在的文件或文件夹（例如网易云下载刚下好的歌）
+  ipcMain.handle("host:revealPath", async (event, path: unknown) => {
+    const caller = callerOf(event.senderFrame);
+    if (!caller || caller === SHELL_CALLER || typeof path !== "string" || !existsSync(path)) return false;
+    if (statSync(path).isDirectory()) await shell.openPath(path);
+    else shell.showItemInFolder(path);
+    return true;
   });
 
   // 用系统默认程序打开子应用自己目录下的一个文本文件（例如哲野试验台的「在编辑器里打开」，D-0077）

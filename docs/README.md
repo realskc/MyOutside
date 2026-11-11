@@ -13,6 +13,7 @@
 | [`../apps/dialog/docs/README.md`](../apps/dialog/docs/README.md) | 对话：消息树、API、生成流程、界面、实验室 |
 | [`../apps/go/docs/README.md`](../apps/go/docs/README.md) | 围棋：9 路特殊规则、双人联机、聊天、悔棋、棋谱、界面 |
 | [`../apps/66CCFF/docs/README.md`](../apps/66CCFF/docs/README.md) | 纯蓝：六轨分离、内建慢放播放器、引擎与文件布局 |
+| [`../apps/netease/docs/README.md`](../apps/netease/docs/README.md) | 网易云下载：读官方客户端的登录状态，搜歌、下载 |
 | [`../apps/zheye/docs/README.md`](../apps/zheye/docs/README.md) | 哲野（未实现）：数据模型、状态机、API、流程 |
 | `future/one-off-functions.md` | 临时函数（未实现） |
 | `future/multi-device.md` | 多端（未实施） |
