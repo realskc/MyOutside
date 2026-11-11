@@ -18,7 +18,7 @@
 
 ## 动手之前：先读 user spec
 
-`user-spec/` 记录作者对 MyOutside 的预期，是整个项目的源头；各子应用的作者预期放在 `apps/<app>/user-spec/`；`docs/` 与 `apps/<app>/docs/` 下是技术文档（派生物）。`references/` 记录其他产品与项目：资料 agent 可以自行补充，想法（`<项目名>-thoughts.md`）只记作者说的或作者明确认可的（见 `references/README.md`）。应用专属的外部资料放 `apps/<app>/references/`，格式与主 `references/` 相同；主 `references/` 只放跨应用 / 平台级资料。
+`user-spec/` 记录作者对 MyOutside 的预期，是整个项目的源头；各子应用的作者预期放在 `apps/<app>/user-spec/`；`docs/` 与 `apps/<app>/docs/` 下是技术文档（派生物）。`references/` 记录 MyOutside 以外、值得留下来的外部资料：其他产品与项目，也包括领域资料（人物、作品、版本、数据集、某个网站能查到什么……）；工作中搜集到的、值得记录的资料都放进来（作者，2026-11-11）。资料 agent 可以自行补充，想法（`<项目名>-thoughts.md`）只记作者说的或作者明确认可的（见 `references/README.md`）。应用专属的外部资料放 `apps/<app>/references/`，格式与主 `references/` 相同；主 `references/` 只放跨应用 / 平台级资料。
 
 作者用 Obsidian 查看和编辑文档（整个仓库就是一个库）：文档里的链接一律用标准 Markdown 相对链接，指向文件而不是文件夹，不用 `[[双链]]`（见 [D-0079](user-spec/decisions/0079-obsidian-for-docs.md)）。
 
@@ -45,7 +45,7 @@
 
 ### 边聊边记
 
-- 作者和 agent 可以像朋友一样聊天。agent 一边聊，一边把该记的记下来：愿景和哲学记到 [vision.md](user-spec/vision.md)，具体的预期记到对应的 spec，实现上的选择记为决策，其他产品与项目的资料和想法记到 [references/](references/README.md)（想法只记作者说的，或作者明确认可的 agent 的说法）。
+- 作者和 agent 可以像朋友一样聊天。agent 一边聊，一边把该记的记下来：愿景和哲学记到 [vision.md](user-spec/vision.md)，具体的预期记到对应的 spec，实现上的选择记为决策，外部资料和想法记到 [references/](references/README.md)（想法只记作者说的，或作者明确认可的 agent 的说法）。为了做事去查的外部事实（例如挑训练数据时查的声库版本、歌曲信息）也随查随记，不要只留在对话或试验记录里。
 - 聊天时 agent 也可以说自己的看法和联想，不只是记录。
 
 ### 什么时候可以直接改
