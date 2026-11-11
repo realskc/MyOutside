@@ -46,4 +46,4 @@
 
 ## 相关文档
 
-- `docs/server.md` §4
+- `docs/server.md` §5
