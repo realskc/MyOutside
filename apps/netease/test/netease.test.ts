@@ -71,6 +71,7 @@ interface FakeCall {
   method: string;
   headers: Headers;
   body: string;
+  at: number;
 }
 
 /** 假的网易云：一首歌《测试 歌/曲》，账号最高能下无损；音频是固定的一段字节 */
@@ -79,22 +80,38 @@ function fakeNetease(options: { audio?: Buffer; md5?: string; apiCode?: number; 
   const audio = options.audio ?? Buffer.from("fLaC fake audio bytes ".repeat(5000));
   const md5 = options.md5 ?? createHash("md5").update(audio).digest("hex");
   const calls: FakeCall[] = [];
-  const song = { id: 123, name: "测试 歌/曲", ar: [{ name: "洛天依Official" }, { name: "乐正绫" }], al: { name: "专辑" }, dt: 200000, fee: 8 };
+  const songs: Record<string, Record<string, unknown>> = {
+    "123": { id: 123, name: "测试 歌/曲", ar: [{ name: "洛天依Official" }, { name: "乐正绫" }], al: { name: "专辑" }, dt: 200000, fee: 8 },
+    "456": { id: 456, name: "第二首", ar: [{ name: "乐正绫" }], al: { name: "专辑" }, dt: 100000, fee: 0 },
+    "789": { id: 789, name: "第三首", ar: [{ name: "洛天依Official" }], al: { name: "专辑" }, dt: 100000, fee: 0 },
+  };
+  const song = songs["123"]!;
   const privilege = { st: 0, dl: 999000, dlLevel: options.maxLevel ?? "lossless" };
   const json = (data: unknown) => new Response(JSON.stringify(data), { status: 200, headers: { "content-type": "application/json" } });
   const impl = (async (input: string | URL | Request, init?: RequestInit) => {
     const url = String(input);
-    calls.push({ url, method: init?.method ?? "GET", headers: new Headers(init?.headers), body: String(init?.body ?? "") });
+    calls.push({ url, method: init?.method ?? "GET", headers: new Headers(init?.headers), body: String(init?.body ?? ""), at: Date.now() });
     if (url.startsWith("https://interface.music.163.com/")) {
       if (options.apiCode) return json({ code: options.apiCode, message: `need login ${TOKEN}` });
       const path = new URL(url).pathname;
       if (path === "/api/cloudsearch/pc") return json({ code: 200, result: { songCount: 1, songs: [{ ...song, privilege }] } });
-      if (path === "/api/v3/song/detail") return json({ code: 200, songs: [song], privileges: [privilege] });
+      if (path === "/api/v3/song/detail") {
+        const id = (JSON.parse(new URLSearchParams(String(init?.body)).get("c") ?? "[]") as Array<{ id: string }>)[0]?.id ?? "";
+        return json({ code: 200, songs: [songs[id] ?? song], privileges: [privilege] });
+      }
       if (path === "/api/song/enhance/download/url/v1") {
-        const level = new URLSearchParams(String(init?.body)).get("level");
+        const params = new URLSearchParams(String(init?.body));
         return json({
           code: 200,
-          data: { code: 200, url: `http://m701.music.126.net/a/b.flac?sign=${TOKEN.length}`, size: audio.length, md5, type: "flac", level, br: 931763 },
+          data: {
+            code: 200,
+            url: `http://m701.music.126.net/a/${params.get("id")}.flac?sign=${TOKEN.length}`,
+            size: audio.length,
+            md5,
+            type: "flac",
+            level: params.get("level"),
+            br: 931763,
+          },
         });
       }
       if (path === "/api/song/lyric") {
@@ -114,23 +131,46 @@ function fakeNetease(options: { audio?: Buffer; md5?: string; apiCode?: number; 
   return { impl, calls, audio };
 }
 
-function setup(options: { cookie?: boolean; fake?: ReturnType<typeof fakeNetease> } = {}): {
+function setup(
+  options: {
+    cookie?: boolean;
+    fake?: ReturnType<typeof fakeNetease>;
+    /** 默认 0：其他测试不用等；专门测间隔时传 */
+    gapMs?: { min: number; max: number };
+    dailyLimit?: number;
+    now?: () => number;
+    /** 数据库文件（模拟重启 MyOutside）；默认内存 */
+    dbPath?: string;
+    dir?: string;
+  } = {},
+): {
   kernel: Kernel;
   downloads: string;
   fake: ReturnType<typeof fakeNetease>;
+  dir: string;
 } {
-  const dir = tempDir();
+  const dir = options.dir ?? tempDir();
   const downloads = join(dir, "网易云音乐");
   const fake = options.fake ?? fakeNetease();
   const cookiePaths = options.cookie === false ? [join(dir, "missing.binarycookies")] : [writeCookieFile(dir)];
-  const kernel = createKernel({ storage: createNodeSqliteAdapter({ path: ":memory:" }) });
-  kernel.registerApp(createNeteaseApp({ cookiePaths, defaultDownloadDir: downloads, fetch: fake.impl }));
+  const kernel = createKernel({ storage: createNodeSqliteAdapter({ path: options.dbPath ?? ":memory:" }) });
+  kernel.registerApp(
+    createNeteaseApp({
+      cookiePaths,
+      defaultDownloadDir: downloads,
+      fetch: fake.impl,
+      downloadGapMs: options.gapMs ?? { min: 0, max: 0 },
+      dailyLimit: options.dailyLimit,
+      now: options.now,
+      random: () => 0.5,
+    }),
+  );
   kernel.start();
-  return { kernel, downloads, fake };
+  return { kernel, downloads, fake, dir };
 }
 
-async function raw(kernel: Kernel, call: string, payload: unknown = {}, emit?: (event: unknown) => void) {
-  return kernel.handle({ call, payload }, { caller: "netease", emit });
+async function raw(kernel: Kernel, call: string, payload: unknown = {}, emit?: (event: unknown) => void, signal?: AbortSignal) {
+  return kernel.handle({ call, payload }, { caller: "netease", emit, signal });
 }
 
 async function call<T>(kernel: Kernel, name: string, payload: unknown = {}, emit?: (event: unknown) => void): Promise<T> {
@@ -255,6 +295,9 @@ describe("netease", () => {
     expect(result.alreadyExisted).toBe(true);
     expect(readFileSync(file, "utf8")).toBe("official client file");
     expect(fake.calls.some((item) => item.url.startsWith("https://m701.music.126.net/"))).toBe(false);
+    // 没真正下载：不记下载记录，不占每天的额度（NETEASE-0002）
+    expect(await call<unknown[]>(kernel, "netease.listHistory")).toHaveLength(0);
+    expect((await call<{ downloadsToday: number }>(kernel, "netease.getStatus")).downloadsToday).toBe(0);
   });
 
   it("要的档位超过账号权限时拒绝；MD5 不对时不留下文件", async () => {
@@ -281,6 +324,66 @@ describe("netease", () => {
     expect(listing.files[0]!.lyricPath).toBe(join(downloads, "洛天依Official,乐正绫 - 测试\u00a0歌／曲.lrc"));
     const fns = kernel.listFunctions();
     expect(fns).toContain("netease.listDownloadedFiles");
+  });
+
+  it("硬性限制：一次只下一首，上一首结束后才开始等间隔；排队和等待都在进度里说明（NETEASE-0002）", async () => {
+    const { kernel, fake } = setup({ gapMs: { min: 150, max: 250 } });
+    const events: Record<string, Array<{ message?: string; waitUntil?: number }>> = { "123": [], "456": [] };
+    const started = Date.now();
+    const [first, second] = await Promise.all(
+      ["123", "456"].map((songId) =>
+        call<{ songId: string }>(kernel, "netease.download", { songId }, (event) => events[songId]!.push(event as { message?: string })),
+      ),
+    );
+    expect([first.songId, second.songId]).toEqual(["123", "456"]);
+    const cdn = (id: string) => fake.calls.find((item) => item.url.includes(`/a/${id}.flac`))!;
+    const detailOf = (id: string) => fake.calls.find((item) => item.url.endsWith("/api/v3/song/detail") && item.body.includes(id))!;
+    // 第二首在第一首的音频下完之后，至少再等 200 毫秒（random 固定 0.5：150 + 0.5 × 100）才开始查询
+    expect(detailOf("456").at - cdn("123").at).toBeGreaterThanOrEqual(195);
+    expect(events["456"]!.some((event) => event.message?.startsWith("排队中：前面还有 1 首"))).toBe(true);
+    expect(events["456"]!.some((event) => typeof event.waitUntil === "number")).toBe(true);
+    expect(Date.now() - started).toBeGreaterThanOrEqual(195);
+    const status = await call<{ queued: number; nextDownloadAt: number | null; downloadsToday: number }>(kernel, "netease.getStatus");
+    expect(status.queued).toBe(0);
+    expect(status.downloadsToday).toBe(2);
+    expect(status.nextDownloadAt).not.toBeNull();
+  });
+
+  it("重启 MyOutside 后也按最近一条下载记录等间隔；等待时取消马上返回，不发请求", async () => {
+    const dir = tempDir();
+    const dbPath = join(dir, "myoutside.db");
+    const first = setup({ dir, dbPath, gapMs: { min: 400, max: 400 } });
+    await call(first.kernel, "netease.download", { songId: "123" });
+
+    const second = setup({ dir, dbPath, gapMs: { min: 400, max: 400 } });
+    const before = Date.now();
+    await call(second.kernel, "netease.download", { songId: "456" });
+    expect(Date.now() - before).toBeGreaterThanOrEqual(250);
+
+    const controller = new AbortController();
+    const pending = raw(second.kernel, "netease.download", { songId: "789" }, undefined, controller.signal);
+    setTimeout(() => controller.abort(), 30);
+    const cancelled = await pending;
+    expect(cancelled.ok).toBe(false);
+    if (!cancelled.ok) expect(cancelled.error.code).toBe("ABORTED");
+    expect(second.fake.calls.some((item) => item.body.includes("789"))).toBe(false);
+  });
+
+  it("硬性限制：每天最多真正下载几首（作者：50）；第二天又能下", async () => {
+    let clock = new Date(2026, 10, 11, 9, 0, 0).getTime();
+    const { kernel } = setup({ dailyLimit: 2, now: () => clock });
+    await call(kernel, "netease.download", { songId: "123" });
+    await call(kernel, "netease.download", { songId: "456" });
+    const over = await raw(kernel, "netease.download", { songId: "789" });
+    expect(over.ok).toBe(false);
+    if (!over.ok) {
+      expect(over.error.code).toBe("PRECONDITION");
+      expect(over.error.message).toMatch(/今天已经下载了 2 首/);
+    }
+    expect((await call<{ downloadsToday: number; dailyLimit: number }>(kernel, "netease.getStatus")).dailyLimit).toBe(2);
+    clock = new Date(2026, 10, 12, 0, 0, 1).getTime();
+    expect((await call<{ downloadsToday: number }>(kernel, "netease.getStatus")).downloadsToday).toBe(0);
+    expect((await raw(kernel, "netease.download", { songId: "789" })).ok).toBe(true);
   });
 
   it("别的子应用只能读下载文件夹；搜索和下载是内部 API，调不了", async () => {

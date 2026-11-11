@@ -1,11 +1,11 @@
 # 网易云下载（netease）技术文档
 
-> 应用 id `netease`。作者预期见 [`../user-spec/README.md`](../user-spec/README.md)；决策见 [`../user-spec/decisions/README.md`](../user-spec/decisions/README.md)（主要是 [NETEASE-0001](../user-spec/decisions/NETEASE-0001-search-and-download.md)）。
+> 应用 id `netease`。作者预期见 [`../user-spec/README.md`](../user-spec/README.md)；决策见 [`../user-spec/decisions/README.md`](../user-spec/decisions/README.md)（主要是 [NETEASE-0001](../user-spec/decisions/NETEASE-0001-search-and-download.md)、[NETEASE-0002](../user-spec/decisions/NETEASE-0002-download-rate-limit.md)）。
 
 ## 1. 组成
 
 - **后端** `backend/src/`：
-  - `index.ts`：`createNeteaseApp({ cookiePaths?, defaultDownloadDir?, fetch? })`，表和 API；
+  - `index.ts`：`createNeteaseApp({ cookiePaths?, defaultDownloadDir?, fetch?, downloadGapMs?, dailyLimit?, now?, random? })`，表、API、下载排队；
   - `cookies.ts`：解析 Apple 二进制 Cookie，读 `MUSIC_U`；
   - `client.ts`：网易云的四个接口和 CDN 下载（校验大小、MD5）；
   - `files.ts`：官方式文件名、列下载文件夹。
@@ -16,18 +16,18 @@
 
 | 函数 | 类型 | 可见性 | 说明 |
 |---|---|---|---|
-| `netease.getStatus` | 只读 | 内部 | 有没有读到官方客户端的登录状态（不联网）、下载文件夹 |
+| `netease.getStatus` | 只读 | 内部 | 有没有读到官方客户端的登录状态（不联网）、下载文件夹、今天下了几首 / 上限、下一首最早开始时间、排队数 |
 | `netease.search` | 只读 | 内部 | 搜歌，每首带本账号能下的最高档位 `maxLevel` |
-| `netease.download` | 普通异步函数 | 内部 | 下载一首歌；进度事件 `{ type: "progress", progress, message }`；最后一条消息括号里说明歌词情况 |
+| `netease.download` | 普通异步函数 | 内部 | 下载一首歌：在应用内部排队，一次一首，上一首结束后随机等 10–20 秒，每天最多 50 首（NETEASE-0002）；进度事件 `{ type: "progress", progress, message }`，排队时带 `queued`，等待时带 `waitUntil`；最后一条消息括号里说明歌词情况 |
 | `netease.insertDownload` | 事务 | 内部 | 记一条下载记录（`download` 调用） |
-| `netease.listHistory` | 只读 | 内部 | 最近 100 条下载记录 |
+| `netease.listHistory` | 只读 | 内部 | 最近 100 条下载记录（只有真正下载了的） |
 | `netease.setDownloadDir` | 事务 | 内部 | 改下载文件夹（绝对路径）；`null` 恢复默认 |
 | `netease.listDownloadedFiles` | 只读 | **公开** | 下载文件夹里的音频（不进子文件夹）和同名 `.lrc`，新的在前 |
 
 ## 3. 数据
 
 - 表 `setting`（`key`、`value`）：目前只有 `download_dir`；
-- 表 `download`：`song_id`、`name`、`artists`（JSON）、`album`、`level`、`bitrate`、`file`（绝对路径）、`lyric_file`、`size`、`created_at`；
+- 表 `download`（只记真正下载了的；每天的额度、重启后的间隔都按它算）：`song_id`、`name`、`artists`（JSON）、`album`、`level`、`bitrate`、`file`（绝对路径）、`lyric_file`、`size`、`created_at`；
 - 音频和歌词不在应用目录里，在下载文件夹（默认 `~/Music/网易云音乐`）。
 
 ## 4. 网易云接口（2026-11-11 核对）
@@ -52,6 +52,7 @@
 
 ## 7. 限制
 
+- 下载：一次一首，相邻两首随机隔 10–20 秒（按上一首结束算），每天最多 50 首（本地时间零点起算）；
 - 只支持 macOS；
 - 下载不是公开 API（D-0063），纯蓝只能读下载文件夹；
 - 没有批量下载、歌单、播放。

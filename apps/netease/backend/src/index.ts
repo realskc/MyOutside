@@ -3,7 +3,7 @@ import { existsSync, mkdirSync, writeFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { isAbsolute, join, resolve } from "node:path";
 import { z } from "zod";
-import { defineAsync, defineRead, defineTx, KernelError, type AppModule, type ReadContext } from "@myoutside/kernel";
+import { defineAsync, defineRead, defineTx, KernelError, type AppModule, type AsyncContext, type ReadContext } from "@myoutside/kernel";
 import {
   NeteaseDownloadInput,
   NeteaseSearchInput,
@@ -32,6 +32,13 @@ export interface NeteaseAppOptions {
   defaultDownloadDir?: string;
   /** 测试用：替换网络请求 */
   fetch?: typeof fetch;
+  /** 相邻两次下载之间随机等多久（毫秒）；默认 10–20 秒（作者，NETEASE-0002）。测试传小的值 */
+  downloadGapMs?: { min: number; max: number };
+  /** 每天最多真正下载几首；默认 50（作者，NETEASE-0002） */
+  dailyLimit?: number;
+  /** 测试用：时钟、随机数 */
+  now?: () => number;
+  random?: () => number;
 }
 
 interface SettingRow {
@@ -84,6 +91,38 @@ function toDownload(row: DownloadRow): NeteaseDownload {
   };
 }
 
+/** 可以被取消的等待 */
+function sleep(ms: number, signal: AbortSignal): Promise<void> {
+  return new Promise((resolvePromise, reject) => {
+    if (signal.aborted) {
+      reject(new KernelError("ABORTED", "已取消"));
+      return;
+    }
+    const onAbort = () => {
+      clearTimeout(timer);
+      reject(new KernelError("ABORTED", "已取消"));
+    };
+    const timer = setTimeout(() => {
+      signal.removeEventListener("abort", onAbort);
+      resolvePromise();
+    }, ms);
+    signal.addEventListener("abort", onAbort, { once: true });
+  });
+}
+
+/** 等 `ready`，但发起方取消时马上放弃 */
+function untilReady(ready: Promise<void>, signal: AbortSignal): Promise<void> {
+  if (signal.aborted) return Promise.reject(new KernelError("ABORTED", "已取消"));
+  return new Promise((resolvePromise, reject) => {
+    const onAbort = () => reject(new KernelError("ABORTED", "已取消"));
+    signal.addEventListener("abort", onAbort, { once: true });
+    void ready.then(() => {
+      signal.removeEventListener("abort", onAbort);
+      resolvePromise();
+    });
+  });
+}
+
 function credentialMessage(credential: CredentialResult): string {
   if (credential.ok) return "已读到官方网易云客户端的登录状态";
   if (credential.reason === "missing") return "没找到官方网易云客户端的登录信息：请先安装网易云音乐并登录";
@@ -96,6 +135,42 @@ export function createNeteaseApp(options: NeteaseAppOptions = {}): AppModule {
   const defaultDownloadDir = resolve(options.defaultDownloadDir ?? join(homedir(), "Music", "网易云音乐"));
   const fetchImpl = options.fetch ?? fetch;
   const platformSupported = options.cookiePaths !== undefined || process.platform === "darwin";
+  const gap = options.downloadGapMs ?? { min: 10_000, max: 20_000 };
+  const dailyLimit = options.dailyLimit ?? 50;
+  const now = options.now ?? Date.now;
+  const random = options.random ?? Math.random;
+
+  // ---- 下载排队（NETEASE-0002）：一次只下一首；上一首结束后随机等 10–20 秒才开始下一首；每天最多 50 首 ----
+  /** 队尾：每首下载拿一个位置，等前一个放行 */
+  let tail: Promise<void> = Promise.resolve();
+  /** 排队中和正在下载的有几首 */
+  let queued = 0;
+  /** 下一首最早开始的时间；null = 还没算过（第一次用时从最近一条下载记录推算：重启 MyOutside 也不会马上连着下） */
+  let nextAllowedAt: number | null = null;
+
+  const randomGap = (): number => gap.min + random() * (gap.max - gap.min);
+  const startOfToday = (): number => {
+    const day = new Date(now());
+    day.setHours(0, 0, 0, 0);
+    return day.getTime();
+  };
+  /** 下载记录只记真正下载了的（NETEASE-0002），所以直接数今天的记录 */
+  const downloadsToday = (ctx: Pick<ReadContext, "db">): number => ctx.db.count("download", { created_at: { gte: startOfToday() } });
+  const nextStartAt = (ctx: Pick<ReadContext, "db">): number => {
+    if (nextAllowedAt === null) {
+      const last = ctx.db.all<DownloadRow>("download", undefined, { orderBy: "created_at DESC", limit: 1 })[0];
+      nextAllowedAt = last ? last.created_at + randomGap() : 0;
+    }
+    return nextAllowedAt;
+  };
+  const limitError = () => new KernelError("PRECONDITION", `今天已经下载了 ${dailyLimit} 首，明天再来（防止下得太多被封控）`);
+  const takeSlot = (): { ready: Promise<void>; release: () => void } => {
+    let release!: () => void;
+    const done = new Promise<void>((resolvePromise) => (release = resolvePromise));
+    const ready = tail;
+    tail = tail.then(() => done);
+    return { ready, release };
+  };
 
   const downloadDirOf = (ctx: Pick<ReadContext, "db">): { dir: string; isDefault: boolean } => {
     const row = ctx.db.get<SettingRow>("setting", { key: DOWNLOAD_DIR_KEY });
@@ -150,84 +225,52 @@ export function createNeteaseApp(options: NeteaseAppOptions = {}): AppModule {
           downloadDir: dir,
           downloadDirIsDefault: isDefault,
           defaultDownloadDir,
+          downloadsToday: downloadsToday(ctx),
+          dailyLimit,
+          nextDownloadAt: nextStartAt(ctx) > now() ? nextStartAt(ctx) : null,
+          queued,
         };
       }),
 
       search: defineRead(NeteaseSearchInput, async (ctx, input) => client().search(input.query, input.limit ?? 30, input.offset ?? 0, ctx.signal)),
 
       /**
-       * 下载一首歌（普通的异步函数，只能是内部 API，D-0063）：查权限 → 选档位 → 拿下载地址 → 下载并校验 → 存歌词 → 记一条下载记录。
-       * 文件夹里已有同名文件（例如官方客户端下过）就不重复下载、不覆盖。
+       * 下载一首歌（普通的异步函数，只能是内部 API，D-0063）。
+       * 硬性限制（作者，NETEASE-0002）：在应用内部排队，一次只下一首，上一首结束后随机等 10–20 秒才开始下一首；每天最多 50 首。
        */
       download: defineAsync(NeteaseDownloadInput, async (ctx, input): Promise<NeteaseDownloadOutput> => {
         const api = client();
-        ctx.emit({ type: "progress", progress: 0, message: "查询这首歌" });
-        const song = await api.detail(input.songId, ctx.signal);
-        if (!song.maxLevel) throw new KernelError("PRECONDITION", "这首歌这个账号不能下载");
-        const level: NeteaseLevel = input.level ?? song.maxLevel;
-        if (LEVELS.indexOf(level) > LEVELS.indexOf(song.maxLevel)) {
-          throw new KernelError("PRECONDITION", `这首歌这个账号最高只能下 ${song.maxLevel}`);
-        }
-        const resource = await api.downloadUrl(song.id, level, ctx.signal);
-
-        const { dir } = downloadDirOf(ctx);
-        if (!isAbsolute(dir)) throw new KernelError("PRECONDITION", "下载文件夹不是绝对路径");
-        mkdirSync(dir, { recursive: true });
-        const base = baseName(song.artists, song.name);
-        const file = join(dir, `${base}.${resource.type}`);
-        const alreadyExisted = existsSync(file);
-        if (!alreadyExisted) {
-          ctx.emit({ type: "progress", progress: 0.02, message: "下载中" });
-          await api.fetchFile(resource.url, resource, file, {
-            signal: ctx.signal,
-            onProgress: (done, total) => ctx.emit({ type: "progress", progress: 0.02 + 0.93 * (done / total), message: "下载中" }),
-          });
-        }
-
-        ctx.emit({ type: "progress", progress: 0.97, message: "保存歌词" });
-        const lyricPath = join(dir, `${base}.lrc`);
-        let lyricFile: string | null = existsSync(lyricPath) ? lyricPath : null;
-        let lyricNote = "";
-        if (!lyricFile) {
-          // 歌词是附带的：拿不到不影响下载结果；偶尔会失败一次（2026-11-11 实测遇到过），重试一次。
-          // 还是不行就在进度里说明；再下一次同一首歌会补上
-          let lyric: string | null = null;
-          for (let attempt = 0; attempt < 2; attempt += 1) {
-            try {
-              lyric = await api.lyric(song.id, ctx.signal);
-              lyricNote = lyric ? "" : "（这首歌没有歌词）";
-              break;
-            } catch (error) {
-              if (ctx.signal.aborted) throw error;
-              lyricNote = "（歌词没拿到，再下一次会补上）";
-            }
+        if (downloadsToday(ctx) >= dailyLimit) throw limitError();
+        const ahead = queued;
+        queued += 1;
+        const slot = takeSlot();
+        try {
+          if (ahead > 0) ctx.emit({ type: "progress", progress: 0, message: `排队中：前面还有 ${ahead} 首`, queued: ahead });
+          await untilReady(slot.ready, ctx.signal);
+          // 轮到时再查一次：前面排队的可能已经把今天的额度用完了
+          if (downloadsToday(ctx) >= dailyLimit) throw limitError();
+          const wait = nextStartAt(ctx) - now();
+          if (wait > 0) {
+            ctx.emit({
+              type: "progress",
+              progress: 0,
+              message: `等 ${Math.ceil(wait / 1000)} 秒再开始（防止下得太频繁）`,
+              waitUntil: now() + wait,
+            });
+            await sleep(wait, ctx.signal);
           }
-          if (lyric) {
-            try {
-              writeFileSync(lyricPath, lyric, { encoding: "utf8", flag: "wx" });
-              lyricFile = lyricPath;
-            } catch {
-              lyricFile = existsSync(lyricPath) ? lyricPath : null;
-            }
+          try {
+            return await downloadFlow(ctx, api, input, downloadDirOf(ctx).dir, now);
+          } finally {
+            // 不论成败都算一次：已经向网易云发了请求
+            nextAllowedAt = now() + randomGap();
           }
+        } finally {
+          queued -= 1;
+          slot.release();
         }
-
-        const record = {
-          id: randomUUID(),
-          songId: song.id,
-          name: song.name,
-          artists: song.artists,
-          album: song.album,
-          level: resource.level,
-          bitrate: resource.bitrate,
-          file,
-          lyricFile,
-          size: resource.size,
-        };
-        const saved = (await ctx.call("netease.insertDownload", record)) as NeteaseDownload;
-        ctx.emit({ type: "progress", progress: 1, message: (alreadyExisted ? "文件夹里已经有了" : "下载完成") + lyricNote });
-        return { ...saved, alreadyExisted };
       }),
+
 
       insertDownload: defineTx(InsertDownloadInput, (ctx, input): NeteaseDownload => {
         const row: DownloadRow = {
@@ -241,13 +284,13 @@ export function createNeteaseApp(options: NeteaseAppOptions = {}): AppModule {
           file: input.file,
           lyric_file: input.lyricFile,
           size: input.size,
-          created_at: Date.now(),
+          created_at: now(),
         };
         ctx.db.insert("download", row as unknown as Record<string, string | number | null>);
         return toDownload(row);
       }),
 
-      /** 最近的下载记录，新的在前 */
+      /** 最近的下载记录（只有真正下载了的），新的在前 */
       listHistory: defineRead(z.object({}), (ctx) =>
         ctx.db.all<DownloadRow>("download", undefined, { orderBy: "created_at DESC", limit: 100 }).map(toDownload),
       ),
@@ -277,4 +320,84 @@ export function createNeteaseApp(options: NeteaseAppOptions = {}): AppModule {
       ),
     },
   };
+}
+
+/**
+ * 一首歌的下载流程：查权限 → 选档位 → 拿下载地址 → 下载并校验 → 存歌词 → 记下载记录。
+ * 文件夹里已有同名文件（例如官方客户端下过）就不重复下载、不覆盖，也不记下载记录（NETEASE-0002：记录只算真正下载了的）。
+ */
+async function downloadFlow(
+  ctx: AsyncContext,
+  api: NeteaseClient,
+  input: NeteaseDownloadInput,
+  dir: string,
+  now: () => number,
+): Promise<NeteaseDownloadOutput> {
+  ctx.emit({ type: "progress", progress: 0, message: "查询这首歌" });
+  const song = await api.detail(input.songId, ctx.signal);
+  if (!song.maxLevel) throw new KernelError("PRECONDITION", "这首歌这个账号不能下载");
+  const level: NeteaseLevel = input.level ?? song.maxLevel;
+  if (LEVELS.indexOf(level) > LEVELS.indexOf(song.maxLevel)) {
+    throw new KernelError("PRECONDITION", `这首歌这个账号最高只能下 ${song.maxLevel}`);
+  }
+  const resource = await api.downloadUrl(song.id, level, ctx.signal);
+
+  if (!isAbsolute(dir)) throw new KernelError("PRECONDITION", "下载文件夹不是绝对路径");
+  mkdirSync(dir, { recursive: true });
+  const base = baseName(song.artists, song.name);
+  const file = join(dir, `${base}.${resource.type}`);
+  const alreadyExisted = existsSync(file);
+  if (!alreadyExisted) {
+    ctx.emit({ type: "progress", progress: 0.02, message: "下载中" });
+    await api.fetchFile(resource.url, resource, file, {
+      signal: ctx.signal,
+      onProgress: (done, total) => ctx.emit({ type: "progress", progress: 0.02 + 0.93 * (done / total), message: "下载中" }),
+    });
+  }
+
+  ctx.emit({ type: "progress", progress: 0.97, message: "保存歌词" });
+  const lyricPath = join(dir, `${base}.lrc`);
+  let lyricFile: string | null = existsSync(lyricPath) ? lyricPath : null;
+  let lyricNote = "";
+  if (!lyricFile) {
+    // 歌词是附带的：拿不到不影响下载结果；偶尔会失败一次（2026-11-11 实测遇到过），重试一次。
+    // 还是不行就在进度里说明；再下一次同一首歌会补上
+    let lyric: string | null = null;
+    for (let attempt = 0; attempt < 2; attempt += 1) {
+      try {
+        lyric = await api.lyric(song.id, ctx.signal);
+        lyricNote = lyric ? "" : "（这首歌没有歌词）";
+        break;
+      } catch (error) {
+        if (ctx.signal.aborted) throw error;
+        lyricNote = "（歌词没拿到，再下一次会补上）";
+      }
+    }
+    if (lyric) {
+      try {
+        writeFileSync(lyricPath, lyric, { encoding: "utf8", flag: "wx" });
+        lyricFile = lyricPath;
+      } catch {
+        lyricFile = existsSync(lyricPath) ? lyricPath : null;
+      }
+    }
+  }
+
+  const record = {
+    id: randomUUID(),
+    songId: song.id,
+    name: song.name,
+    artists: song.artists,
+    album: song.album,
+    level: resource.level,
+    bitrate: resource.bitrate,
+    file,
+    lyricFile,
+    size: resource.size,
+  };
+  const saved: NeteaseDownload = alreadyExisted
+    ? { ...record, createdAt: now() }
+    : ((await ctx.call("netease.insertDownload", record)) as NeteaseDownload);
+  ctx.emit({ type: "progress", progress: 1, message: (alreadyExisted ? "文件夹里已经有了" : "下载完成") + lyricNote });
+  return { ...saved, alreadyExisted };
 }

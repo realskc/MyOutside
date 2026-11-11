@@ -430,7 +430,7 @@ async function waitFor(win: BrowserWindow, condition: string, attempts = 40, del
  */
 /**
  * 网易云下载（NETEASE-0001）：冒烟检查不给登录信息的位置，应显示「未登录」、搜索按钮不可点、
- * 下载文件夹在临时数据里；不发任何网络请求。
+ * 下载文件夹在临时数据里、显示今天的下载额度（NETEASE-0002）；不发任何网络请求。
  */
 async function smokeNetease(win: BrowserWindow): Promise<void> {
   await win.loadURL("app://netease/index.html");
@@ -455,6 +455,8 @@ async function smokeNetease(win: BrowserWindow): Promise<void> {
         pickFolder: typeof window.outside.pickFolder === "function",
         revealPath: typeof window.outside.revealPath === "function",
         filesOk: files.ok,
+        dailyLimit: status.ok ? status.result.dailyLimit : null,
+        quota: document.getElementById("quota").textContent,
       };
     })()`,
   );
@@ -467,6 +469,8 @@ async function smokeNetease(win: BrowserWindow): Promise<void> {
     check.pickFolder &&
     check.revealPath &&
     check.filesOk &&
+    check.dailyLimit === 50 &&
+    String(check.quota).includes("50") &&
     String(check.folder).includes("myoutside-smoke-data");
   console.log("[smoke] netease:", JSON.stringify({ ok, ...check }));
   const shot = join(app.getPath("temp"), "myoutside-netease.png");

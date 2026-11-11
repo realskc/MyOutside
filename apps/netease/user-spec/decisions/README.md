@@ -13,4 +13,5 @@
 
 | 编号 | 标题 | 状态 |
 |---|---|---|
-| [NETEASE-0001](NETEASE-0001-search-and-download.md) | 读官方客户端的登录状态，搜歌、按账号允许的最高音质下载 | 有效 |
+| [NETEASE-0001](NETEASE-0001-search-and-download.md) | 读官方客户端的登录状态，搜歌、按账号允许的最高音质下载 | 有效（下载记录的部分被 0002 取代） |
+| [NETEASE-0002](NETEASE-0002-download-rate-limit.md) | 下载的硬性限制：应用内排队，相邻两首随机隔 10–20 秒，每天最多 50 首 | 有效 |

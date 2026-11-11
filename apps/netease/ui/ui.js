@@ -42,6 +42,11 @@
       noResults: "没有搜到",
       pickerUnavailable: "文件夹选择器不可用",
       failed: "失败：",
+      cancel: "取消",
+      waiting: (seconds) => `${seconds} 秒后开始`,
+      quota: (done, limit) => `今天已下载 ${done} / ${limit}`,
+      limitReached: (limit) => `今天已经下载了 ${limit} 首，明天再来（防止下得太多被封控）`,
+      gapHint: "每两首之间会等 10–20 秒，防止下得太频繁",
       levels: { standard: "标准", higher: "较高", exhigh: "极高", lossless: "无损", hires: "Hi-Res" },
     },
     en: {
@@ -79,6 +84,11 @@
       noResults: "No results",
       pickerUnavailable: "Folder picker unavailable",
       failed: "Failed: ",
+      cancel: "Cancel",
+      waiting: (seconds) => `Starts in ${seconds}s`,
+      quota: (done, limit) => `${done} / ${limit} today`,
+      limitReached: (limit) => `${limit} songs downloaded today; try again tomorrow`,
+      gapHint: "Waits 10–20 s between songs to avoid rate limits",
       levels: { standard: "Standard", higher: "Higher", exhigh: "Extra high", lossless: "Lossless", hires: "Hi-Res" },
     },
   };
@@ -115,12 +125,14 @@
   const historyEl = $("history");
   const historyEmpty = $("history-empty");
   const toastEl = $("toast");
+  const quotaEl = $("quota");
+  const limitNotice = $("limit-notice");
 
   let status = null;
   let query = "";
   let offset = 0;
   let total = null;
-  /** 歌曲 id → 下载状态 { state: "running" | "done" | "existed" | "failed", progress, file, message } */
+  /** 歌曲 id → 下载状态 { state: "queued" | "waiting" | "running" | "done" | "existed" | "failed", progress, waitUntil, runId, file, message } */
   const jobs = new Map();
 
   let toastTimer = null;
@@ -172,6 +184,16 @@
     folderPath.textContent = status.downloadDir;
     folderPath.title = status.downloadDir;
     btnDefaultFolder.classList.toggle("hidden", status.downloadDirIsDefault);
+    quotaEl.textContent = t("quota")(status.downloadsToday, status.dailyLimit);
+    quotaEl.title = t("gapHint");
+    const full = status.downloadsToday >= status.dailyLimit;
+    limitNotice.textContent = full ? t("limitReached")(status.dailyLimit) : "";
+    limitNotice.classList.toggle("hidden", !full);
+    for (const song of lastResults) refreshRow(song.id);
+  }
+
+  function limitReached() {
+    return !!status && status.downloadsToday >= status.dailyLimit;
   }
 
   $("btn-change-folder").addEventListener("click", async () => {
@@ -274,13 +296,26 @@
   function renderAction(td, song) {
     td.innerHTML = "";
     const job = jobs.get(song.id);
-    if (job && job.state === "running") {
-      const bar = document.createElement("div");
-      bar.className = "progress";
-      const fill = document.createElement("div");
-      fill.style.width = `${Math.round(job.progress * 100)}%`;
-      bar.appendChild(fill);
-      td.appendChild(bar);
+    if (job && (job.state === "queued" || job.state === "waiting" || job.state === "running")) {
+      if (job.state === "running") {
+        const bar = document.createElement("div");
+        bar.className = "progress";
+        const fill = document.createElement("div");
+        fill.style.width = `${Math.round(job.progress * 100)}%`;
+        bar.appendChild(fill);
+        td.appendChild(bar);
+      } else {
+        const label = document.createElement("span");
+        label.className = "muted";
+        label.textContent =
+          job.state === "waiting" ? t("waiting")(Math.max(0, Math.ceil((job.waitUntil - Date.now()) / 1000))) : job.message;
+        td.appendChild(label);
+      }
+      const cancel = document.createElement("button");
+      cancel.className = "link";
+      cancel.textContent = t("cancel");
+      cancel.addEventListener("click", () => void bridge.cancel(job.runId));
+      td.appendChild(cancel);
       return;
     }
     if (job && (job.state === "done" || job.state === "existed")) {
@@ -299,7 +334,7 @@
     }
     const button = document.createElement("button");
     button.textContent = t("download");
-    button.disabled = !song.maxLevel || !(status && status.loggedIn);
+    button.disabled = !song.maxLevel || !(status && status.loggedIn) || limitReached();
     button.addEventListener("click", () => void download(song));
     td.appendChild(button);
     if (job && job.state === "failed") {
@@ -330,16 +365,24 @@
 
   async function download(song) {
     const runId = bridge.newRunId();
-    jobs.set(song.id, { state: "running", progress: 0 });
+    jobs.set(song.id, { state: "running", progress: 0, runId });
     refreshRow(song.id);
     const off = bridge.onEvent(runId, (event) => {
       if (!event || event.type !== "progress") return;
       const job = jobs.get(song.id);
-      if (job && job.state === "running") {
+      if (!job || !["queued", "waiting", "running"].includes(job.state)) return;
+      job.lastMessage = event.message ?? "";
+      if (typeof event.waitUntil === "number") {
+        job.state = "waiting";
+        job.waitUntil = event.waitUntil;
+      } else if (typeof event.queued === "number") {
+        job.state = "queued";
+        job.message = event.message ?? "";
+      } else {
+        job.state = "running";
         job.progress = event.progress ?? 0;
-        job.lastMessage = event.message ?? "";
-        refreshRow(song.id);
       }
+      refreshRow(song.id);
     });
     try {
       const result = await callOrThrow("netease.download", { songId: song.id, level: levelFor(song) }, { runId });
@@ -349,13 +392,22 @@
       jobs.set(song.id, { state: result.alreadyExisted ? "existed" : "done", file: result.file, note });
       await loadHistory();
     } catch (error) {
-      jobs.set(song.id, { state: "failed", message: error.message });
-      toast(t("failed") + error.message, true);
+      if (error.code === "ABORTED") jobs.delete(song.id);
+      else {
+        jobs.set(song.id, { state: "failed", message: error.message });
+        toast(t("failed") + error.message, true);
+      }
     } finally {
       off();
       refreshRow(song.id);
+      await loadStatus().catch(() => undefined);
     }
   }
+
+  // 等待中的倒计时每秒刷新一次
+  setInterval(() => {
+    for (const [songId, job] of jobs) if (job.state === "waiting") refreshRow(songId);
+  }, 1000);
 
   // ---- 最近下载 ----
 

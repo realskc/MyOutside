@@ -164,6 +164,15 @@ main {
   background: var(--panel);
 }
 
+.quota {
+  white-space: nowrap;
+  font-size: 12px;
+}
+
+#limit-notice {
+  margin-top: 12px;
+}
+
 .results-head {
   display: flex;
   justify-content: space-between;

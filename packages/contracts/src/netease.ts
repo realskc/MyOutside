@@ -45,6 +45,14 @@ export const NeteaseStatusOutput = z.object({
   /** 用的是默认文件夹（没在设置里改过） */
   downloadDirIsDefault: z.boolean(),
   defaultDownloadDir: z.string(),
+  /** 今天（本地时间）真正下载了几首；文件夹里已有、没重复下载的不算（NETEASE-0002） */
+  downloadsToday: z.number().int(),
+  /** 每天最多下载几首（作者：50） */
+  dailyLimit: z.number().int(),
+  /** 下一首最早什么时候开始（毫秒时间戳）；现在就能开始时为 null */
+  nextDownloadAt: z.number().nullable(),
+  /** 排队中和正在下载的有几首 */
+  queued: z.number().int(),
 });
 export type NeteaseStatusOutput = z.infer<typeof NeteaseStatusOutput>;
 
