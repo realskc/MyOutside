@@ -1,6 +1,6 @@
 # 服务器版 MyOutside（第 2 步第一段：用测试数据上线）
 
-> 第 1、2 步已在本机实现（2026-11-11，`apps/server/`），还没部署。作者的预期见 `user-spec/platform.md`「多端」「分发与隔离」；依据：D-0013（云端内核）、D-0090（沙箱 iframe）、D-0091（每个用户一个库）、D-0093（登录与安全）、D-0092（备份，第二段）。服务器本身见 `docs/server.md`。
+> 2026-11-11 第一次部署到服务器（空库，只等作者建账号）。作者的预期见 `user-spec/platform.md`「多端」「分发与隔离」；依据：D-0013（云端内核）、D-0090（沙箱 iframe）、D-0091（每个用户一个库）、D-0093（登录与安全）、D-0092（备份，第二段）。服务器本身见 `docs/server.md`。
 
 ## 1. 范围
 
@@ -101,7 +101,7 @@ MYOUTSIDE_CHECK_SETUP=<设置链接> apps/host/node_modules/.bin/electron apps/s
 1. ✅ 服务端骨架：HTTP、静态文件、平台库与登录、WebSocket、内核管理器；本机跑通；
 2. ✅ 外壳网页版：登录页、沙箱 iframe、消息桥、`outside.storage`、设置页；围棋、对话实验室改用 `outside.storage`；Chromium 里实测通过（D-0090「实测」）；
 3. 安全：大小限制、限次数、会话已有单测（D-0093「怎么验证」）；还要：把浏览器检查并进冒烟、Safari / Firefox 实测；
-4. 服务器环境：Node、`myoutside` 账号、目录、systemd、Caddy 转发、fail2ban 规则；
-5. 第一次部署（作者同意后）：作者用设置链接设密码、在设置页填 API key、在各台设备上试用。
+4. ✅ 服务器环境：Node、`myoutside` 账号、目录、systemd、Caddy 转发、fail2ban 规则（`server-setup.sh` + 每次部署的 `activate-release.sh`）；
+5. ✅ 第一次部署（2026-11-11，作者同意后）；从外面检查过：登录页、跳转、子应用页面关进沙箱、没登录拿不到数据、两百万位长的用户名被 Caddy 挡掉、WebSocket 没登录 / 伪造登录 / 别的网站都被拒。还差：作者建账号、设密码、填 API key、在各台设备（含 Safari、iPhone）上试用。
 
 之后：第二段备份（D-0092），第三段搬真实数据（Mac 和 ThinkBook 的四个云端应用都当作用过，合并后作者确认再上传）。

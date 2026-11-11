@@ -60,6 +60,8 @@
 
 ## 5. 对外入口：Caddy（D-0089）
 
+> 2026-11-11 第一次部署 MyOutside 后，`myoutside.org` 从占位页改成了转给 MyOutside 服务端（配置在仓库 `apps/server/deploy/Caddyfile`，部署时安装）。下面占位页那段是之前的样子，留作记录。
+
 - Caddy 2.11.9（官方源，见 [references/Caddy.md](../references/Caddy.md)），systemd 服务 `caddy`，以 `caddy` 用户运行。
 - 配置 `/etc/caddy/Caddyfile`（装好时的默认配置备份在 `Caddyfile.default`）：
   - `myoutside.org`：现在是占位页 `/var/www/myoutside/index.html`（「还在建设中」）；部署后改成反向代理到 MyOutside 的服务端；
@@ -67,8 +69,21 @@
   - 去掉 `Server` 响应头，加 `X-Content-Type-Options`、`Referrer-Policy`。
 - 证书：Let's Encrypt，两个域名各一张，90 天，Caddy 自动续期；存在 `/var/lib/caddy/.local/share/caddy/`。2026-11-11 第一次签发，到 2027-02-09。
 - 改了配置：`sudo caddy validate --config /etc/caddy/Caddyfile` 检查，`sudo systemctl reload caddy` 生效。
+- 现在的配置：`myoutside.org` → `reverse_proxy 127.0.0.1:8787`，请求体超过 4 KB 直接拒绝（D-0093）；`www` 照旧跳主域名。
 
-## 6. 检查命令
+## 6. MyOutside 服务端（docs/future/web-version.md）
+
+- systemd 服务 `myoutside`（`/etc/systemd/system/myoutside.service`，来自仓库 `apps/server/deploy/`）：系统账号 `myoutside`（不能登录），只监听 `127.0.0.1:8787`，崩溃自动重启，开机自启。
+- 沙箱：没有任何特权、过滤系统调用、系统目录只读、看不到家目录，只能写 `/var/lib/myoutside`；`systemd-analyze security myoutside` 评分 1.4（越低越好，2026-11-11）。
+- Node 24（NodeSource 软件源，进自动安全更新：`/etc/apt/apt.conf.d/52myoutside-node-upgrades`）。
+- 代码：`/opt/myoutside/releases/<时间>/`，`/opt/myoutside/current` 指向当前版本，只留最近 5 个。
+- 数据：`/var/lib/myoutside/`（`platform.db` 账号与会话、`users/<用户 id>/myoutside.db` 每个用户的库、`secrets/master.key` 加密 API key 的主密钥），文件都只有 `myoutside` 能读写。
+- 部署前的本地备份：`/var/backups/myoutside/pre-deploy-<时间>.tar.gz`（只留 10 份；异地备份见 D-0092，还没做）。
+- 登录的封禁：fail2ban 的 `myoutside` 规则（`/etc/fail2ban/filter.d/myoutside.conf`、`jail.d/myoutside-web.local`），只认服务端写的 `ban-request` 那一行，封 1 小时（D-0093）。
+- 管理账号：`myoutside-admin create-user <用户名> [--admin]`、`myoutside-admin setup-link <用户名>`（打印设置链接；只在自己的终端里看）。
+- 部署：在 Mac 上 `bash apps/server/scripts/deploy.sh`（每次都要作者明确同意，AGENTS.md 红线 4）；第一次准备服务器用 `apps/server/scripts/server-setup.sh`。
+
+## 7. 检查命令
 
 ```bash
 sudo ufw status verbose                                  # 防火墙
@@ -78,5 +93,7 @@ systemctl is-active unattended-upgrades apt-daily-upgrade.timer
 ls /var/run/reboot-required                              # 有这个文件 = 该重启了
 sudo ss -tulpn                                           # 在听哪些端口
 systemctl status caddy; sudo journalctl -u caddy -n 50   # 入口和证书
+systemctl status myoutside; sudo journalctl -u myoutside -n 50   # MyOutside 服务端
+cat /opt/myoutside/current/VERSION                       # 现在跑的是哪个版本
 curl -sI https://myoutside.org                           # 从外面看（在 Mac 上跑）
 ```
