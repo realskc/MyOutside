@@ -157,6 +157,7 @@
 | [D-0086](0086-public-async-functions.md) | 普通 API 也可以公开；长事务式的流程，冲突由所有者自己挡 | 有效 |
 | [D-0087](0087-server-baseline-security.md) | 云服务器的基本安全设置：只用密钥登录 SSH，防火墙只开 22，fail2ban，自动装安全更新 | 有效 |
 | [D-0088](0088-domain-dns.md) | 域名 myoutside.org 的 DNS：不走 Cloudflare 代理，www 作别名，声明不发邮件 | 有效 |
+| [D-0089](0089-caddy-as-front.md) | 服务器的对外入口用 Caddy：自动 HTTPS，先放占位页 | 有效 |
 
 ## 应用专属决策
 

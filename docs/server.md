@@ -49,16 +49,26 @@
   - 例外：从 UCloud 控制台所在的内网 10.8.255.0/24 来的连接可以用密码（控制台的网页登录走这条路），留作后备；
   - 文件名排在 `50-cloud-init.conf` 前面：sshd 对同一项取第一次出现的值，cloud-init 那份里的 `PasswordAuthentication yes` 不生效。
   - 现在只有作者 Mac 的一把 ed25519 公钥在 `~ubuntu/.ssh/authorized_keys` 里；ThinkBook 要登录，得先把它的公钥加进去。
-- **防火墙（ufw）**：默认拒绝所有进来的连接、允许出去的；只放行 22/tcp。部署时再放行 80 / 443（`sudo ufw allow 80/tcp` 等）。
+- **防火墙（ufw）**：默认拒绝所有进来的连接、允许出去的；放行 22/tcp（SSH）、80/tcp、443/tcp、443/udp（Caddy，见 §4）。
   - 坑：这个镜像里 `ufw.service` 默认是停用的，`ufw enable` 只改了配置，重启后防火墙不会起来。已经 `systemctl enable ufw`，重启验证过。
   - 以后如果用 Docker：Docker 直接改 iptables，会绕过 ufw；发布端口时要绑到 127.0.0.1，或者另行处理。
 - **fail2ban**：`/etc/fail2ban/jail.d/myoutside.local`。SSH 10 分钟内失败 5 次封 1 小时（`mode = aggressive`）；一天内被封 5 次的封一周（`recidive`）。
-- **自动安全更新**：`unattended-upgrades` 每天装安全更新；**不自动重启**（内核更新后要手动重启，`/var/run/reboot-required` 存在时就该重启了）。
+- **自动安全更新**：`unattended-upgrades` 每天装安全更新，Caddy 的官方源也在内（`/etc/apt/apt.conf.d/51myoutside-caddy-upgrades`）；**不自动重启**（内核更新后要手动重启，`/var/run/reboot-required` 存在时就该重启了）。
 - **没升级的包**：`cloud-init` 是 UCloud 改过的版本（`24.1.3-0ubuntu3.5ucloud`），升级会覆盖厂商的改动、可能影响控制台的功能（重置密码、网络配置等），留着不动；跟着它的 `distro-info`、`python3-distro-info` 也没升。
 
 开通当天（2026-11-11，开机约 2 小时内），就有人在用密码爆破 SSH：一个地址试了约 370 次（root、ubuntu、admin、deploy……）。都失败了；成功的登录只有作者的密钥登录和一次控制台的密码登录。
 
-## 5. 检查命令
+## 5. 对外入口：Caddy（D-0089）
+
+- Caddy 2.11.9（官方源，见 [references/Caddy.md](../references/Caddy.md)），systemd 服务 `caddy`，以 `caddy` 用户运行。
+- 配置 `/etc/caddy/Caddyfile`（装好时的默认配置备份在 `Caddyfile.default`）：
+  - `myoutside.org`：现在是占位页 `/var/www/myoutside/index.html`（「还在建设中」）；部署后改成反向代理到 MyOutside 的服务端；
+  - `www.myoutside.org` → 301 到 `myoutside.org`（保留路径）；`http://` → 308 到 `https://`；
+  - 去掉 `Server` 响应头，加 `X-Content-Type-Options`、`Referrer-Policy`。
+- 证书：Let's Encrypt，两个域名各一张，90 天，Caddy 自动续期；存在 `/var/lib/caddy/.local/share/caddy/`。2026-11-11 第一次签发，到 2027-02-09。
+- 改了配置：`sudo caddy validate --config /etc/caddy/Caddyfile` 检查，`sudo systemctl reload caddy` 生效。
+
+## 6. 检查命令
 
 ```bash
 sudo ufw status verbose                                  # 防火墙
@@ -67,4 +77,6 @@ sudo fail2ban-client status sshd                         # 封了谁
 systemctl is-active unattended-upgrades apt-daily-upgrade.timer
 ls /var/run/reboot-required                              # 有这个文件 = 该重启了
 sudo ss -tulpn                                           # 在听哪些端口
+systemctl status caddy; sudo journalctl -u caddy -n 50   # 入口和证书
+curl -sI https://myoutside.org                           # 从外面看（在 Mac 上跑）
 ```

@@ -43,3 +43,4 @@
 | UCloud | [UCloud](UCloud.md)：作者的云服务器所在的云服务商；香港机房和 Ubuntu 镜像的实测情况 | 无 |
 | Let's Encrypt | [Let's Encrypt](Lets-Encrypt.md)：免费 TLS 证书；没有域名时也能给 IP 地址签 6 天的短期证书 | 无 |
 | Cloudflare | [Cloudflare](Cloudflare.md)：MyOutside 域名的注册商和 DNS；代理（橙色云朵）的取舍 | 无 |
+| Caddy | [Caddy](Caddy.md)：自动 HTTPS 的网页服务器 / 反向代理；MyOutside 服务器的对外入口 | 无 |
