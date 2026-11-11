@@ -13,7 +13,7 @@
 | CPU / 内存 | 4 核 Intel Xeon（Cascade Lake，KVM 虚拟机）/ 8 GB |
 | 硬盘 | 120 GB（系统盘，已用约 3 GB） |
 | 交换 | 4 GB 交换文件 `/swapfile`，`vm.swappiness=10`（2026-11-11 加的，原来没有） |
-| 网络 | 内网 10.7.0.0/16，公网地址经 NAT 映射；只有 IPv4，没有 IPv6 |
+| 网络 | 内网 10.7.0.0/16，公网地址经 NAT 映射；只有 IPv4，没有 IPv6（UCloud 香港能开 IPv6，但对 Ubuntu 不在官方支持范围、要另买带宽，见 [references/UCloud.md](../references/UCloud.md)） |
 | 时区 | Asia/Hong_Kong（UTC+8，和北京时间相同） |
 | 账号 | `ubuntu`（可免密码 sudo）；`root` 不能登录 |
 

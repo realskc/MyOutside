@@ -11,6 +11,14 @@
 - 从服务器能直接访问 Google、GitHub、npm、Hugging Face、Docker Hub 等，不需要代理。
 - 厂商有一层外网防火墙：从外面能连到 22、80、443，连不到 3000、8080（在服务器上开着监听、本机防火墙关着的情况下测的）。规则在控制台里配。
 
+## IPv6（官方文档，2026-11-11 查）
+
+- 支持 IPv6 的地域里有香港（还有北京2、乌兰察布、上海2、广州、华盛顿、莫斯科）（[构建IPV6双栈网络](https://docs.ucloud.cn/vpc/guide/ipv6gw)）。
+- 要先给 VPC 和子网开 IPv6 网段；分到的 IPv6 地址默认只能内网通信，要在「IPv6 网关」里给这个地址单独买公网带宽，才能上外网（同上；[IPV6网关产品简介](https://docs.ucloud.cn/vpc/introduction/ipv6gw)）。
+- 云主机的 IPv6 功能「目前在灰度中，如有需求请联系技术支持」；文档列出的支持 IPv6 的镜像只有 CentOS、Rocky 和 Debian 11.7，**没有 Ubuntu**；网关简介里更是写「仅 centos7.9 EOL 和 Debian11.7 支持 IPV6」（[IPv6](https://docs.ucloud.cn/uhost/introduction/network/ipv6)）。两处说法不完全一致。
+- 创建主机后再绑定的 IPv6 地址不会自动配置，要重装系统，或在机器里 `sudo cloud-init clean` 后重启（同上）。
+- 推断：在我们的 Ubuntu 24.04 上手动配置也许可行，但不在官方支持范围内，没试过。
+
 ## Ubuntu 24.04 镜像的特点（实测）
 
 - 开机后 SSH **允许密码登录**（`/etc/ssh/sshd_config.d/50-cloud-init.conf` 里写着 `PasswordAuthentication yes`），`root` 和 `ubuntu` 都设了密码；`root` 只允许密钥登录（`permitrootlogin without-password`），但没有放公钥。
