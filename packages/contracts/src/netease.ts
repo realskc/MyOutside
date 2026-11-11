@@ -58,7 +58,7 @@ export const NeteaseStatusOutput = z.object({
 export type NeteaseStatusOutput = z.infer<typeof NeteaseStatusOutput>;
 
 /**
- * 公开 API `netease.download`：下载一首歌（公开的普通异步函数，D-0086）。
+ * 公开 API `netease.download`：下载一首歌（公开的普通 API，D-0086）。
  * - 排队：一次只下一首；上一首结束后随机等 10–20 秒才开始下一首；每天最多真正下载 50 首（NETEASE-0002）。
  *   本应用的界面和别的子应用发起的排同一个队、共用同一份额度，所以一次调用可能要等好几分钟；
  *   今天的额度满了报 `PRECONDITION`。调用方要等它结束（或取消），不能发起后不管。

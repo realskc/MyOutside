@@ -77,7 +77,7 @@ function denyWrite(): never {
   throw new KernelError("FORBIDDEN", "只读上下文不能写数据：写数据只能通过事务 API");
 }
 
-/** 创建以某个应用为作用域的只读数据访问助手（只读 API、普通的异步函数使用） */
+/** 创建以某个应用为作用域的只读数据访问助手（只读 API、普通 API 使用） */
 export function createReadonlyAppDb(adapter: DbAdapter, appId: string): AppDb {
   const db = createAppDb(adapter, appId);
   return { ...db, insert: denyWrite, update: denyWrite, delete: denyWrite };

@@ -63,7 +63,7 @@ const NOOP = () => {};
 
 /**
  * 创建内核：应用注册 → 迁移 → 处理调用。
- * - 只读 API 直接执行；事务 API 经串行队列、单事务执行；普通的异步函数直接执行，写入经本应用的事务 API；
+ * - 只读 API 直接执行；事务 API 经串行队列、单事务执行；普通 API 直接执行，写入经本应用的事务 API；
  * - 每次调用都按调用者检查权限（D-0053、D-0058、D-0063、D-0086）。
  */
 export function createKernel({ storage, secrets }: KernelOptions) {
@@ -292,7 +292,7 @@ export function createKernel({ storage, secrets }: KernelOptions) {
       if (fn.appId === PLATFORM) return;
       throw new KernelError("FORBIDDEN", `外壳不能调用子应用的 API：${name}`);
     }
-    // 调用自己的函数不受限（含内部 API 与异步函数）
+    // 调用自己的函数不受限（含内部 API 与普通 API）
     if (fn.appId === caller) return;
 
     const uses = manifests.get(caller)?.uses ?? [];
@@ -352,9 +352,9 @@ export function createKernel({ storage, secrets }: KernelOptions) {
       signal: frame.signal,
       async call(name, payload) {
         const target = lookup(name);
-        // 写数据只能经本应用的事务 API（D-0063）；其他子应用的公开异步函数可以调用，它只写它自己的数据（D-0086）
+        // 写数据只能经本应用的事务 API（D-0063）；其他子应用公开的普通 API 可以调用，它只写它自己的数据（D-0086）
         if (target.kind === "tx" && target.appId !== fn.appId) {
-          throw new KernelError("TX_CALL_INVALID", `异步函数只能调用本子应用的事务 API：${name}`);
+          throw new KernelError("TX_CALL_INVALID", `普通 API 只能调用本子应用的事务 API：${name}`);
         }
         const child = nested(frame, fn.appId, name);
         checkAccess(fn.appId, name, target);

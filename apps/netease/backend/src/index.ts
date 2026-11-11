@@ -235,7 +235,7 @@ export function createNeteaseApp(options: NeteaseAppOptions = {}): AppModule {
       search: defineRead(NeteaseSearchInput, async (ctx, input) => client().search(input.query, input.limit ?? 30, input.offset ?? 0, ctx.signal)),
 
       /**
-       * 公开 API：下载一首歌（公开的普通异步函数，D-0086；作者：最多向纯蓝开放「下载」）。契约见 contracts 的 NeteaseDownloadInput。
+       * 公开 API：下载一首歌（公开的普通 API，D-0086；作者：最多向纯蓝开放「下载」）。契约见 contracts 的 NeteaseDownloadInput。
        * 硬性限制（作者，NETEASE-0002）：在应用内部排队，一次只下一首，上一首结束后随机等 10–20 秒才开始下一首；每天最多 50 首。
        * 不论是本应用的界面还是别的子应用发起，都排同一个队、共用同一份额度。
        */
