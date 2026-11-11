@@ -9,6 +9,7 @@
 |---|---|
 | `architecture.md` | 架构与协议：内核、函数与调用、事务、数据访问、平台 API、Electron 程序 |
 | `agent.md` | agent 框架（共享库）：分层、平台工具、循环库、工具与权限、执行模式 |
+| `server.md` | 云服务器：配置、网络能力、安全设置、检查命令 |
 | [`../apps/vocab/docs/README.md`](../apps/vocab/docs/README.md) | 学英语：数据模型、API、添加 / 查词流程、界面 |
 | [`../apps/dialog/docs/README.md`](../apps/dialog/docs/README.md) | 对话：消息树、API、生成流程、界面、实验室 |
 | [`../apps/go/docs/README.md`](../apps/go/docs/README.md) | 围棋：9 路特殊规则、双人联机、聊天、悔棋、棋谱、界面 |

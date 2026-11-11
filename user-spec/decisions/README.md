@@ -155,6 +155,7 @@
 | [D-0084](0084-raw-ai-stop-while-reading-body.md) | 原始 AI 请求在读响应体时被停止，统一报「已取消」（修复实验室停止被记成失败） | 有效 |
 | [D-0085](0085-workflow-merged-into-agents-md.md) | 开发方式并入 AGENTS.md；AGENTS.md 属于 user spec | 有效 |
 | [D-0086](0086-public-async-functions.md) | 普通 API 也可以公开；长事务式的流程，冲突由所有者自己挡 | 有效 |
+| [D-0087](0087-server-baseline-security.md) | 云服务器的基本安全设置：只用密钥登录 SSH，防火墙只开 22，fail2ban，自动装安全更新 | 有效 |
 
 ## 应用专属决策
 

@@ -1,0 +1,52 @@
+# 云服务器
+
+> 作者 2026-11-11 买的云服务器，用来部署 MyOutside（[platform.md「多端」](../user-spec/platform.md)、[D-0013](../user-spec/decisions/0013-cloud-kernel-for-multi-device.md)）。安全设置的依据见 [D-0087](../user-spec/decisions/0087-server-baseline-security.md)。
+> **服务器的公网地址不写进仓库**（仓库是公开的）；作者知道地址，连接方式是在作者的 Mac 上 `ssh ubuntu@<服务器地址>`（密钥登录）。
+> 最近一次核对：2026-11-11。
+
+## 1. 配置
+
+| 项 | 值 |
+|---|---|
+| 厂商 / 机房 | UCloud，香港（AS135377）；厂商的情况见 [references/UCloud.md](../references/UCloud.md) |
+| 系统 | Ubuntu 24.04 LTS，内核 6.8.0-149（2026-11-11 升级后） |
+| CPU / 内存 | 4 核 Intel Xeon（Cascade Lake，KVM 虚拟机）/ 8 GB |
+| 硬盘 | 120 GB（系统盘，已用约 3 GB） |
+| 交换 | 4 GB 交换文件 `/swapfile`，`vm.swappiness=10`（2026-11-11 加的，原来没有） |
+| 网络 | 内网 10.7.0.0/16，公网地址经 NAT 映射；只有 IPv4，没有 IPv6 |
+| 时区 | Asia/Hong_Kong（UTC+8，和北京时间相同） |
+| 账号 | `ubuntu`（可免密码 sudo）；`root` 不能登录 |
+
+## 2. 网络能力（2026-11-11 实测）
+
+- 从服务器访问外网：Google、GitHub、npm、Hugging Face、DeepSeek API、网易云音乐、Docker Hub、Let's Encrypt 都能直接访问，不需要代理。PyPI 的索引页要 7 秒左右（页面大），能用。
+- 带宽：从 Cloudflare 下载约 6.6 MB/s，上传约 4.3 MB/s（约 50 / 35 Mbps）。
+- 厂商的外网防火墙：从外面能连到 80、443（和 22）；3000、8080 连不上。所以厂商那层只放行了少数端口，具体规则在 UCloud 控制台里看。
+- **作者的 Mac 到服务器延迟约 380–390 ms**：Mac 上所有流量都走 VPN（`utun4`），出口在洛杉矶，到香港要绕一圈美国。直连的延迟没法在不改 VPN 设置的情况下测（推断：直连会低得多）。这会影响以后 MyOutside 每次调用的手感，部署前要处理（例如让 VPN 对这个地址直连）。
+
+## 3. 安全设置（D-0087）
+
+- **SSH**：`/etc/ssh/sshd_config.d/10-myoutside-hardening.conf`
+  - 只允许密钥登录（`PasswordAuthentication no`），root 不能登录，最多试 4 次，登录限时 30 秒，关掉 X11 转发；
+  - 例外：从 UCloud 控制台所在的内网 10.8.255.0/24 来的连接可以用密码（控制台的网页登录走这条路），留作后备；
+  - 文件名排在 `50-cloud-init.conf` 前面：sshd 对同一项取第一次出现的值，cloud-init 那份里的 `PasswordAuthentication yes` 不生效。
+  - 现在只有作者 Mac 的一把 ed25519 公钥在 `~ubuntu/.ssh/authorized_keys` 里；ThinkBook 要登录，得先把它的公钥加进去。
+- **防火墙（ufw）**：默认拒绝所有进来的连接、允许出去的；只放行 22/tcp。部署时再放行 80 / 443（`sudo ufw allow 80/tcp` 等）。
+  - 坑：这个镜像里 `ufw.service` 默认是停用的，`ufw enable` 只改了配置，重启后防火墙不会起来。已经 `systemctl enable ufw`，重启验证过。
+  - 以后如果用 Docker：Docker 直接改 iptables，会绕过 ufw；发布端口时要绑到 127.0.0.1，或者另行处理。
+- **fail2ban**：`/etc/fail2ban/jail.d/myoutside.local`。SSH 10 分钟内失败 5 次封 1 小时（`mode = aggressive`）；一天内被封 5 次的封一周（`recidive`）。
+- **自动安全更新**：`unattended-upgrades` 每天装安全更新；**不自动重启**（内核更新后要手动重启，`/var/run/reboot-required` 存在时就该重启了）。
+- **没升级的包**：`cloud-init` 是 UCloud 改过的版本（`24.1.3-0ubuntu3.5ucloud`），升级会覆盖厂商的改动、可能影响控制台的功能（重置密码、网络配置等），留着不动；跟着它的 `distro-info`、`python3-distro-info` 也没升。
+
+开通当天（2026-11-11，开机约 2 小时内），就有人在用密码爆破 SSH：一个地址试了约 370 次（root、ubuntu、admin、deploy……）。都失败了；成功的登录只有作者的密钥登录和一次控制台的密码登录。
+
+## 4. 检查命令
+
+```bash
+sudo ufw status verbose                                  # 防火墙
+sudo sshd -T | grep -E "^(passwordauthentication|permitrootlogin) "
+sudo fail2ban-client status sshd                         # 封了谁
+systemctl is-active unattended-upgrades apt-daily-upgrade.timer
+ls /var/run/reboot-required                              # 有这个文件 = 该重启了
+sudo ss -tulpn                                           # 在听哪些端口
+```

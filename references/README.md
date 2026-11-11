@@ -40,3 +40,5 @@
 | LobeHub | [LobeHub](LobeHub.md)：以 agent 为工作单位的 agent 团队平台（前身 LobeChat） | 无 |
 | OpenClaw | [OpenClaw](OpenClaw.md)：开源的个人 agent；一个 agent = 工作区文件 + 凭据 + 会话，记忆是工作区里的 Markdown | 无 |
 | 知更（Unitick） | [知更](知更.md)：面向北大校园事务的个人助手；整合教学网、课程回放、校园信息、待办提醒和微信入口 | [有](知更-thoughts.md) |
+| UCloud | [UCloud](UCloud.md)：作者的云服务器所在的云服务商；香港机房和 Ubuntu 镜像的实测情况 | 无 |
+| Let's Encrypt | [Let's Encrypt](Lets-Encrypt.md)：免费 TLS 证书；没有域名时也能给 IP 地址签 6 天的短期证书 | 无 |
