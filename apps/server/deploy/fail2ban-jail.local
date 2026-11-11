@@ -1,0 +1,9 @@
+# MyOutside 登录（D-0093）：服务端判定是程序的地址，封 1 小时（只封网页端口）
+[myoutside]
+enabled = true
+filter = myoutside
+backend = systemd
+maxretry = 1
+findtime = 10m
+bantime = 1h
+port = http,https

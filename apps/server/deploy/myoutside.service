@@ -1,0 +1,57 @@
+# MyOutside 服务端（docs/future/web-version.md §5、D-0093）
+# 用专门的低权限账号 myoutside 运行，只能读写 /var/lib/myoutside；只监听 127.0.0.1，外面经 Caddy 进来。
+[Unit]
+Description=MyOutside server
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=myoutside
+Group=myoutside
+WorkingDirectory=/opt/myoutside/current
+Environment=NODE_ENV=production
+Environment=MYOUTSIDE_DATA_DIR=/var/lib/myoutside
+Environment=MYOUTSIDE_ROOT=/opt/myoutside/current
+Environment=MYOUTSIDE_ORIGIN=https://myoutside.org
+Environment=MYOUTSIDE_PORT=8787
+ExecStart=/usr/bin/node /opt/myoutside/current/server.mjs serve
+Restart=on-failure
+RestartSec=3
+# 停止时先等进行中的调用结束（程序里最多等 30 秒）
+TimeoutStopSec=40
+UMask=0077
+
+# ---- 沙箱 ----
+NoNewPrivileges=yes
+ProtectSystem=strict
+ReadWritePaths=/var/lib/myoutside
+ProtectHome=yes
+PrivateTmp=yes
+PrivateDevices=yes
+ProtectKernelTunables=yes
+ProtectKernelModules=yes
+ProtectKernelLogs=yes
+ProtectControlGroups=yes
+ProtectClock=yes
+ProtectHostname=yes
+ProtectProc=invisible
+ProcSubset=pid
+RestrictSUIDSGID=yes
+RestrictRealtime=yes
+RestrictNamespaces=yes
+LockPersonality=yes
+RemoveIPC=yes
+# V8 的即时编译要能生成可执行的内存，所以不能开 MemoryDenyWriteExecute
+RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX
+SystemCallArchitectures=native
+SystemCallFilter=@system-service
+SystemCallFilter=~@privileged @resources
+CapabilityBoundingSet=
+AmbientCapabilities=
+MemoryMax=2G
+TasksMax=256
+LimitNOFILE=8192
+
+[Install]
+WantedBy=multi-user.target

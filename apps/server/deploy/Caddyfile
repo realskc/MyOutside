@@ -1,0 +1,19 @@
+# MyOutside 的对外入口（D-0089）：自动 HTTPS；把请求转给本机的 MyOutside 服务端（docs/future/web-version.md §5）。
+
+myoutside.org {
+	encode zstd gzip
+	header -Server
+
+	# 服务端只有登录、设置密码、退出登录接受请求体，都很小：超过 4 KB 的在这里就挡掉，到不了程序（D-0093）
+	request_body {
+		max_size 4KB
+	}
+
+	# 访客的地址经 X-Forwarded-For 交给服务端（Caddy 会覆盖访客自己填的），WebSocket 自动转发
+	reverse_proxy 127.0.0.1:8787
+}
+
+# www 跳到主域名
+www.myoutside.org {
+	redir https://myoutside.org{uri} permanent
+}

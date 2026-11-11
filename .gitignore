@@ -11,3 +11,6 @@ out/
 
 # Python 编译缓存（运行或检查脚本时生成）
 __pycache__/
+
+# 服务器版的发布包（apps/server/scripts/build-release.mjs 生成）
+apps/server/dist-release/
