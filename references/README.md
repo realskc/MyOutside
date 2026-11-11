@@ -42,3 +42,4 @@
 | 知更（Unitick） | [知更](知更.md)：面向北大校园事务的个人助手；整合教学网、课程回放、校园信息、待办提醒和微信入口 | [有](知更-thoughts.md) |
 | UCloud | [UCloud](UCloud.md)：作者的云服务器所在的云服务商；香港机房和 Ubuntu 镜像的实测情况 | 无 |
 | Let's Encrypt | [Let's Encrypt](Lets-Encrypt.md)：免费 TLS 证书；没有域名时也能给 IP 地址签 6 天的短期证书 | 无 |
+| Cloudflare | [Cloudflare](Cloudflare.md)：MyOutside 域名的注册商和 DNS；代理（橙色云朵）的取舍 | 无 |
