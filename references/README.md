@@ -44,3 +44,4 @@
 | Let's Encrypt | [Let's Encrypt](Lets-Encrypt.md)：免费 TLS 证书；没有域名时也能给 IP 地址签 6 天的短期证书 | 无 |
 | Cloudflare | [Cloudflare](Cloudflare.md)：MyOutside 域名的注册商和 DNS；代理（橙色云朵）的取舍 | 无 |
 | Caddy | [Caddy](Caddy.md)：自动 HTTPS 的网页服务器 / 反向代理；MyOutside 服务器的对外入口 | 无 |
+| Superpowers | [Superpowers](Superpowers.md)：给编码 agent 的一整套方法论 skill（头脑风暴 → 设计 → 计划 → 子 agent 一路执行） | [有](Superpowers-thoughts.md) |
