@@ -29,7 +29,9 @@
 
 - 价格（[R2 pricing](https://developers.cloudflare.com/r2/pricing/)，2026-11-11 查）：免费额度每月 10 GB 存储、100 万次写类操作、1000 万次读类操作，下载（流出流量）不收费；超出后标准存储 $0.015 / GB·月。
 - 推断：开通 R2 要求账号里有支付方式（没核实）。
-- 候选用途：MyOutside 服务器数据库的异地加密备份（还没定）。
+- **自动删除（Object lifecycles）**（[文档](https://developers.cloudflare.com/r2/buckets/object-lifecycles/)）：按前缀（相当于文件夹）设规则，例如「上传满 90 天就删」；到期后一般 24 小时内删掉。改这些规则要账号级的 `Workers R2 Storage Write` 权限。
+- **锁定（Bucket locks）**（[文档](https://developers.cloudflare.com/r2/buckets/bucket-locks/)）：按前缀设保留期（多少天，或永久），期间对象不能被删除、覆盖，也不会被自动删除规则删掉（锁定优先）；不影响上传新对象。被锁住时删除请求返回 409 `ObjectLockedByBucketPolicy`。有锁定规则的桶不能清空。推断：和自动删除规则一样，改锁定规则要账号级权限，只能读写这个桶里对象的令牌改不了（没核实）。
+- 用途：MyOutside 服务器数据库的异地加密备份（[D-0092](../user-spec/decisions/0092-backup-to-r2.md)）。
 
 ## 后台给的建议（作者在 2026-11-11 看到的）
 
