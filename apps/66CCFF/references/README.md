@@ -2,7 +2,7 @@
 
 > 这里记录 **66CCFF（纯蓝）领域**的外部工具、模型和资料线索；不是 spec，也不是决策。
 >
-> 外部项目分三类：`separation/` 是分轨 / 音频源分离，`midi/` 是音频转 MIDI / 多轨转录，`piano-roll/` 是钢琴卷帘 / MIDI 查看与学琴工具（给纯蓝的卷帘设计做参考）。分类目录下，一个项目直接一个 `.md`；需要多个文件时用 `<项目名>-<主题>.md`，不再建项目目录。
+> 分四类：`separation/` 是分轨 / 音频源分离，`midi/` 是音频转 MIDI / 多轨转录，`piano-roll/` 是钢琴卷帘 / MIDI 查看与学琴工具（给纯蓝的卷帘设计做参考），`singers/` 是虚拟歌手、声库和歌曲资料（给对唱分轨挑数据、测试曲用）。分类目录下，一个项目（歌手、歌、系列）直接一个 `.md`；需要多个文件时用 `<项目名>-<主题>.md`，不再建项目目录。
 >
 > Gemini 对话（2026-11-07）只作为推荐来源之一；能核对的事实以官方仓库、论文或模型页面为准，未核对的标为「待核实」。不把 Gemini 原文复制进来。
 
@@ -61,6 +61,16 @@
 | [timbreAMT](separation/timbreamt.md) | TISMIR 2026，不分离音频、按音色把音符聚成几条 MIDI；按乐器类别训练；《白石溪》上两类不是两个人（54%），作者看了：基本没分出来（[想法](separation/timbreamt-thoughts.md)） |
 | [SpeechBrain ECAPA](separation/speechbrain-ecapa.md) | 说话人识别模型；不分离，改为判断「谁在唱」再把 GAME 的音符分到两个人；作者听了：比 UNMIXX 好，但还不可用（[想法](separation/speechbrain-ecapa-thoughts.md)）；两人同时唱不同的音时无能为力 |
 | [MedleyVox 与合唱分离模型](separation/medleyvox.md) | 评测集 + 社区模型（Cyru5 权重、MVSEP duet 模型、karaoke 模型） |
+
+## 虚拟歌手、声库和歌曲
+
+| 资料 | 备注 |
+|---|---|
+| [洛天依](singers/luo-tianyi.md) | Vsinger；V3 2012、V4 2017 年底、V5 2022、ACE AI 2022、XS AI 2024；2017-12-30 之前的歌只可能是 V3 |
+| [乐正绫](singers/yuezheng-ling.md) | Vsinger；V3 2015-07-17、V5 2022、ACE AI 2023；2015 年 7 月之前没有声音 |
+| [白石溪](singers/baishixi.md) | 2016 原版（天依 V3 + 阿绫 V3，调教 Digger）和 2023 ACE 重制版；谁唱哪句；网易云上有官方伴奏 |
+| [中华少女系列](singers/zhonghua-shaonv.md) | 纯白的系列；正篇都是天依；《真·中华烛火娘》是阿绫；专辑里墨水娘、烛火娘是两人混合音源 |
+| [歌曲清单](singers/songs.md) | 用过和查到的独唱、双版本（世末歌者）、合唱测试曲（大司徒系列）；日期、声库、调教、网易云 ID |
 
 ## 钢琴卷帘 / MIDI 查看工具
 
