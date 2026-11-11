@@ -21,13 +21,13 @@ import {
   type X66CCFFTranscription,
 } from "@myoutside/contracts";
 import {
-  defineAsync,
+  definePlain,
   defineRead,
   defineTx,
   KernelError,
   type AppDb,
   type AppModule,
-  type AsyncContext,
+  type PlainContext,
   type SqlValue,
 } from "@myoutside/kernel";
 import { Midi } from "@tonejs/midi";
@@ -591,7 +591,7 @@ export function createX66CCFFApp({
        * 导入音频：慢操作（复制 + 探测）在异步 API 里，最后用事务写入。
        * 只接受常见音频扩展名；文件复制到应用私有目录。
        */
-      importTrack: defineAsync(ImportTrackInput, async (ctx, input) => {
+      importTrack: definePlain(ImportTrackInput, async (ctx, input) => {
         const source = resolve(input.path);
         if (!existsSync(source) || !statSync(source).isFile()) {
           throw new KernelError("VALIDATION", "文件不存在");
@@ -630,7 +630,7 @@ export function createX66CCFFApp({
        * 六轨分离（普通异步函数）：创建任务 → 运行 BS-RoFormer → 进度事件 → 事务写六轨。
        * 前端用 runId 订阅事件、用 cancel(runId) 取消。
        */
-      startSeparation: defineAsync(StartSeparationInput, async (ctx, input) => {
+      startSeparation: definePlain(StartSeparationInput, async (ctx, input) => {
         const track = getTrackOrThrow(ctx.db, input.trackId);
         // 重新分离会换掉分轨文件，正在转写的会读到被删掉的文件
         if (runningTranscription(ctx.db, track.id)) throw new KernelError("PRECONDITION", "这首曲目正在转 MIDI");
@@ -725,7 +725,7 @@ export function createX66CCFFApp({
        * 转 MIDI（普通异步函数，66CCFF-0012）：所选 stem（几条就先混成一条）→ MuScriptor（只允许一个乐器）→ 单轨 MIDI，
        * 存到 tracks/<id>/midi/<转写 id>.mid。进度经事件和记录两条路给界面；前端用 runId 取消。
        */
-      startTranscription: defineAsync(StartTranscriptionInput, async (ctx, input) => {
+      startTranscription: definePlain(StartTranscriptionInput, async (ctx, input) => {
         const track = getTrackOrThrow(ctx.db, input.trackId);
         const useGame = input.engine === "game";
         let script: string;
@@ -831,7 +831,7 @@ export function createX66CCFFApp({
         }
       }),
 
-      deleteTranscription: defineAsync(TranscriptionIdInput, async (ctx, input) => {
+      deleteTranscription: definePlain(TranscriptionIdInput, async (ctx, input) => {
         const row = ctx.db.get<TranscriptionRow>("transcription", { id: input.transcriptionId });
         if (!row) throw new KernelError("NOT_FOUND", `转写记录不存在：${input.transcriptionId}`);
         if (row.status === "running" && !isStaleTranscription(row)) {
@@ -842,7 +842,7 @@ export function createX66CCFFApp({
         return { ok: true as const };
       }),
 
-      deleteTrack: defineAsync(DeleteTrackInput, async (ctx, input) => {
+      deleteTrack: definePlain(DeleteTrackInput, async (ctx, input) => {
         const track = getTrackOrThrow(ctx.db, input.trackId);
         if (runningTranscription(ctx.db, track.id)) throw new KernelError("PRECONDITION", "转 MIDI 进行中，不能删除");
         const running = ctx.db.get<JobRow>("job", { track_id: track.id, status: "running" });

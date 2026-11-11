@@ -8,7 +8,7 @@ import {
   type SourceRegistry,
 } from "@myoutside/agent";
 import type { AiMessage, GenerateOutput, GetRequestOutput, ReasoningEffort, ReplyStep } from "@myoutside/contracts";
-import { KernelError, type AppDb, type AsyncContext, type KernelErrorCode } from "@myoutside/kernel";
+import { KernelError, type AppDb, type PlainContext, type KernelErrorCode } from "@myoutside/kernel";
 import { estimateTokens, trimTurns, type HistoryTurn } from "./history.js";
 import { parseSteps, type ConversationRow, type MessageRow } from "./mapping.js";
 
@@ -218,7 +218,7 @@ const PASS_THROUGH_CODES = new Set<KernelErrorCode>(["PRECONDITION", "UPSTREAM",
  * 3. 调用事务 API `dialog.saveReply` 把回复挂在这条用户消息下（明确的父节点，生成期间切换分支也不会挂错地方）。
  * 被停止或出错中断时保存已生成的部分（标记 stopped / error；一个字都没输出则不保存，用户消息保留，可以重试）。
  */
-export async function generateReply(ctx: AsyncContext, conversationId: string, parentId: string): Promise<GenerateOutput> {
+export async function generateReply(ctx: PlainContext, conversationId: string, parentId: string): Promise<GenerateOutput> {
   if (running.has(conversationId)) throw new KernelError("PRECONDITION", "这个会话正在生成回复");
   running.add(conversationId);
   try {

@@ -24,7 +24,7 @@ import {
   SetWebSearchInput,
   SwitchBranchInput,
 } from "@myoutside/contracts";
-import { defineAsync, defineRead, defineTx, KernelError, type AppDb, type AppModule, type SqlValue } from "@myoutside/kernel";
+import { definePlain, defineRead, defineTx, KernelError, type AppDb, type AppModule, type SqlValue } from "@myoutside/kernel";
 import {
   buildRawRequest,
   buildSystemPrompt,
@@ -431,7 +431,7 @@ export const dialogApp: AppModule = {
     }),
 
     /** 发送一条用户消息并生成回复（普通的异步函数，D-0063）：回复由后端保存，前端是否还在不影响结果 */
-    send: defineAsync(SendMessageInput, async (ctx, input) => {
+    send: definePlain(SendMessageInput, async (ctx, input) => {
       const { messageId } = (await ctx.call("dialog.appendMessage", {
         conversationId: input.conversationId,
         role: "user",
@@ -441,10 +441,10 @@ export const dialogApp: AppModule = {
     }),
 
     /** 为一条用户消息生成回复：重新生成（DIALOG-0012）、失败或中断后重试 */
-    generate: defineAsync(GenerateInput, (ctx, input) => generateReply(ctx, input.conversationId, input.parentId)),
+    generate: definePlain(GenerateInput, (ctx, input) => generateReply(ctx, input.conversationId, input.parentId)),
 
     /** 编辑一条用户消息（产生新分叉）并生成回复 */
-    editAndSend: defineAsync(EditAndSendInput, async (ctx, input) => {
+    editAndSend: definePlain(EditAndSendInput, async (ctx, input) => {
       const original = ctx.db.get<MessageRow>("message", { id: input.messageId });
       if (!original) throw new KernelError("NOT_FOUND", `消息不存在：${input.messageId}`);
       const { messageId } = (await ctx.call("dialog.editUserMessage", input)) as { messageId: string };
@@ -462,7 +462,7 @@ export const dialogApp: AppModule = {
      * 实验室运行：把请求体原样交给平台 raw API，成功 / 失败都先存一条运行记录再返回。
      * 运行在后端进行，前端关掉也不丢记录；取消时存为 aborted。
      */
-    labRun: defineAsync(LabRunInput, async (ctx, input) => {
+    labRun: definePlain(LabRunInput, async (ctx, input) => {
       const started = Date.now();
       let response: unknown = null;
       let status: "ok" | "error" | "aborted" = "ok";

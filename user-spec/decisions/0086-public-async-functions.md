@@ -32,9 +32,9 @@ D-0063 当时的理由是让跨子应用的契约保持两种干净的形态（�
 
 ### 名字：普通 API
 
-- 第三种执行方式（可以等外部，写数据经本应用的事务 API，整体不保证原子）叫**普通 API**（作者，2026-11-11：「这类异步公开 API 叫普通 API」；内部的也这么叫是 agent 的提议，待作者确认）。以前叫「普通的异步函数」（D-0063 当时决定不另起名字），旧决策里的这个说法就是它。
+- 第三种执行方式（可以等外部，写数据经本应用的事务 API，整体不保证原子）叫**普通 API**（作者，2026-11-11：「这类异步公开 API 叫普通 API」；内部的也这么叫，是 agent 的提议，作者同意）。和只读 API、事务 API 一样，它只表示执行方式，不分公开还是内部；需要区分时说「公开的普通 API」「内部的普通 API」。以前叫「普通的异步函数」（D-0063 当时决定不另起名字），旧决策里的这个说法就是它。
 - 和另外两种并列：只读 API 保证不改数据，事务 API 保证原子；普通 API 没有这类特殊保证——所以公开时，安全要它自己做。
-- 代码里仍是 `defineAsync`、函数类别 `async`，不改名：改名要动所有子应用，收益只是对齐名字；对应关系写在 `concepts/subapp.md`。
+- 代码里跟着改名：`defineAsync` → `definePlain`，函数类别 `async` → `plain`，`AsyncContext` → `PlainContext`。原来的 `async` 也不准确——只读 API 同样可以是异步的；三种 API 在代码里对应 `defineRead` / `defineTx` / `definePlain`。（agent 起初想不改名，作者提醒现在是改动最小的时候、以后只会越来越多，于是改了。）
 
 ### 公开 API 的两条约束（作者）
 
@@ -44,7 +44,7 @@ D-0063 当时的理由是让跨子应用的契约保持两种干净的形态（�
 
 ### 内核
 
-- `defineAsync(schema, handler, { visibility: "public" })`：普通 API 可以公开；默认仍是内部。
+- `definePlain(schema, handler, { visibility: "public" })`：普通 API 可以公开；默认仍是内部。
 - 权限照旧：其他子应用要调用，函数必须是公开的，且在自己的清单 `uses` 里声明。
 - 谁能调用公开的普通 API：
   - 其他子应用的**前端**、其他子应用的**普通 API**：可以；
@@ -106,9 +106,9 @@ D-0063 当时的理由是让跨子应用的契约保持两种干净的形态（�
 
 ## 修订记录
 
-- 2026-11-11：作者把这类函数命名为「普通 API」，并把公开 API 的约束归纳成两条；全文改用新名字。
+- 2026-11-11：作者把这类函数命名为「普通 API」（公开、内部都这么叫），并把公开 API 的约束归纳成两条；全文改用新名字；代码里的 `defineAsync` 改名为 `definePlain`。
 - 2026-11-11：改写「不乱」一节。agent 起初把作者说的「写冲突」理解成数据库层面之外的逻辑穿插，作者纠正：本意是事务层面的写冲突——「下载音乐」不是事务所以可以放开，「长事务」当作普通的异步函数开放才会冲突、内核难以保证。
 
 ## 相关文档
 
-- `docs/architecture.md` §3；`packages/kernel/src/kernel.ts`（`checkAccess`、`makeAsyncContext`）
+- `docs/architecture.md` §3；`packages/kernel/src/kernel.ts`（`checkAccess`、`makePlainContext`）

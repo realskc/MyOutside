@@ -1,5 +1,5 @@
 export { createKernel, SHELL_CALLER, type Kernel, type KernelOptions } from "./kernel.js";
-export { defineAsync, defineRead, defineTx, type ApiOptions } from "./api.js";
+export { definePlain, defineRead, defineTx, type ApiOptions } from "./api.js";
 export { KernelError, type KernelErrorCode } from "./errors.js";
 export {
   createPlatformAiDefinition,
@@ -19,8 +19,8 @@ export type {
   AppDb,
   AppManifest,
   AppModule,
-  AsyncContext,
-  AsyncHandler,
+  PlainContext,
+  PlainHandler,
   DbAdapter,
   ExecuteResult,
   HandleOptions,

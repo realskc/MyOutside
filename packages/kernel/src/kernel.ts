@@ -9,7 +9,7 @@ import type {
   ApiDefinition,
   AppManifest,
   AppModule,
-  AsyncContext,
+  PlainContext,
   DbAdapter,
   HandleOptions,
   KernelResponse,
@@ -343,7 +343,7 @@ export function createKernel({ storage, secrets }: KernelOptions) {
     };
   }
 
-  function makeAsyncContext(fn: RegisteredFunction, frame: CallFrame): AsyncContext {
+  function makePlainContext(fn: RegisteredFunction, frame: CallFrame): PlainContext {
     return {
       appId: fn.appId,
       caller: frame.caller,
@@ -411,7 +411,7 @@ export function createKernel({ storage, secrets }: KernelOptions) {
   async function dispatch(fn: RegisteredFunction, input: unknown, frame: CallFrame): Promise<unknown> {
     if (fn.kind === "read") return runRead(fn, input, frame);
     if (fn.kind === "tx") return executeTx(fn, input, frame);
-    return (fn.handler as (c: AsyncContext, i: unknown) => Promise<unknown>)(makeAsyncContext(fn, frame), input);
+    return (fn.handler as (c: PlainContext, i: unknown) => Promise<unknown>)(makePlainContext(fn, frame), input);
   }
 
   async function handle(request: { call: string; payload?: unknown }, options: HandleOptions = {}): Promise<KernelResponse> {

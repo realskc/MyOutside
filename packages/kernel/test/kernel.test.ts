@@ -4,7 +4,7 @@ import { describe, expect, it, vi } from "vitest";
 import { z } from "zod";
 import {
   createKernel,
-  defineAsync,
+  definePlain,
   defineRead,
   defineTx,
   type AppManifest,
@@ -87,7 +87,7 @@ const notesApp: AppModule = {
       return "written";
     }),
     /** 普通 API：等一下外部，再调用本应用的事务 API 写入两次（两个短事务） */
-    importTwo: defineAsync(z.object({ title: z.string().min(1) }), async (ctx, input) => {
+    importTwo: definePlain(z.object({ title: z.string().min(1) }), async (ctx, input) => {
       await new Promise((resolve) => setTimeout(resolve, 5));
       const a = (await ctx.call("notes.createNote", { title: `${input.title}-1` })) as { id: string };
       ctx.emit({ type: "progress", done: 1 });
@@ -95,26 +95,26 @@ const notesApp: AppModule = {
       return { ids: [a.id, b.id] };
     }),
     /** 普通 API：中途失败，已完成的短事务不回滚 */
-    importThenFail: defineAsync(z.object({}), async (ctx) => {
+    importThenFail: definePlain(z.object({}), async (ctx) => {
       await ctx.call("notes.createNote", { title: "kept" });
       await ctx.call("notes.fail", {});
       return "unreachable";
     }),
     /** 普通 API：被取消后保存已有的进度（取消不拒绝写入，由函数自己决定） */
-    saveOnAbort: defineAsync(z.object({}), async (ctx) => {
+    saveOnAbort: definePlain(z.object({}), async (ctx) => {
       await new Promise<void>((resolve) => ctx.signal.addEventListener("abort", () => resolve()));
       await ctx.call("notes.createNote", { title: "partial" });
       return "saved";
     }),
     /** 普通 API：等待取消 */
-    waitForever: defineAsync(z.object({}), async (ctx) => {
+    waitForever: definePlain(z.object({}), async (ctx) => {
       await new Promise((_resolve, reject) => {
         ctx.signal.addEventListener("abort", () => reject(new Error("aborted")));
       });
       return "unreachable";
     }),
     /** 公开的普通 API（D-0086）：等一下外部，再经本应用的事务 API 写入；记下是谁请它办的 */
-    importPublic: defineAsync(
+    importPublic: definePlain(
       z.object({ title: z.string().min(1) }),
       async (ctx, input) => {
         await new Promise((resolve) => setTimeout(resolve, 5));
@@ -125,7 +125,7 @@ const notesApp: AppModule = {
       { visibility: "public" },
     ),
     /** 公开的普通 API：一直等到发起方取消 */
-    waitPublic: defineAsync(
+    waitPublic: definePlain(
       z.object({}),
       async (ctx) => {
         await new Promise((_resolve, reject) => {
@@ -168,7 +168,7 @@ const tasksApp: AppModule = {
     callUndeclared: defineRead(z.object({}), (ctx) => ctx.call("seed.listItems", {})),
     callAi: defineRead(z.object({}), (ctx) => ctx.call("platform.ai.chat", { messages: [{ role: "user", content: "hi" }] })),
     /** 普通 API 调用其他子应用公开的普通 API，再写自己的数据 */
-    importViaNotes: defineAsync(z.object({ title: z.string().min(1) }), async (ctx, input) => {
+    importViaNotes: definePlain(z.object({ title: z.string().min(1) }), async (ctx, input) => {
       const note = (await ctx.call("notes.importPublic", { title: input.title })) as { id: string };
       ctx.emit({ type: "progress", from: "tasks" });
       await ctx.call("tasks.insertTask", { title: input.title });
@@ -178,9 +178,9 @@ const tasksApp: AppModule = {
       ctx.db.insert("task", { id: randomUUID(), title: input.title, created_at: Date.now() });
       return { ok: true };
     }),
-    waitViaNotes: defineAsync(z.object({}), async (ctx) => ctx.call("notes.waitPublic", {})),
+    waitViaNotes: definePlain(z.object({}), async (ctx) => ctx.call("notes.waitPublic", {})),
     /** 普通 API 直接调用其他子应用的事务 API：不允许（写别人的数据只能在事务 API 里，D-0063） */
-    asyncCallsOtherTx: defineAsync(z.object({}), async (ctx) => ctx.call("notes.createNote", { title: "x" })),
+    plainCallsOtherTx: definePlain(z.object({}), async (ctx) => ctx.call("notes.createNote", { title: "x" })),
     /** 只读 API 调用公开的普通 API：不允许（会间接写数据） */
     readCallsPublicAsync: defineRead(z.object({}), (ctx) => ctx.call("notes.importPublic", { title: "x" })),
     /** 事务 API 调用公开的普通 API：不允许（事务 API 必须同步） */
@@ -593,7 +593,7 @@ describe("kernel", () => {
 
   it("公开的普通 API：只读 API、事务 API 不能调用；普通 API 仍不能直接调用其他子应用的事务 API", async () => {
     const { storage, kernel } = setup();
-    for (const call of ["tasks.readCallsPublicAsync", "tasks.txCallsPublicAsync", "tasks.asyncCallsOtherTx"]) {
+    for (const call of ["tasks.readCallsPublicAsync", "tasks.txCallsPublicAsync", "tasks.plainCallsOtherTx"]) {
       const r = await kernel.handle({ call, payload: {} });
       expect(r.ok, call).toBe(false);
       if (!r.ok) expect(r.error.code, call).toBe("TX_CALL_INVALID");

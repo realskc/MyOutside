@@ -24,7 +24,7 @@
 
 **只读句柄**：只读 API 与普通的异步函数拿到的 `ctx.db` 的写入方法会抛出 `FORBIDDEN`。
 
-**普通的异步函数**：函数类别 `async`（`defineAsync`），只能是内部 API；`ctx.call` 可以调用只读 API、本子应用的事务 API（各自进写队列、独立成事务）与本子应用的异步函数。
+**普通的异步函数**（现在叫普通 API，函数类别 `plain`、`definePlain`，D-0086）：函数类别 `async`（`defineAsync`），只能是内部 API；`ctx.call` 可以调用只读 API、本子应用的事务 API（各自进写队列、独立成事务）与本子应用的异步函数。
 
 **清单**：每个子应用一份 `manifest.json`，由 Electron 主进程以静态 `import` 读入后传给 `kernel.registerApp(app, manifest)`；内核校验 id 与协议版本（当前为 1）。**自动发现与装载子应用暂不实现**——仍在 Electron 主进程代码里逐个注册。
 

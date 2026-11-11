@@ -91,7 +91,7 @@ export interface ReadContext extends RunContext {
   call(name: string, payload?: unknown): Promise<unknown>;
 }
 
-export interface AsyncContext extends RunContext {
+export interface PlainContext extends RunContext {
   readonly appId: string;
   /** 只读句柄：写数据只能通过调用本子应用的事务 API */
   readonly db: AppDb;
@@ -101,7 +101,7 @@ export interface AsyncContext extends RunContext {
 
 export type TxHandler = (ctx: TxContext, input: any) => unknown;
 export type ReadHandler = (ctx: ReadContext, input: any) => unknown | Promise<unknown>;
-export type AsyncHandler = (ctx: AsyncContext, input: any) => Promise<unknown>;
+export type PlainHandler = (ctx: PlainContext, input: any) => Promise<unknown>;
 
 /** 可见性：公开 API 其他子应用可调用（还需在其清单 uses 里声明）；内部 API 只有本子应用能调用 */
 export type ApiVisibility = "public" | "internal";
@@ -109,7 +109,7 @@ export type ApiVisibility = "public" | "internal";
 export type ApiDefinition =
   | { kind: "read"; input: ZodType<any>; handler: ReadHandler; visibility: ApiVisibility }
   | { kind: "tx"; input: ZodType<any>; handler: TxHandler; visibility: ApiVisibility }
-  | { kind: "async"; input: ZodType<any>; handler: AsyncHandler; visibility: ApiVisibility };
+  | { kind: "plain"; input: ZodType<any>; handler: PlainHandler; visibility: ApiVisibility };
 
 export interface AppModule {
   id: string;

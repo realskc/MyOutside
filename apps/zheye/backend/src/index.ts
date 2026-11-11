@@ -15,7 +15,7 @@ import {
   type ZheyeTrialSummary,
   type ZheyeType,
 } from "@myoutside/contracts";
-import { defineAsync, defineRead, defineTx, KernelError, type AppDb, type AppModule, type WhereValue } from "@myoutside/kernel";
+import { definePlain, defineRead, defineTx, KernelError, type AppDb, type AppModule, type WhereValue } from "@myoutside/kernel";
 import { availableTypes, loadRecipe } from "./recipe.js";
 import { runTrial } from "./trial.js";
 
@@ -241,7 +241,7 @@ export function createZheyeApp(options: ZheyeAppOptions): AppModule {
        * 开始一次试跑（普通的异步函数，D-0063）：读取当前配方、存下快照，然后跑完整个流程才返回。
        * 一开始先推送 { type: "trial_created", runId }，界面据此显示这次试跑；界面关掉不影响试跑。
        */
-      trialStart: defineAsync(ZheyeTrialStartInput, async (ctx, input) => {
+      trialStart: definePlain(ZheyeTrialStartInput, async (ctx, input) => {
         let recipe: ZheyeRecipe;
         try {
           recipe = loadRecipe(options.recipesDir, input.type);
@@ -273,7 +273,7 @@ export function createZheyeApp(options: ZheyeAppOptions): AppModule {
        * 停止一次进行中的试跑（不是发起它的页面也能停）。
        * 正在等模型输出时，要等这一次输出结束才停下；发起它的页面用取消（outside.cancel）能立刻停。
        */
-      trialStop: defineAsync(ZheyeTrialStopInput, async (_ctx, input) => {
+      trialStop: definePlain(ZheyeTrialStopInput, async (_ctx, input) => {
         const controller = active.get(input.runId);
         if (controller) controller.abort();
         return { ok: true as const, stopping: Boolean(controller) };

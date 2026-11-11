@@ -1,6 +1,6 @@
 import { createSourceRegistry, runToolLoop, webFetchTool, webSearchTool, type AgentContext, type Round } from "@myoutside/agent";
 import type { AiUsage, ReasoningEffort, ZheyeRecipe, ZheyeTrialAppendInput, ZheyeType } from "@myoutside/contracts";
-import { estimateCost, WEB_REQUEST_PRICE, type AsyncContext } from "@myoutside/kernel";
+import { estimateCost, WEB_REQUEST_PRICE, type PlainContext } from "@myoutside/kernel";
 import { createDrafts } from "./drafts.js";
 import { renderPrompt, TYPE_LABELS } from "./recipe.js";
 
@@ -57,7 +57,7 @@ export interface TrialOutcome {
  * 被停止或出错时，已经存下的轨迹与花费都保留。
  */
 export async function runTrial(
-  ctx: AsyncContext,
+  ctx: PlainContext,
   input: { runId: string; subject: string; type: ZheyeType; recipe: ZheyeRecipe; signal: AbortSignal },
 ): Promise<TrialOutcome> {
   const { runId, subject, type, recipe } = input;

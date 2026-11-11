@@ -3,7 +3,7 @@ import { existsSync, mkdirSync, writeFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { isAbsolute, join, resolve } from "node:path";
 import { z } from "zod";
-import { defineAsync, defineRead, defineTx, KernelError, type AppModule, type AsyncContext, type ReadContext } from "@myoutside/kernel";
+import { definePlain, defineRead, defineTx, KernelError, type AppModule, type PlainContext, type ReadContext } from "@myoutside/kernel";
 import {
   NeteaseDownloadInput,
   NeteaseSearchInput,
@@ -239,7 +239,7 @@ export function createNeteaseApp(options: NeteaseAppOptions = {}): AppModule {
        * 硬性限制（作者，NETEASE-0002）：在应用内部排队，一次只下一首，上一首结束后随机等 10–20 秒才开始下一首；每天最多 50 首。
        * 不论是本应用的界面还是别的子应用发起，都排同一个队、共用同一份额度。
        */
-      download: defineAsync(
+      download: definePlain(
         NeteaseDownloadInput,
         async (ctx, input): Promise<NeteaseDownloadOutput> => {
           const api = client();
@@ -331,7 +331,7 @@ export function createNeteaseApp(options: NeteaseAppOptions = {}): AppModule {
  * 文件夹里已有同名文件（例如官方客户端下过）就不重复下载、不覆盖，也不记下载记录（NETEASE-0002：记录只算真正下载了的）。
  */
 async function downloadFlow(
-  ctx: AsyncContext,
+  ctx: PlainContext,
   api: NeteaseClient,
   input: NeteaseDownloadInput,
   dir: string,
