@@ -10,7 +10,7 @@
 - 自动分配的权威 DNS 服务器：`cameron.ns.cloudflare.com`、`cortney.ns.cloudflare.com`（各个账号分到的名字不同）。
 - 新域名加了记录后，几分钟内公共 DNS（1.1.1.1、8.8.8.8）就能查到（在服务器上查的）。
 - 区域的 SOA 记录里，「不存在」的缓存时间是 1800 秒（实测）。
-- **自动续费**（[Renew domains](https://developers.cloudflare.com/registrar/account-options/renew-domains/)）：默认开着；在 **Manage domains** 页面（`https://dash.cloudflare.com/?to=/:account/registrar/domains`）每个域名有 Auto-renew 开关。到期前约 30 天第一次尝试续费，失败了再试几次，最后一次在到期前一天；失败会发邮件。按注册局的原价续，不加价。要靠账号里能扣款的支付方式。
+- **自动续费**（[Renew domains](https://developers.cloudflare.com/registrar/account-options/renew-domains/)）：默认开着。文档说在 **Manage domains** 页面（`https://dash.cloudflare.com/?to=/:account/registrar/domains`）每个域名有 Auto-renew 开关；但 2026-11 的后台里这个链接会跳到 **Domains → Overview**（列的是网站这一侧：状态、访客、套餐，没有续费设置），注册相关的在左侧菜单 **Domains → Registrations**（`/<账号 id>/domains/registrations`）里（作者下载的页面里看到的菜单；Registrations 页里具体长什么样还没看到）。到期前约 30 天第一次尝试续费，失败了再试几次，最后一次在到期前一天；失败会发邮件。按注册局的原价续，不加价。要靠账号里能扣款的支付方式。
 
 ## DNS 记录的代理（橙色云朵）
 
