@@ -18,3 +18,4 @@
 | [`../apps/zheye/docs/README.md`](../apps/zheye/docs/README.md) | 哲野（未实现）：数据模型、状态机、API、流程 |
 | `future/one-off-functions.md` | 临时函数（未实现） |
 | `future/multi-device.md` | 多端（未实施） |
+| `future/web-version.md` | 服务器版 MyOutside：第 2 步第一段，用测试数据上线（未实施） |
