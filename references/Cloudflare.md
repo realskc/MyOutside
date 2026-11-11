@@ -19,6 +19,10 @@
 - 「Redirect rule」（跳转规则）这类功能要求走代理（推断：后台的说明是这么写的，没有逐个核实）。
 - Auto TTL：DNS only 的记录，权威服务器返回的 TTL 是 300 秒（实测）。
 - 常见说法：免费版的代理在中国大陆访问时，常被分到海外节点，速度不稳定（没有核实）。
+- **IPv6**：走代理的记录，Cloudflare 默认自动给出它自己的 IPv4 和 IPv6 地址（自动生成 AAAA），免费版也一样，非企业版关不掉；所以源站只有 IPv4 时，只有 IPv6 的访客也能经 Cloudflare 访问（[IPv6 compatibility](https://developers.cloudflare.com/network/ipv6-compatibility/)）。源站同时有 IPv4 和 IPv6 时，Cloudflare 优先用 IPv4 连源站。DNS only 的记录没有这个效果。
+- **走代理时的限制**（2026-11-11 查的官方文档）：
+  - 单个请求最大上传 100 MB（Free、Pro；Business 200 MB）；更大的要分块，或走 DNS only 的记录（[Default cache behavior](https://developers.cloudflare.com/cache/concepts/default-cache-behavior/)）；
+  - 源站 125 秒内没有响应就报 524（Proxy Read Timeout，非企业版不能改）；连接空闲 900 秒断开（[Connection limits](https://developers.cloudflare.com/fundamentals/reference/connection-limits/)）。
 
 ## 后台给的建议（作者在 2026-11-11 看到的）
 
