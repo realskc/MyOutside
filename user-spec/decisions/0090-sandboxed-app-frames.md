@@ -23,6 +23,8 @@
 - **子应用的地址随意**：都在 `myoutside.org` 下，按路径区分，不需要额外的子域名和证书。
 - 外壳是平台自己的代码，是这套隔离的关键，要写严。
 - 实现前先在 Chrome、Safari、Firefox 里实测上面这些浏览器行为（无名源读不到别人的存储、CSP 的 `sandbox` 对直接打开也生效、`event.source` 能区分 iframe）。
+- **每次打开子应用都新建一个 iframe**，换掉旧的：旧页面在卸载前发来的消息，`source` 对不上任何现有的面板，不会被算到新打开的子应用头上。
+- **子应用的本地存储** `outside.storage`（`get` / `set` / `remove`，值是字符串）：外壳按子应用分开，存在自己的 localStorage 里（键是 `mo.app.<应用 id>.<键>`），只在这台浏览器上。
 
 ## 考虑过、没有采用
 
@@ -42,6 +44,15 @@
 - 浏览器实测发现上面的行为不成立时；
 - 这只管界面这一半；子应用的后端也要关起来，才能防住恶意子应用（见 platform.md「分发与隔离」的 agent 注），那是另一条决策。
 
+## 实测（2026-11-11，Chromium：Electron 38 自带的；`apps/server/scripts/browser-check.cjs`）
+
+- 子应用页面的源是 `null`；读外壳的页面、localStorage、cookie 都被挡住；直接 `fetch` 服务器、直接连 WebSocket 都失败（服务端按 Origin 拒绝）；
+- 子应用冒充外壳改平台设置：`FORBIDDEN`；
+- 子应用页面里再嵌一个页面，从里面直接给外壳发调用、或用它自己的桥调用：外壳都不理；
+- 切换子应用：换成了新的 iframe 元素，旧的已移出页面；
+- 对话的调用正常、KaTeX 字体能加载；围棋的座位令牌重新打开后不变。
+- Safari、Firefox 还没测。
+
 ## 相关文档
 
-- 实现后写进 `docs/architecture.md`。
+- `docs/future/web-version.md`；实现：`apps/server/web/client.js`（外壳一侧）、`apps/server/web/bridge.js`（子应用一侧）。部署后写进 `docs/architecture.md`。

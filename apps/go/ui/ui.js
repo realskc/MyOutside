@@ -255,6 +255,20 @@
     }
   }
 
+  /** 网页版（D-0090）：沙箱里没有 localStorage，座位令牌改存进外壳代管的 outside.storage（只在这台浏览器上） */
+  async function loadToken() {
+    const store = window.outside && window.outside.storage;
+    if (!store) return token;
+    try {
+      const saved = await store.get(TOKEN_KEY);
+      if (saved) return saved;
+      await store.set(TOKEN_KEY, token);
+    } catch {
+      /* 存不了：本次用临时令牌，刷新后可用「找回座位」 */
+    }
+    return token;
+  }
+
   async function call(name, payload) {
     const response = await bridge.call(name, payload);
     if (!response || !response.ok) {
@@ -826,6 +840,7 @@
 
   initLanguage()
     .then(async () => {
+      token = await loadToken();
       await ensureJoined();
       await refresh();
       setInterval(() => void refresh(), 500);

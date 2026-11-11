@@ -346,6 +346,46 @@ importers:
         specifier: ^3.0.0
         version: 3.2.7(@types/node@24.19.0)(tsx@4.23.15)
 
+  apps/server:
+    dependencies:
+      '@myoutside/dialog':
+        specifier: workspace:*
+        version: link:../dialog
+      '@myoutside/go':
+        specifier: workspace:*
+        version: link:../go
+      '@myoutside/kernel':
+        specifier: workspace:*
+        version: link:../../packages/kernel
+      '@myoutside/kernel-node':
+        specifier: workspace:*
+        version: link:../../packages/kernel-node
+      '@myoutside/vocab':
+        specifier: workspace:*
+        version: link:../vocab
+      '@myoutside/zheye':
+        specifier: workspace:*
+        version: link:../zheye
+      ws:
+        specifier: ^8.18.0
+        version: 8.22.2
+    devDependencies:
+      '@types/node':
+        specifier: ^24.0.0
+        version: 24.19.0
+      '@types/ws':
+        specifier: ^8.5.0
+        version: 8.18.2
+      tsx:
+        specifier: ^4.19.0
+        version: 4.23.15
+      typescript:
+        specifier: ^5.6.0
+        version: 5.9.3
+      vitest:
+        specifier: ^3.0.0
+        version: 3.2.7(@types/node@24.19.0)(tsx@4.23.15)
+
   apps/vocab:
     dependencies:
       '@myoutside/contracts':
@@ -813,6 +853,9 @@ packages:
 
   '@types/trusted-types@2.0.7':
     resolution: {integrity: sha512-ScaPdn1dQczgbl0QFTeTOmVHFULt394XJgOQNoyVhZ6r2vLnMLJfBPd53SB52T/3G36VI1/g2MZaX0cwDuXsfw==}
+
+  '@types/ws@8.18.2':
+    resolution: {integrity: sha512-67MQl+fpWKVTT1NYdnmo3U4sc/xPo/zQBncVnI74qmQa0z/b+1g6iYqNmGCPbxO+zz2aklb08a0oHfegiVd0/w==}
 
   '@types/yauzl@2.10.3':
     resolution: {integrity: sha512-oJoftv0LSuaDZE3Le4DbKX+KS9G36NzOeSap90UIK0yMA/NhKJhqlSGtNDORNRaIbQfzjXDrQa0ytJ6mNRGz/Q==}
@@ -1312,6 +1355,18 @@ packages:
   wrappy@1.0.2:
     resolution: {integrity: sha512-l4Sp/DRseor9wL6EvV2+TuQn63dMkPjZ/sp9XkghTEbV9KlPS1xUsZ3u7/IQO4wxtcFB4bgpQPRcR3QCvezPcQ==}
 
+  ws@8.22.2:
+    resolution: {integrity: sha512-/rEZ2ejown2N5gxVTHUu9bVVC7ttu0/Tgzf5hbTOixR3Fs7mbbXgn2DbdbcKgJOmpQMtrIUWivtYuVMnp/W/yA==}
+    engines: {node: '>=10.0.0'}
+    peerDependencies:
+      bufferutil: ^4.0.1
+      utf-8-validate: '>=5.0.2'
+    peerDependenciesMeta:
+      bufferutil:
+        optional: true
+      utf-8-validate:
+        optional: true
+
   yauzl@2.10.0:
     resolution: {integrity: sha512-p4a9I6X6nu6IhoGmBqAcbJy1mlC4j27vEPZX9F4L4/vZT3Lyq1VkFHw/V/PUcB9Buo+DG3iHkT0x3Qya58zc3g==}
 
@@ -1539,6 +1594,10 @@ snapshots:
 
   '@types/trusted-types@2.0.7':
     optional: true
+
+  '@types/ws@8.18.2':
+    dependencies:
+      '@types/node': 24.19.0
 
   '@types/yauzl@2.10.3':
     dependencies:
@@ -2077,6 +2136,8 @@ snapshots:
       stackback: 0.0.2
 
   wrappy@1.0.2: {}
+
+  ws@8.22.2: {}
 
   yauzl@2.10.0:
     dependencies:

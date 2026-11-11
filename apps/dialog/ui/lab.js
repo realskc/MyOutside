@@ -318,15 +318,25 @@
     setError("");
   }
 
-  /** 草稿存进 localStorage；块编辑时每次按键都会改，稍等一下再存（长请求体序列化不便宜） */
+  /** 本地存储：网页版（D-0090）沙箱里没有 localStorage，用外壳代管的 outside.storage；Electron 里用 localStorage */
+  const store = {
+    async get(key) {
+      if (window.outside && window.outside.storage) return window.outside.storage.get(key);
+      return localStorage.getItem(key);
+    },
+    async set(key, value) {
+      if (window.outside && window.outside.storage) return window.outside.storage.set(key, value);
+      localStorage.setItem(key, value);
+    },
+  };
+
+  /** 草稿存进本地存储；块编辑时每次按键都会改，稍等一下再存（长请求体序列化不便宜） */
   function saveDraft() {
     clearTimeout(saveDraft._timer);
     saveDraft._timer = setTimeout(() => {
-      try {
-        localStorage.setItem(DRAFT_KEY, mode === "blocks" ? JSON.stringify(editor.getBody(), null, 2) : requestEl.value);
-      } catch {
-        /* localStorage 不可用时忽略 */
-      }
+      store.set(DRAFT_KEY, mode === "blocks" ? JSON.stringify(editor.getBody(), null, 2) : requestEl.value).catch(() => {
+        /* 本地存储不可用时忽略 */
+      });
     }, 300);
   }
 
@@ -392,11 +402,9 @@
       return;
     }
     mode = next;
-    try {
-      localStorage.setItem(MODE_KEY, mode);
-    } catch {
+    store.set(MODE_KEY, mode).catch(() => {
       /* ignore */
-    }
+    });
     clearError();
     setRequest(body);
     applyMode();
@@ -933,8 +941,8 @@
   async function init() {
     let saved = null;
     try {
-      saved = localStorage.getItem(DRAFT_KEY);
-      mode = localStorage.getItem(MODE_KEY) === "json" ? "json" : "blocks";
+      saved = await store.get(DRAFT_KEY);
+      mode = (await store.get(MODE_KEY)) === "json" ? "json" : "blocks";
     } catch {
       /* ignore */
     }

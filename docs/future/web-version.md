@@ -1,6 +1,6 @@
 # 服务器版 MyOutside（第 2 步第一段：用测试数据上线）
 
-> 未实施。作者的预期见 `user-spec/platform.md`「多端」「分发与隔离」；依据：D-0013（云端内核）、D-0090（沙箱 iframe）、D-0091（每个用户一个库）、D-0093（登录与安全）、D-0092（备份，第二段）。服务器本身见 `docs/server.md`。
+> 第 1、2 步已在本机实现（2026-11-11，`apps/server/`），还没部署。作者的预期见 `user-spec/platform.md`「多端」「分发与隔离」；依据：D-0013（云端内核）、D-0090（沙箱 iframe）、D-0091（每个用户一个库）、D-0093（登录与安全）、D-0092（备份，第二段）。服务器本身见 `docs/server.md`。
 
 ## 1. 范围
 
@@ -23,7 +23,28 @@
 
 - **内核管理器**：`kernelFor(用户 id)`——第一次用时为这个用户建内核、注册云端应用、跑迁移；闲置 30 分钟、且没有进行中的调用时关掉；
 - **SecretCodec 的服务器实现**：用主密钥做 AES-256-GCM，代替 Electron 的 safeStorage（D-0075）；
-- **登录**（D-0093）、**WebSocket 传输**、**静态文件**（外壳、子应用界面；子应用页面带 `Content-Security-Policy: sandbox allow-scripts allow-forms`，并注入桥脚本）。
+- **登录**（D-0093）、**WebSocket 传输**、**静态文件**（外壳、子应用界面；子应用页面带 `Content-Security-Policy: sandbox allow-scripts allow-forms allow-modals allow-downloads` 和 `Access-Control-Allow-Origin: *`（无名源要跨源加载字体），并注入桥脚本）。界面的静态文件不要求登录（D-0093），数据都经 WebSocket。
+
+### 代码在哪
+
+| 文件 | 内容 |
+|---|---|
+| `apps/server/src/server.ts` | HTTP 路由、登录、设置密码、WebSocket |
+| `apps/server/src/accounts.ts` | 平台库：账号、会话、设置链接（令牌只存哈希） |
+| `apps/server/src/kernels.ts` | 内核管理器（每个用户一份，闲置关掉） |
+| `apps/server/src/cloud-apps.ts` | 上服务器的子应用 |
+| `apps/server/src/password.ts`、`rate-limit.ts`、`secrets.ts` | 密码哈希、限次数、API key 加密 |
+| `apps/server/src/main.ts` | 命令行：`serve`、`create-user`、`setup-link` |
+| `apps/server/web/` | 登录页、设置密码页、`client.js`（外壳一侧）、`bridge.js`（子应用一侧） |
+| `apps/host/renderer/shell.js` | 外壳（和 Electron 共用）；服务器版下用 `client.js` 的 `mountApp` 打开子应用 |
+
+### 本机试用
+
+```bash
+pnpm --filter @myoutside/server dev                        # 用系统临时目录里的数据，http://localhost:8787
+pnpm --filter @myoutside/server admin create-user <用户名> --dev   # 打印设置链接
+MYOUTSIDE_CHECK_SETUP=<设置链接> apps/host/node_modules/.bin/electron apps/server/scripts/browser-check.cjs  # 浏览器里的检查（后台运行）
+```
 
 ## 3. 一次调用怎么走
 
@@ -48,9 +69,10 @@
 ## 4. 子应用界面的变化
 
 - `window.outside` 由桥脚本提供，调用面不变：`call`、`newRunId`、`onEvent`、`cancel`、`openExternal`（由外壳打开）。
-- 新增 `outside.storage`（`get` / `set` / `remove`，异步）：沙箱里没有 localStorage，由外壳按子应用分开存在它自己的 localStorage 里（每个子应用有大小上限），只在这台浏览器上。要改的：
-  - 围棋的座位令牌（现在用 localStorage）；
-  - 对话实验室的草稿和编辑模式（现在用 localStorage）。
+- 新增 `outside.storage`（`get` / `set` / `remove`，异步，值是字符串，单个值最大 1 MB）：沙箱里没有 localStorage，由外壳按子应用分开存在它自己的 localStorage 里（键 `mo.app.<应用 id>.<键>`），只在这台浏览器上。已改用它（没有时退回 localStorage，Electron 里照旧）：
+  - 围棋的座位令牌；
+  - 对话实验室的草稿和编辑模式。
+- 外壳侧栏多一个「退出登录」按钮（`client.js` 加的）。
 - 设备功能（选文件、在访达里显示、用本地编辑器打开）网页版没有：哲野的「在编辑器里打开」按钮已经按 `typeof window.outside.openAppFile` 判断，没有时不显示。哲野的配方跟着部署的代码走：改了配方要部署才生效。
 - 跨用户的功能先不做：围棋只能在同一个账号的不同设备之间下（例如作者的电脑对作者的手机）；和朋友下要另外设计（D-0091「代价」）。
 
@@ -76,9 +98,9 @@
 
 ## 8. 实施顺序
 
-1. 服务端骨架：HTTP、静态文件、平台库与登录、WebSocket、内核管理器；本机跑通；
-2. 外壳网页版：登录页、沙箱 iframe、消息桥、`outside.storage`、设置页；围棋、对话实验室改用 `outside.storage`；
-3. 安全：大小限制、限次数、会话；把上面的攻击都测一遍；
+1. ✅ 服务端骨架：HTTP、静态文件、平台库与登录、WebSocket、内核管理器；本机跑通；
+2. ✅ 外壳网页版：登录页、沙箱 iframe、消息桥、`outside.storage`、设置页；围棋、对话实验室改用 `outside.storage`；Chromium 里实测通过（D-0090「实测」）；
+3. 安全：大小限制、限次数、会话已有单测（D-0093「怎么验证」）；还要：把浏览器检查并进冒烟、Safari / Firefox 实测；
 4. 服务器环境：Node、`myoutside` 账号、目录、systemd、Caddy 转发、fail2ban 规则；
 5. 第一次部署（作者同意后）：作者用设置链接设密码、在设置页填 API key、在各台设备上试用。
 

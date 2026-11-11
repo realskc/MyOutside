@@ -11,6 +11,7 @@ const DICT = {
     languageLabel: "界面语言",
     apiKeyLabel: "DeepSeek API Key",
     apiKeyHint: "保存在本机，用系统钥匙串加密；任何子应用都读不到。",
+    apiKeyHintServer: "保存在服务器上，加密保存；任何子应用都读不到。",
     save: "保存",
     saved: "已保存",
     notSet: "未设置",
@@ -45,6 +46,7 @@ const DICT = {
     languageLabel: "Language",
     apiKeyLabel: "DeepSeek API Key",
     apiKeyHint: "Stored locally, encrypted with the system keychain; no app can read it.",
+    apiKeyHintServer: "Stored on the server, encrypted; no app can read it.",
     save: "Save",
     saved: "Saved",
     notSet: "Not set",
@@ -72,7 +74,7 @@ const DICT = {
 };
 
 const appsEl = document.getElementById("apps");
-const panel = document.getElementById("panel");
+let panel = document.getElementById("panel");
 const versionEl = document.getElementById("version");
 const settingsView = document.getElementById("settings-view");
 
@@ -84,6 +86,21 @@ const t = (key) => DICT[lang][key];
 
 // Electron 用 app:// 自定义协议；局域网预览用同源的 /apps/<id>/。
 const IS_WEB = location.protocol === "http:" || location.protocol === "https:";
+// 服务器版（docs/future/web-version.md）：子应用关进沙箱 iframe，每次打开都新建一个（D-0090），由 client.js 提供
+const SERVER = window.__MYOUTSIDE_SERVER__ === true;
+/** 当前面板里的子应用（服务器版没法从 src 可靠地认出来：面板可能自己跳走） */
+let currentAppId = null;
+
+function openApp(id) {
+  currentAppId = id.toLowerCase();
+  if (SERVER) {
+    panel = window.__myoutsideShell.mountApp(id, panel);
+  } else {
+    panel.src = appUrl(id);
+  }
+  // 切换应用后把键盘焦点交给面板，空格等快捷键直接作用于子应用
+  panel.addEventListener("load", () => panel.focus(), { once: true });
+}
 
 function appUrl(id) {
   // app:// 的 host 大小写不敏感；应用 id 本身保留原始大小写。
@@ -135,6 +152,10 @@ async function setLanguage(next) {
 }
 
 function reloadPanel() {
+  if (SERVER) {
+    if (currentAppId) openApp(currentAppId);
+    return;
+  }
   const src = panel.getAttribute("src") || "";
   if (src.startsWith("app://") || src.startsWith("/apps/")) {
     panel.src = src.replace(/\?.*$/, "") + "?l=" + Date.now();
@@ -166,14 +187,12 @@ async function loadApps() {
       button.textContent = app.name;
       button.addEventListener("click", () => {
         closeSettings();
-        panel.src = appUrl(app.id);
+        openApp(app.id);
         setActive(button);
-        // 切换应用后把键盘焦点交给面板，空格等快捷键直接作用于子应用
-        panel.addEventListener("load", () => panel.focus(), { once: true });
       });
       appsEl.appendChild(button);
     }
-    const currentId = appIdFromSrc(panel.getAttribute("src") || "");
+    const currentId = SERVER ? currentAppId : appIdFromSrc(panel.getAttribute("src") || "");
     if (currentId) {
       const active = [...appsEl.querySelectorAll(".app-item")].find(
         (item) => item.dataset.appId.toLowerCase() === currentId,
@@ -232,7 +251,7 @@ async function renderSettings() {
     `<input id="set-api-key" type="password" placeholder="${hasKey ? t("apiKeyPlaceholderSet") : t("apiKeyPlaceholder")}" />` +
     `<div class="setting-actions"><button id="save-api-key">${t("save")}</button>` +
     `<span class="hint">${hasKey ? t("saved") : t("notSet")}</span></div>` +
-    `<p class="hint">${t("apiKeyHint")}</p></div>` +
+    `<p class="hint">${t(SERVER ? "apiKeyHintServer" : "apiKeyHint")}</p></div>` +
     `<div class="setting-row usage-row"><label>${t("usageTitle")}</label>` +
     `<select id="usage-period">` +
     `<option value="today">${t("usageToday")}</option><option value="7d">${t("usage7d")}</option>` +

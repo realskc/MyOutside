@@ -1,0 +1,23 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="referrer" content="no-referrer" />
+    <title>设置密码 · MyOutside</title>
+    <link rel="stylesheet" href="/__myoutside/static/auth.css" />
+  </head>
+  <body>
+    <main class="auth">
+      <h1>MyOutside</h1>
+      <p class="lead">设置你的密码</p>
+      <form id="form">
+        <label>新密码（至少 8 个字符）<input name="password" type="password" autocomplete="new-password" minlength="8" maxlength="256" required autofocus /></label>
+        <label>再输一遍<input name="confirm" type="password" autocomplete="new-password" minlength="8" maxlength="256" required /></label>
+        <button id="submit" type="submit">保存并登录</button>
+        <p id="message" class="message" role="alert"></p>
+      </form>
+    </main>
+    <script src="/__myoutside/static/setup.js"></script>
+  </body>
+</html>
