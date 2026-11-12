@@ -78,10 +78,33 @@
 - Node 24（NodeSource 软件源，进自动安全更新：`/etc/apt/apt.conf.d/52myoutside-node-upgrades`）。
 - 代码：`/opt/myoutside/releases/<时间>/`，`/opt/myoutside/current` 指向当前版本，只留最近 5 个。
 - 数据：`/var/lib/myoutside/`（`platform.db` 账号与会话、`users/<用户 id>/myoutside.db` 每个用户的库、`secrets/master.key` 加密 API key 的主密钥），文件都只有 `myoutside` 能读写。
-- 部署前的本地备份：`/var/backups/myoutside/pre-deploy-<时间>.tar.gz`（只留 10 份；异地备份见 D-0092，还没做）。
+- 部署前的本地备份：`/var/backups/myoutside/pre-deploy-<时间>.tar.gz`（只留 10 份）；R2 加密备份程序在 `apps/server/scripts/backup.mjs`，配置完成后由 `myoutside-backup.timer` 每天香港时间凌晨 4 点运行（D-0092）。
 - 登录的封禁：fail2ban 的 `myoutside` 规则（`/etc/fail2ban/filter.d/myoutside.conf`、`jail.d/myoutside-web.local`），只认服务端写的 `ban-request` 那一行，封 1 小时（D-0093）。
 - 管理账号：`myoutside-admin create-user <用户名> [--admin]`、`myoutside-admin setup-link <用户名>`（打印设置链接；只在自己的终端里看）。
 - 部署：在 Mac 上 `bash apps/server/scripts/deploy.sh`（每次都要作者明确同意，AGENTS.md 红线 4）；第一次准备服务器用 `apps/server/scripts/server-setup.sh`。
+
+### R2 备份（D-0092）
+
+R2 的 bucket、最小权限 token 和备份钥匙不放进仓库，也不通过聊天传递。配置时在服务器自己的终端运行：
+
+```bash
+sudo /opt/myoutside/current/apps/server/scripts/configure-backup.sh
+```
+
+脚本会把 R2 endpoint、bucket、Access Key、Secret Key 和 32 字节备份钥匙保存到只有 root 可读的 `/etc/myoutside/backup.env`、`/etc/myoutside/backup.key`。备份钥匙还要复制到作者自己的密码管理器。配置完成后：
+
+```bash
+sudo systemctl enable --now myoutside-backup.timer
+sudo systemctl start myoutside-backup.service
+sudo journalctl -u myoutside-backup.service -n 30 --no-pager
+```
+
+每次备份会对平台库和每个用户库做 SQLite 快照，压缩、AES-256-GCM 加密，上传后下载回来解密并检查压缩包。恢复演练使用新目录：
+
+```bash
+sudo -u root env MYOUTSIDE_BACKUP_KEY_FILE=/etc/myoutside/backup.key \
+  node /opt/myoutside/current/apps/server/scripts/restore-backup.mjs <下载的备份文件> /var/tmp/myoutside-restore-check
+```
 
 ## 7. 检查命令
 

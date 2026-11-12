@@ -1,0 +1,15 @@
+[Unit]
+Description=MyOutside encrypted R2 backup
+After=network-online.target myoutside.service
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+User=root
+WorkingDirectory=/opt/myoutside/current
+EnvironmentFile=/etc/myoutside/backup.env
+Environment=MYOUTSIDE_DATA_DIR=/var/lib/myoutside
+Environment=MYOUTSIDE_BACKUP_KEY_FILE=/etc/myoutside/backup.key
+ExecStart=/usr/bin/node /opt/myoutside/current/apps/server/scripts/backup.mjs
+TimeoutStartSec=30min
+UMask=0077

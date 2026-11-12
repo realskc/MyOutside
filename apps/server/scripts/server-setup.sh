@@ -9,7 +9,12 @@ if ! command -v node >/dev/null 2>&1 || ! node --version | grep -q '^v24\.'; the
   curl -fsSL https://deb.nodesource.com/gpgkey/nodesource-repo.gpg.key | gpg --batch --yes --dearmor -o /usr/share/keyrings/nodesource.gpg
   echo "deb [signed-by=/usr/share/keyrings/nodesource.gpg] https://deb.nodesource.com/node_24.x nodistro main" > /etc/apt/sources.list.d/nodesource.list
   apt-get update -qq
-  apt-get install -y -qq nodejs
+apt-get install -y -qq nodejs
+fi
+
+if ! command -v aws >/dev/null 2>&1; then
+  apt-get update -qq
+  apt-get install -y -qq awscli
 fi
 
 # NodeSource 的来源名是「. nodistro」，按网站认
@@ -26,4 +31,5 @@ fi
 install -d -m 0700 -o myoutside -g myoutside /var/lib/myoutside
 install -d -m 0755 /opt/myoutside /opt/myoutside/releases
 install -d -m 0700 /var/backups/myoutside
+install -d -m 0700 /var/lib/myoutside-backup-work
 echo "准备好了：node $(node --version)，账号 myoutside，数据 /var/lib/myoutside"

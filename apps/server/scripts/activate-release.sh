@@ -25,6 +25,8 @@ if ! cmp -s "$deploy/myoutside.service" /etc/systemd/system/myoutside.service; t
   unit_changed=1
 fi
 install -m 0755 "$deploy/myoutside-admin" /usr/local/bin/myoutside-admin
+install -m 0644 "$deploy/myoutside-backup.service" /etc/systemd/system/myoutside-backup.service
+install -m 0644 "$deploy/myoutside-backup.timer" /etc/systemd/system/myoutside-backup.timer
 f2b_changed=0
 if ! cmp -s "$deploy/fail2ban-filter.conf" /etc/fail2ban/filter.d/myoutside.conf; then
   install -m 0644 "$deploy/fail2ban-filter.conf" /etc/fail2ban/filter.d/myoutside.conf
@@ -35,6 +37,7 @@ if ! cmp -s "$deploy/fail2ban-jail.local" /etc/fail2ban/jail.d/myoutside-web.loc
   f2b_changed=1
 fi
 [ "$unit_changed" = 1 ] && systemctl daemon-reload
+systemctl daemon-reload
 
 previous="$(readlink -f /opt/myoutside/current 2>/dev/null || true)"
 if systemctl is-active --quiet myoutside; then

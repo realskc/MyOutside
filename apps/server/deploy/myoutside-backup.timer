@@ -1,0 +1,10 @@
+[Unit]
+Description=Daily MyOutside encrypted R2 backup
+
+[Timer]
+OnCalendar=*-*-* 04:00:00 Asia/Hong_Kong
+Persistent=true
+RandomizedDelaySec=15m
+
+[Install]
+WantedBy=timers.target
