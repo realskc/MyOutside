@@ -80,7 +80,7 @@ MYOUTSIDE_CHECK_SETUP=<设置链接> apps/host/node_modules/.bin/electron apps/s
 
 - Node 24 LTS（官方发行版）；系统账号 `myoutside`；
 - 代码：`/opt/myoutside/releases/<时间>/`（打包好的服务端 + 界面文件），`/opt/myoutside/current` 指向当前版本；
-- 数据：`/var/lib/myoutside/`；
+- 数据：`/var/lib/myoutside/`；备份的状态：`/var/lib/myoutside-backup/status.json`（D-0096）；
 - systemd：`myoutside.service`，`User=myoutside`，沙箱选项（D-0093），崩溃自动重启；
 - Caddy：`myoutside.org` 从占位页改成 `reverse_proxy 127.0.0.1:8787`，登录相关路径限请求大小（D-0093）；
 - fail2ban：加一个登录失败的规则（D-0093）。
@@ -88,7 +88,7 @@ MYOUTSIDE_CHECK_SETUP=<设置链接> apps/host/node_modules/.bin/electron apps/s
 ## 6. 部署（每次都要作者明确同意，AGENTS.md 红线 4）
 
 1. 请作者同意时说明：这次改了什么、会打断什么（只换界面 / 重启整个服务），服务器上有没有正在进行的任务；
-2. 作者同意后：在 Mac 上打包 → 传到服务器的新 `releases/` 目录 → 备份数据（D-0092 落地前先在服务器本地拷一份）→ 停止接新调用、等进行中的调用结束（有上限）→ 切换 `current` → 重启 → 检查（登录页、WebSocket、一个只读调用）→ 检查失败自动切回上一个版本。
+2. 作者同意后：在 Mac 上打包 → 传到服务器的新 `releases/` 目录 → 停止接新调用、等进行中的调用结束（有上限）→ 备份数据（服务器本地拷一份；R2 配置好以后再传一份，D-0096）→ 切换 `current` → 重启 → 检查（登录页能打开）→ 检查失败自动切回上一个版本。
 
 ## 7. 开发与检查
 
@@ -102,6 +102,9 @@ MYOUTSIDE_CHECK_SETUP=<设置链接> apps/host/node_modules/.bin/electron apps/s
 2. ✅ 外壳网页版：登录页、沙箱 iframe、消息桥、`outside.storage`、设置页；围棋、对话实验室改用 `outside.storage`；Chromium 里实测通过（D-0090「实测」）；
 3. 安全：大小限制、限次数、会话已有单测（D-0093「怎么验证」）；还要：把浏览器检查并进冒烟、Safari / Firefox 实测；
 4. ✅ 服务器环境：Node、`myoutside` 账号、目录、systemd、Caddy 转发、fail2ban 规则（`server-setup.sh` + 每次部署的 `activate-release.sh`）；
-5. ✅ 第一次部署（2026-11-11，作者同意后）；从外面检查过：登录页、跳转、子应用页面关进沙箱、没登录拿不到数据、两百万位长的用户名被 Caddy 挡掉、WebSocket 没登录 / 伪造登录 / 别的网站都被拒。还差：作者建账号、设密码、填 API key、在各台设备（含 Safari、iPhone）上试用。
+5. ✅ 第一次部署（2026-11-11，作者同意后）；从外面检查过：登录页、跳转、子应用页面关进沙箱、没登录拿不到数据、两百万位长的用户名被 Caddy 挡掉、WebSocket 没登录 / 伪造登录 / 别的网站都被拒。作者已建好账号 `admin`（管理员）、设了密码、登录过（2026-11-11）。还差：填 API key、在各台设备（含 Safari、iPhone）上试用。
 
-之后：第二段备份（D-0092），第三段搬真实数据（Mac 和 ThinkBook 的四个云端应用都当作用过，合并后作者确认再上传）。
+之后：
+
+- 第二段备份（D-0092、D-0096）：程序就绪（2026-11-13，含网页上的备份状态），等部署这一版，然后作者在 Cloudflare 后台建桶和令牌、在服务器上运行配置脚本（`docs/server.md`「R2 备份」），再做一次恢复演练；
+- 第三段搬真实数据（Mac 和 ThinkBook 的四个云端应用都当作用过，合并后作者确认再上传）。

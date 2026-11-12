@@ -35,6 +35,13 @@ const DICT = {
     usagePlatform: "平台内部（脚本等）",
     usageHint:
       "按 DeepSeek 官方价格估算：区分高峰 / 空闲时段（空闲半价），法定节假日按工作日计；被停止的回复拿不到用量，不计入。实际以 DeepSeek 账单为准。",
+    backupTitle: "服务器备份",
+    backupOk: (when, ago) => `上次成功：${when}（${ago}）`,
+    backupNever: "还没有成功备份过",
+    backupFailed: (when, error) => `上次尝试失败（${when}）：${error}`,
+    backupWarn: "服务器备份有问题，打开设置查看",
+    backupHint: "每天凌晨 4 点（香港时间）和每次部署前，加密备份到 Cloudflare R2；超过一天没有成功就标红。只有管理员能看到。",
+    ago: (hours) => (hours < 1 ? "不到 1 小时前" : hours < 48 ? `${hours} 小时前` : `${Math.floor(hours / 24)} 天前`),
   },
   en: {
     appName: "MyOutside",
@@ -70,6 +77,14 @@ const DICT = {
     usagePlatform: "Platform (scripts etc.)",
     usageHint:
       "Estimated from DeepSeek's official prices, with peak / off-peak rates (off-peak is half price; public holidays are treated as workdays). Stopped replies report no usage and are not counted. DeepSeek's bill is authoritative.",
+    backupTitle: "Server backup",
+    backupOk: (when, ago) => `Last success: ${when} (${ago})`,
+    backupNever: "No successful backup yet",
+    backupFailed: (when, error) => `Last attempt failed (${when}): ${error}`,
+    backupWarn: "Server backup needs attention; open Settings",
+    backupHint:
+      "Encrypted backup to Cloudflare R2 every day at 4:00 (Hong Kong time) and before every deploy; turns red after a day without success. Only admins see this.",
+    ago: (hours) => (hours < 1 ? "less than an hour ago" : hours < 48 ? `${hours} hours ago` : `${Math.floor(hours / 24)} days ago`),
   },
 };
 
@@ -136,6 +151,7 @@ function applyLanguage() {
   document.title = t("appName");
   document.getElementById("btn-settings").textContent = t("settings");
   document.getElementById("lang-toggle").textContent = t("toggle");
+  applyBackupWarning();
   if (settingsOpen) {
     renderSettings();
   } else {
@@ -242,6 +258,7 @@ async function renderSettings() {
   } catch {
     /* ignore */
   }
+  await refreshBackupStatus();
 
   settingsView.innerHTML =
     `<h2>${t("settingsTitle")}</h2>` +
@@ -252,6 +269,7 @@ async function renderSettings() {
     `<div class="setting-actions"><button id="save-api-key">${t("save")}</button>` +
     `<span class="hint">${hasKey ? t("saved") : t("notSet")}</span></div>` +
     `<p class="hint">${t(SERVER ? "apiKeyHintServer" : "apiKeyHint")}</p></div>` +
+    backupRowHtml() +
     `<div class="setting-row usage-row"><label>${t("usageTitle")}</label>` +
     `<select id="usage-period">` +
     `<option value="today">${t("usageToday")}</option><option value="7d">${t("usage7d")}</option>` +
@@ -277,6 +295,49 @@ async function renderSettings() {
     input.value = "";
     await renderSettings();
   });
+}
+
+// ---- 服务器备份（D-0096）：只有服务器版、只给管理员；超过一天没成功或上次失败，设置按钮上带红点 ----
+
+let backupStatus = null;
+
+const escapeHtml = (text) => String(text).replace(/[&<>"']/g, (ch) => `&#${ch.charCodeAt(0)};`);
+
+async function refreshBackupStatus() {
+  if (!SERVER) return;
+  try {
+    const res = await fetch("/__myoutside/backup-status", { cache: "no-store" });
+    const body = res.ok ? await res.json() : null;
+    backupStatus = body && body.enabled ? body : null;
+  } catch {
+    /* 网络断了：保留上次的 */
+  }
+  applyBackupWarning();
+}
+
+function applyBackupWarning() {
+  const button = document.getElementById("btn-settings");
+  const warn = !!(backupStatus && backupStatus.problem);
+  button.classList.toggle("warn", warn);
+  button.title = warn ? t("backupWarn") : "";
+}
+
+function backupRowHtml() {
+  if (!backupStatus) return "";
+  const when = (ms) => new Date(ms).toLocaleString(lang === "zh" ? "zh-CN" : "en-US", { hour12: false });
+  const lines = [
+    backupStatus.lastSuccessAt
+      ? t("backupOk")(when(backupStatus.lastSuccessAt), t("ago")(Math.floor((Date.now() - backupStatus.lastSuccessAt) / 3_600_000)))
+      : t("backupNever"),
+  ];
+  if (backupStatus.lastAttemptOk === false) {
+    lines.push(t("backupFailed")(when(backupStatus.lastAttemptAt), backupStatus.lastError || "?"));
+  }
+  return (
+    `<div class="setting-row"><label>${t("backupTitle")}</label>` +
+    `<p id="backup-status" class="backup-status${backupStatus.problem ? " problem" : ""}">${lines.map(escapeHtml).join("<br>")}</p>` +
+    `<p class="hint">${t("backupHint")}</p></div>`
+  );
 }
 
 // ---- 用量与花费（D-0074） ----
@@ -344,4 +405,8 @@ document.getElementById("lang-toggle").addEventListener("click", () => {
 
 initLanguage().then(() => {
   setInterval(refreshVersion, 3000);
+  if (SERVER) {
+    void refreshBackupStatus();
+    setInterval(() => void refreshBackupStatus(), 10 * 60_000);
+  }
 });

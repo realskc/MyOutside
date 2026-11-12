@@ -4,6 +4,7 @@ import type { Duplex } from "node:stream";
 import { extname, join, normalize, resolve, sep } from "node:path";
 import { WebSocketServer, type RawData, type WebSocket } from "ws";
 import { MAX_USERNAME_LENGTH, normalizeUsername, openAccounts, type Accounts, type Session } from "./accounts.js";
+import { readBackupStatus } from "./backup-status.js";
 import { cloudAppUiDirs, registerCloudApps } from "./cloud-apps.js";
 import { createKernelManager, type KernelManager } from "./kernels.js";
 import { createPasswordHasher, HashBusyError, MAX_PASSWORD_LENGTH, MIN_PASSWORD_LENGTH, type PasswordHasher } from "./password.js";
@@ -30,6 +31,8 @@ export interface ServerConfig {
   hasher?: PasswordHasher;
   log?: (line: string) => void;
   kernelIdleMs?: number;
+  /** 备份程序写的状态文件（D-0096）；不设就不提供备份状态（本机开发） */
+  backupStatusFile?: string;
 }
 
 /** 没登录时能发的请求（登录、设置密码）最大 4 KB；超长的用户名在这里就被挡掉（作者：防两百万位长的用户名） */
@@ -323,6 +326,14 @@ export function createMyOutsideServer(config: ServerConfig) {
     if (path === "/__myoutside/session") {
       const current = sessionOf(req);
       return current ? sendJson(res, 200, { username: current.session.username }) : sendJson(res, 401, { ok: false });
+    }
+    if (path === "/__myoutside/backup-status") {
+      // 备份是整台服务器的事，只给管理员看（D-0096）
+      const current = sessionOf(req);
+      if (!current) return sendJson(res, 401, { ok: false });
+      if (!current.session.isAdmin) return sendJson(res, 403, { ok: false });
+      if (!config.backupStatusFile) return sendJson(res, 200, { enabled: false });
+      return sendJson(res, 200, { enabled: true, ...(await readBackupStatus(config.backupStatusFile, now())) });
     }
     if (path === "/__myoutside/bridge.js") {
       // 沙箱里的子应用页面是「无名源」，跨源加载这个脚本

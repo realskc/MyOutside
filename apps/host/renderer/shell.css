@@ -115,6 +115,29 @@ body {
   background: #333b4d;
 }
 
+/* 服务器备份有问题（D-0096） */
+.side-btn.warn::after {
+  content: "";
+  display: inline-block;
+  width: 7px;
+  height: 7px;
+  margin-left: 6px;
+  border-radius: 50%;
+  background: #ef4444;
+  vertical-align: middle;
+}
+
+.backup-status {
+  margin: 0;
+  font-size: 14px;
+  line-height: 1.6;
+}
+
+.backup-status.problem {
+  color: #dc2626;
+  font-weight: 600;
+}
+
 .lang-toggle {
   width: 56px;
   background: transparent;

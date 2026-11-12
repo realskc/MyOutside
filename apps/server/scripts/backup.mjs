@@ -1,112 +1,84 @@
 #!/usr/bin/env node
-/* MyOutside R2 backup (D-0092). Run as root from myoutside-backup.service. */
-import { execFileSync, spawnSync } from "node:child_process";
-import { createCipheriv, createDecipheriv, randomBytes } from "node:crypto";
-import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+/*
+ * 服务器数据的备份（D-0092、D-0096）：myoutside-backup.service 以 root 运行（每天凌晨 4 点，以及每次部署前）。
+ *   1. 给平台库和每个用户库拍快照，检查完好，打包、压缩、加密；
+ *   2. 上传到 R2：每天 daily/；星期天另传 weekly/；每月 1 号另传 monthly/（日子按香港时间算）；
+ *   3. 每份都下载回来：核对和上传的一样，解密、解开、逐个打开检查——确认真的能恢复；
+ *   4. 结果写进状态文件，网页的设置里显示上次成功的时间，超过一天没成功就标红。
+ */
+import { mkdirSync, rmSync, statSync } from "node:fs";
 import { join } from "node:path";
-import { DatabaseSync } from "node:sqlite";
-import { tmpdir } from "node:os";
+import {
+  aws,
+  checkRestoredDir,
+  decryptFile,
+  encryptFile,
+  hongKongTime,
+  loadR2Config,
+  readBackupKey,
+  sha256,
+  snapshotDataDir,
+  tarCreate,
+  tarExtract,
+  updateStatus,
+} from "./backup-lib.mjs";
 
 const dataDir = process.env.MYOUTSIDE_DATA_DIR ?? "/var/lib/myoutside";
 const workRoot = process.env.MYOUTSIDE_BACKUP_WORK ?? "/var/lib/myoutside-backup-work";
-const keyFile = process.env.MYOUTSIDE_BACKUP_KEY_FILE ?? "/etc/myoutside/backup.key";
-const endpoint = required("R2_ENDPOINT");
-const bucket = required("R2_BUCKET");
-const stamp = new Date().toISOString().replace(/[-:]/g, "").replace(/\.\d{3}Z$/, "Z");
-const date = new Date().toISOString().slice(0, 10);
+const statusFile = process.env.MYOUTSIDE_BACKUP_STATUS ?? "/var/lib/myoutside-backup/status.json";
+// 测试用：假装现在是某个时刻
+const now = Number(process.env.MYOUTSIDE_BACKUP_NOW) || Date.now();
 
-function required(name) {
-  const value = process.env[name];
-  if (!value) throw new Error(`缺少环境变量 ${name}`);
-  return value;
-}
-
-function key() {
-  const value = readFileSync(keyFile, "utf8").trim();
-  const raw = Buffer.from(value, "base64");
-  if (raw.length !== 32) throw new Error("备份钥匙必须是 base64 编码的 32 字节");
-  return raw;
-}
-
-function snapshotDatabase(source, target) {
-  if (!existsSync(source)) return false;
-  const db = new DatabaseSync(source, { readOnly: true });
-  try {
-    db.prepare("VACUUM INTO ?").run(target);
-    const check = db.prepare("PRAGMA integrity_check").get();
-    if (Object.values(check)[0] !== "ok") throw new Error(`源数据库损坏：${source}`);
-  } finally {
-    db.close();
-  }
-  const copy = new DatabaseSync(target, { readOnly: true });
-  try {
-    const check = copy.prepare("PRAGMA integrity_check").get();
-    if (Object.values(check)[0] !== "ok") throw new Error(`快照损坏：${target}`);
-  } finally {
-    copy.close();
-  }
-  return true;
-}
-
-function encrypt(input, output, secret) {
-  const iv = randomBytes(12);
-  const cipher = createCipheriv("aes-256-gcm", secret, iv);
-  const body = Buffer.concat([cipher.update(readFileSync(input)), cipher.final()]);
-  writeFileSync(output, Buffer.concat([Buffer.from("MYO1"), iv, cipher.getAuthTag(), body]), { mode: 0o600 });
-}
-
-function decrypt(input, output, secret) {
-  const raw = readFileSync(input);
-  if (raw.subarray(0, 4).toString() !== "MYO1" || raw.length < 32) throw new Error("不是 MyOutside 备份");
-  const decipher = createDecipheriv("aes-256-gcm", secret, raw.subarray(4, 16));
-  decipher.setAuthTag(raw.subarray(16, 32));
-  writeFileSync(output, Buffer.concat([decipher.update(raw.subarray(32)), decipher.final()]), { mode: 0o600 });
-}
-
-function aws(...args) {
-  execFileSync("aws", ["--endpoint-url", endpoint, ...args], { stdio: "inherit" });
-}
-
-function remoteKey(prefix) {
-  return `${prefix}/${date}-${stamp}.tar.gz.enc`;
-}
-
-const temp = join(workRoot, `${process.pid}-${Date.now()}`);
-mkdirSync(temp, { recursive: true, mode: 0o700 });
+const temp = join(workRoot, `${process.pid}-${now}`);
 try {
-  const snapshot = join(temp, "snapshot");
-  mkdirSync(join(snapshot, "users"), { recursive: true, mode: 0o700 });
-  snapshotDatabase(join(dataDir, "platform.db"), join(snapshot, "platform.db"));
-  const usersDir = join(dataDir, "users");
-  if (existsSync(usersDir)) {
-    for (const userId of readdirSync(usersDir, { withFileTypes: true })) {
-      if (userId.isDirectory()) snapshotDatabase(join(usersDir, userId.name, "myoutside.db"), join(snapshot, "users", userId.name + ".db"));
-    }
-  }
-  const tar = join(temp, "backup.tar.gz");
-  execFileSync("tar", ["-czf", tar, "-C", snapshot, "."]);
-  const encrypted = join(temp, "backup.tar.gz.enc");
-  encrypt(tar, encrypted, key());
-  // Local decrypt check catches a bad key, format, or encryption before upload.
-  const decrypted = join(temp, "roundtrip.tar.gz");
-  decrypt(encrypted, decrypted, key());
-  if (readFileSync(tar).compare(readFileSync(decrypted)) !== 0) throw new Error("本地加密往返校验失败");
+  const { endpoint, bucket } = loadR2Config();
+  const key = readBackupKey();
+  mkdirSync(temp, { recursive: true, mode: 0o700 });
 
+  const snapshot = join(temp, "snapshot");
+  const users = snapshotDataDir(dataDir, snapshot);
+  const tar = join(temp, "backup.tar.gz");
+  tarCreate(snapshot, tar);
+  const encrypted = join(temp, "backup.tar.gz.enc");
+  encryptFile(tar, encrypted, key);
+
+  const time = hongKongTime(now);
   const prefixes = ["daily"];
-  const day = new Date().getUTCDay();
-  if (day === 0) prefixes.push("weekly");
-  if (new Date().getUTCDate() === 1) prefixes.push("monthly");
+  if (time.weekday === 0) prefixes.push("weekly");
+  if (time.dayOfMonth === 1) prefixes.push("monthly");
+
+  const objects = [];
   for (const prefix of prefixes) {
-    const object = remoteKey(prefix);
-    aws("s3", "cp", encrypted, `s3://${bucket}/${object}`, "--no-progress");
-    // Download and decrypt the actual uploaded object, then verify it is a valid archive.
+    // 文件名是香港时间，按名字排序就是按时间排序；不覆盖旧的
+    const object = `${prefix}/${time.stamp}.tar.gz.enc`;
+    aws(endpoint, ["s3", "cp", encrypted, `s3://${bucket}/${object}`, "--no-progress", "--only-show-errors"]);
     const downloaded = join(temp, `${prefix}.downloaded`);
-    aws("s3", "cp", `s3://${bucket}/${object}`, downloaded, "--no-progress");
-    const restored = join(temp, `${prefix}.restored.tar.gz`);
-    decrypt(downloaded, restored, key());
-    execFileSync("tar", ["-tzf", restored]);
-    console.log(`[backup] verified s3://${bucket}/${object}`);
+    aws(endpoint, ["s3", "cp", `s3://${bucket}/${object}`, downloaded, "--no-progress", "--only-show-errors"]);
+    if (sha256(downloaded) !== sha256(encrypted)) throw new Error(`下载回来的和上传的不一样：${object}`);
+    const restoredTar = join(temp, `${prefix}.tar.gz`);
+    decryptFile(downloaded, restoredTar, key);
+    const restored = join(temp, `${prefix}.restored`);
+    tarExtract(restoredTar, restored);
+    const restoredUsers = checkRestoredDir(restored);
+    if (restoredUsers.join(",") !== users.join(",")) throw new Error(`恢复出来的用户库和备份时不一样：${object}`);
+    objects.push(object);
+    console.log(`[backup] 已上传并检查：s3://${bucket}/${object}`);
   }
+
+  updateStatus(statusFile, {
+    lastAttempt: { at: now, ok: true },
+    lastSuccess: { at: now, objects, users: users.length, bytes: statSync(encrypted).size },
+  });
+  console.log(`[backup] 完成：${users.length} 个用户库，${statSync(encrypted).size} 字节`);
+} catch (error) {
+  const message = error instanceof Error ? error.message : String(error);
+  try {
+    updateStatus(statusFile, { lastAttempt: { at: now, ok: false, error: message.slice(0, 500) } });
+  } catch (statusError) {
+    console.error(`[backup] 状态文件写不进去：${statusError instanceof Error ? statusError.message : statusError}`);
+  }
+  console.error(`[backup] 失败：${message}`);
+  process.exitCode = 1;
 } finally {
   rmSync(temp, { recursive: true, force: true });
 }

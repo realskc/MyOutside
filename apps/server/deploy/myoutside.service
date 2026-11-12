@@ -15,6 +15,8 @@ Environment=MYOUTSIDE_DATA_DIR=/var/lib/myoutside
 Environment=MYOUTSIDE_ROOT=/opt/myoutside/current
 Environment=MYOUTSIDE_ORIGIN=https://myoutside.org
 Environment=MYOUTSIDE_PORT=8787
+# 备份程序写的状态（D-0096）：只读，在设置里显示上次成功备份的时间
+Environment=MYOUTSIDE_BACKUP_STATUS=/var/lib/myoutside-backup/status.json
 ExecStart=/usr/bin/node /opt/myoutside/current/server.mjs serve
 Restart=on-failure
 RestartSec=3

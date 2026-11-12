@@ -1,4 +1,4 @@
-import { mkdtempSync, rmSync } from "node:fs";
+import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { DatabaseSync } from "node:sqlite";
@@ -126,7 +126,7 @@ interface Running {
   clock: { now: number };
 }
 
-async function start(): Promise<Running> {
+async function start(options: { backupStatusFile?: string } = {}): Promise<Running> {
   const dataDir = tempDir();
   const logs: string[] = [];
   const clock = { now: Date.now() };
@@ -152,6 +152,7 @@ async function start(): Promise<Running> {
     now: () => clock.now,
     hasher: createPasswordHasher({ cost: 1024 }),
     log: (line) => logs.push(line),
+    backupStatusFile: options.backupStatusFile,
   });
   await app.listen(port, "127.0.0.1");
   cleanups.push(() => app.close());
@@ -169,8 +170,8 @@ async function post(run: Running, path: string, body: unknown, headers: Record<s
 const cookieOf = (response: Response) => (response.headers.get("set-cookie") ?? "").split(";")[0]!;
 
 /** 建账号、用设置链接设密码，返回登录 cookie */
-async function signUp(run: Running, username: string, password = "correct horse battery"): Promise<string> {
-  run.app.accounts.createUser(username);
+async function signUp(run: Running, username: string, password = "correct horse battery", admin = false): Promise<string> {
+  run.app.accounts.createUser(username, { admin });
   const token = run.app.setupLink(username).split("#")[1]!;
   const response = await post(run, "/__myoutside/setup", { token, password });
   expect(response.status).toBe(200);
@@ -342,5 +343,26 @@ describe("服务", () => {
     const after = closed(ws);
     ws.send(JSON.stringify({ t: "call", id: 99, call: "platform.dataVersion" }));
     expect(await after).toBe(4401);
+  });
+
+  it("备份状态（D-0096）：只给登录了的管理员；读备份程序写的状态文件，超过 26 小时没成功就标红", async () => {
+    const statusFile = join(tempDir(), "status.json");
+    const run = await start({ backupStatusFile: statusFile });
+    expect((await fetch(run.base + "/__myoutside/backup-status")).status).toBe(401);
+    const friend = await signUp(run, "bob");
+    expect((await fetch(run.base + "/__myoutside/backup-status", { headers: { cookie: friend } })).status).toBe(403);
+    const admin = await signUp(run, "alice", undefined, true);
+    const read = async () => (await fetch(run.base + "/__myoutside/backup-status", { headers: { cookie: admin } })).json();
+
+    expect(await read()).toMatchObject({ enabled: true, lastSuccessAt: null, problem: true });
+    writeFileSync(statusFile, JSON.stringify({ lastAttempt: { at: run.clock.now, ok: true }, lastSuccess: { at: run.clock.now } }));
+    expect(await read()).toMatchObject({ enabled: true, lastSuccessAt: run.clock.now, problem: false });
+    run.clock.now += 27 * 3600_000;
+    expect(await read()).toMatchObject({ problem: true });
+
+    // 本机开发（没有状态文件的配置）：不显示
+    const dev = await start();
+    const devAdmin = await signUp(dev, "alice", undefined, true);
+    expect(await (await fetch(dev.base + "/__myoutside/backup-status", { headers: { cookie: devAdmin } })).json()).toEqual({ enabled: false });
   });
 });

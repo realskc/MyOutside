@@ -1,6 +1,6 @@
 # Cloudflare
 
-> 最近一次核对：2026-11-11。
+> 最近一次核对：2026-11-13（R2 部分）；其余 2026-11-11。
 
 做 CDN、DNS、网络安全的公司，也卖域名（Cloudflare Registrar）。MyOutside 的域名 `myoutside.org` 在这里注册、DNS 也在这里（[D-0088](../user-spec/decisions/0088-domain-dns.md)）。
 
@@ -28,10 +28,13 @@
 ## R2（对象存储）
 
 - 价格（[R2 pricing](https://developers.cloudflare.com/r2/pricing/)，2026-11-11 查）：免费额度每月 10 GB 存储、100 万次写类操作、1000 万次读类操作，下载（流出流量）不收费；超出后标准存储 $0.015 / GB·月。
-- 推断：开通 R2 要求账号里有支付方式（没核实）。
-- **自动删除（Object lifecycles）**（[文档](https://developers.cloudflare.com/r2/buckets/object-lifecycles/)）：按前缀（相当于文件夹）设规则，例如「上传满 90 天就删」；到期后一般 24 小时内删掉。改这些规则要账号级的 `Workers R2 Storage Write` 权限。
-- **锁定（Bucket locks）**（[文档](https://developers.cloudflare.com/r2/buckets/bucket-locks/)）：按前缀设保留期（多少天，或永久），期间对象不能被删除、覆盖，也不会被自动删除规则删掉（锁定优先）；不影响上传新对象。被锁住时删除请求返回 409 `ObjectLockedByBucketPolicy`。有锁定规则的桶不能清空。推断：和自动删除规则一样，改锁定规则要账号级权限，只能读写这个桶里对象的令牌改不了（没核实）。
-- 用途：MyOutside 服务器数据库的异地加密备份（[D-0092](../user-spec/decisions/0092-backup-to-r2.md)）。
+- **开通**（[Get started](https://developers.cloudflare.com/r2/get-started/)，2026-11-13 查）：后台左侧 **Storage & databases → R2 → Overview**，走一次结账流程给账号加上 R2 订阅；有免费额度，按月按用量计费。没开通之前建不了令牌。推断：结账要账号里有能扣款的支付方式（没核实）。
+- **建桶**：桶名只能用小写字母、数字和 `-`，3–63 个字符，不能以 `-` 开头或结尾。建桶时选了 Jurisdiction（EU、FedRAMP、US）的桶，只能用对应的专用地址访问（`https://<账号 id>.eu.r2.cloudflarestorage.com` 等）。
+- **令牌**（[Authentication](https://developers.cloudflare.com/r2/api/tokens/)，2026-11-13 查）：R2 Overview → **Account Details** 里 **API Tokens** 旁的 **Manage**，可以建 Account API token（属于账号，手动撤销或到期前一直有效）或 User API token（属于个人，人被移出账号就失效）。权限四种：Admin Read & Write（建删桶、改桶的配置、读写对象）、Admin Read only、**Object Read & Write**（只能读、写、列出指定桶里的对象）、Object Read only；后两种可以限定到某几个桶，只能用于 S3 接口。建好后显示 Access Key ID 和 Secret Access Key，Secret 只显示这一次。Access Key ID 是令牌的 id，Secret 是令牌值的 SHA-256（十六进制）。S3 地址是 `https://<账号 id>.r2.cloudflarestorage.com`。
+- **自动删除（Object lifecycles）**（[文档](https://developers.cloudflare.com/r2/buckets/object-lifecycles/)）：后台在桶的 **Settings → Object lifecycle rules**。按前缀（相当于文件夹）设规则，例如「上传满 90 天就删」；到期后一般 24 小时内删掉。每个桶自带一条「分块上传开始 7 天后没完成就中止」。改这些规则是桶级操作，要 `Workers R2 Storage Write` 权限（即 Admin 类令牌）。
+- **锁定（Bucket locks）**（[文档](https://developers.cloudflare.com/r2/buckets/bucket-locks/)）：后台在桶的 **Settings → Bucket lock rules**。按前缀设保留期（多少天、到某一天，或永久），期间对象不能被删除、覆盖，也不会被自动删除规则删掉（锁定优先）；不影响上传新对象。同一个对象有多条规则时取最长的。被锁住时单个删除 / 覆盖返回 409 `ObjectLockedByBucketPolicy`。有锁定规则的桶不能清空。改锁定规则要「能改桶配置」的权限；Object Read & Write 令牌只能读写对象，改不了锁定和自动删除规则（2026-11-13 按上面令牌文档的权限说明核对）。
+- **aws 命令行**（[aws CLI](https://developers.cloudflare.com/r2/examples/aws/aws-cli/)）：`--endpoint-url https://<账号 id>.r2.cloudflarestorage.com`，region 填 `auto`。2025 年初 aws 命令行默认加 CRC 校验头时 R2 曾报错，当时的绕法是 `AWS_REQUEST_CHECKSUM_CALCULATION=when_required`；2026-10 的官方示例已经不提这件事。推断：R2 已经支持（没实测；第一次备份时会知道）。
+- 用途：MyOutside 服务器数据库的异地加密备份（[D-0092](../user-spec/decisions/0092-backup-to-r2.md)、[D-0096](../user-spec/decisions/0096-backup-completion-and-fixes.md)；操作步骤见 [docs/server.md「R2 备份」](../docs/server.md)）。
 
 ## 后台给的建议（作者在 2026-11-11 看到的）
 

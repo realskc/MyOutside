@@ -35,6 +35,7 @@ export interface User {
 export interface Session {
   userId: string;
   username: string;
+  isAdmin: boolean;
   expiresAt: number;
 }
 
@@ -137,15 +138,15 @@ export function openAccounts(path: string, now: () => number = Date.now) {
       if (!token || token.length > 128) return null;
       const row = db
         .prepare(
-          "SELECT s.user_id, s.expires_at, u.username FROM session s JOIN user u ON u.id = s.user_id WHERE s.token_hash = ?",
+          "SELECT s.user_id, s.expires_at, u.username, u.is_admin FROM session s JOIN user u ON u.id = s.user_id WHERE s.token_hash = ?",
         )
-        .get(tokenHash(token)) as { user_id: string; expires_at: number; username: string } | undefined;
+        .get(tokenHash(token)) as { user_id: string; expires_at: number; username: string; is_admin: number } | undefined;
       if (!row) return null;
       if (row.expires_at <= now()) {
         db.prepare("DELETE FROM session WHERE token_hash = ?").run(tokenHash(token));
         return null;
       }
-      return { userId: row.user_id, username: row.username, expiresAt: row.expires_at };
+      return { userId: row.user_id, username: row.username, isAdmin: row.is_admin === 1, expiresAt: row.expires_at };
     },
 
     deleteSession(token: string): void {

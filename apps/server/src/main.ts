@@ -9,7 +9,7 @@ import { createMyOutsideServer, type ServerConfig } from "./server.js";
  *   serve [--dev]              启动服务；--dev 用本机临时数据目录、http://localhost:8787（不碰作者的真实数据）
  *   create-user <用户名> [--admin]   建账号，打印一次性的设置链接（24 小时内有效，用一次作废）
  *   setup-link <用户名>          重新生成设置链接（忘了密码时用）
- * 正式环境用环境变量：MYOUTSIDE_DATA_DIR、MYOUTSIDE_ORIGIN、MYOUTSIDE_PORT、MYOUTSIDE_ROOT。
+ * 正式环境用环境变量：MYOUTSIDE_DATA_DIR、MYOUTSIDE_ORIGIN、MYOUTSIDE_PORT、MYOUTSIDE_ROOT、MYOUTSIDE_BACKUP_STATUS。
  */
 // 新建的文件、目录默认只有自己能读写（平台库里有密码哈希，用户库里有加密的 API key）
 process.umask(0o077);
@@ -30,6 +30,7 @@ function config(): ServerConfig & { port: number; host: string } {
       trustProxy: false,
       port: 8787,
       host: "127.0.0.1",
+      backupStatusFile: process.env.MYOUTSIDE_BACKUP_STATUS,
     };
   }
   const dataDir = process.env.MYOUTSIDE_DATA_DIR;
@@ -42,6 +43,7 @@ function config(): ServerConfig & { port: number; host: string } {
     trustProxy: true,
     port: Number(process.env.MYOUTSIDE_PORT ?? 8787),
     host: "127.0.0.1",
+    backupStatusFile: process.env.MYOUTSIDE_BACKUP_STATUS,
   };
 }
 

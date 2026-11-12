@@ -2,7 +2,7 @@
 
 > 作者 2026-11-11 买的云服务器，用来部署 MyOutside（[platform.md「多端」](../user-spec/platform.md)、[D-0013](../user-spec/decisions/0013-cloud-kernel-for-multi-device.md)）。安全设置的依据见 [D-0087](../user-spec/decisions/0087-server-baseline-security.md)。
 > 域名 **`myoutside.org`**（[D-0088](../user-spec/decisions/0088-domain-dns.md)）。连接：在作者的 Mac 上 `ssh ubuntu@myoutside.org`（密钥登录）。文档里不写 IP：IP 可能会换，以 DNS 为准。
-> 最近一次核对：2026-11-11。
+> 最近一次核对：2026-11-13。
 
 ## 1. 配置
 
@@ -78,33 +78,83 @@
 - Node 24（NodeSource 软件源，进自动安全更新：`/etc/apt/apt.conf.d/52myoutside-node-upgrades`）。
 - 代码：`/opt/myoutside/releases/<时间>/`，`/opt/myoutside/current` 指向当前版本，只留最近 5 个。
 - 数据：`/var/lib/myoutside/`（`platform.db` 账号与会话、`users/<用户 id>/myoutside.db` 每个用户的库、`secrets/master.key` 加密 API key 的主密钥），文件都只有 `myoutside` 能读写。
-- 部署前的本地备份：`/var/backups/myoutside/pre-deploy-<时间>.tar.gz`（只留 10 份）；R2 加密备份程序在 `apps/server/scripts/backup.mjs`，配置完成后由 `myoutside-backup.timer` 每天香港时间凌晨 4 点运行（D-0092）。
+- 部署前的本地备份：`/var/backups/myoutside/pre-deploy-<时间>.tar.gz`（只留 10 份）；R2 加密备份见下面「R2 备份」。
 - 登录的封禁：fail2ban 的 `myoutside` 规则（`/etc/fail2ban/filter.d/myoutside.conf`、`jail.d/myoutside-web.local`），只认服务端写的 `ban-request` 那一行，封 1 小时（D-0093）。
 - 管理账号：`myoutside-admin create-user <用户名> [--admin]`、`myoutside-admin setup-link <用户名>`（打印设置链接；只在自己的终端里看）。
 - 部署：在 Mac 上 `bash apps/server/scripts/deploy.sh`（每次都要作者明确同意，AGENTS.md 红线 4）；第一次准备服务器用 `apps/server/scripts/server-setup.sh`。
 
-### R2 备份（D-0092）
+### R2 备份（D-0092、D-0096）
 
-R2 的 bucket、最小权限 token 和备份钥匙不放进仓库，也不通过聊天传递。配置时在服务器自己的终端运行：
+**做什么**：`myoutside-backup.timer` 每天香港时间凌晨 4 点（随机推迟最多 15 分钟）运行 `apps/server/scripts/backup.mjs`，每次部署前也跑一次。每次都给平台库和每个用户库拍 SQLite 快照，打包、压缩、用备份钥匙加密（AES-256-GCM），传到 R2 的 `daily/`（香港时间星期天另传 `weekly/`，1 号另传 `monthly/`；文件名是香港时间 `YYYYMMDD-HHMMSS.tar.gz.enc`）。传完马上下载回来，核对一字不差，再解密、解开、逐个打开检查。结果写进 `/var/lib/myoutside-backup/status.json`，管理员在网页的设置里能看到上次成功的时间；从没成功、超过 26 小时没成功或者上一次失败，设置按钮上带红点。不备份主密钥（`secrets/`）。
+
+**现在的状态**（2026-11-13）：程序就绪，R2 还没配置。配置分两步，都由作者自己做；R2 令牌和备份钥匙不放进仓库，也不经过聊天（AGENTS.md 红线 3）。
+
+#### 第一步：Cloudflare 后台
+
+后台的写法以 2026-11 的官方文档为准，界面上的字样可能略有出入（[references/Cloudflare.md](../references/Cloudflare.md)「R2」）。
+
+1. **开通 R2**：左侧菜单 **Storage & databases → R2 → Overview**，按提示完成开通（有免费额度；开通要走一次结账流程）。
+2. **建桶**：**Create bucket**，名字 `myoutside-backup`。不要选 Jurisdiction（选了 EU 等，地址会变）。
+3. **锁定规则**：进入这个桶 → **Settings** → **Bucket lock rules** → **Add rule**，加三条：
+
+   | 规则名 | 前缀 | 保留期 |
+   |---|---|---|
+   | `daily-7d` | `daily/` | 7 天 |
+   | `weekly-35d` | `weekly/` | 35 天 |
+   | `monthly-180d` | `monthly/` | 180 天 |
+
+4. **自动删除**：同一页 **Object lifecycle rules** → **Add rule**，加三条：前缀 `daily/` 上传 8 天后删除，`weekly/` 36 天，`monthly/` 181 天。自带的「7 天后中止没完成的分块上传」那条留着。
+5. **令牌**：回到 R2 的 Overview，**Account Details** 一栏里 **API Tokens** 旁边的 **Manage** → **Create Account API token**。权限选 **Object Read & Write**，只给 `myoutside-backup` 这一个桶，不设过期。这种令牌只能读写这个桶里的文件，改不了上面的锁定和删除规则。
+6. 创建以后，页面上会显示 **Access Key ID**、**Secret Access Key** 和 S3 的地址（`https://<账号 id>.r2.cloudflarestorage.com`）。Secret 只显示这一次：**先别关这个页面**，直接做第二步。
+
+#### 第二步：服务器上（作者自己的终端）
 
 ```bash
+ssh ubuntu@myoutside.org
 sudo /opt/myoutside/current/apps/server/scripts/configure-backup.sh
 ```
 
-脚本会把 R2 endpoint、bucket、Access Key、Secret Key 和 32 字节备份钥匙保存到只有 root 可读的 `/etc/myoutside/backup.env`、`/etc/myoutside/backup.key`。备份钥匙还要复制到作者自己的密码管理器。配置完成后：
+- 按提示粘贴 S3 地址、Access Key ID、Secret Access Key（不显示）；
+- 备份钥匙：第一次直接回车，脚本生成一把，只显示一次。存进密码管理器，回车清屏，再从密码管理器里粘贴回来核对。服务器整个没了的时候，只能靠密码管理器里这一份解开备份；
+- 脚本把这些存进只有 root 能读的 `/etc/myoutside/backup.env`、`backup.key`，打开定时器，做第一次备份并显示结果。失败时看报错，改好以后重新运行即可（已有的备份钥匙会保留；要换钥匙加 `--new-key`，旧备份仍要用旧钥匙解）。
+
+#### 看状态
+
+- 网页：设置 →「服务器备份」（只有管理员看得到）；
+- 服务器上：`cat /var/lib/myoutside-backup/status.json`、`sudo journalctl -u myoutside-backup.service -n 30 --no-pager`、`systemctl list-timers myoutside-backup.timer`。
+
+#### 恢复演练（第一次搬真实数据之前做一次）
+
+从 R2 下载最新的一份，解开到一个新目录并逐个打开检查；不碰正在用的数据：
 
 ```bash
-sudo systemctl enable --now myoutside-backup.timer
-sudo systemctl start myoutside-backup.service
-sudo journalctl -u myoutside-backup.service -n 30 --no-pager
+sudo node /opt/myoutside/current/apps/server/scripts/restore-backup.mjs --latest /var/tmp/myoutside-restore-check
+sudo rm -rf /var/tmp/myoutside-restore-check
 ```
 
-每次备份会对平台库和每个用户库做 SQLite 快照，压缩、AES-256-GCM 加密，上传后下载回来解密并检查压缩包。恢复演练使用新目录：
+#### 真的要恢复时
 
-```bash
-sudo -u root env MYOUTSIDE_BACKUP_KEY_FILE=/etc/myoutside/backup.key \
-  node /opt/myoutside/current/apps/server/scripts/restore-backup.mjs <下载的备份文件> /var/tmp/myoutside-restore-check
-```
+钥匙：在原来的服务器上，用的就是 `/etc/myoutside/backup.key`。换了一台新服务器：先跑 `server-setup.sh`、部署一次，再运行 `configure-backup.sh`，备份钥匙那一步粘贴密码管理器里的那份，然后照下面做。注意新服务器配置完会马上备份一次空库，`--latest` 会拿到它，所以要按文件名挑出事前的那一份。
+
+1. 解开到新目录：最新的一份用上面的 `--latest`；要退回到更早的某一份，先列出文件名再下载：
+
+   ```bash
+   sudo bash -c 'set -a; . /etc/myoutside/backup.env; aws --endpoint-url "$R2_ENDPOINT" s3 ls "s3://$R2_BUCKET/daily/"'
+   sudo bash -c 'set -a; . /etc/myoutside/backup.env; aws --endpoint-url "$R2_ENDPOINT" s3 cp "s3://$R2_BUCKET/daily/<文件名>" /var/tmp/backup.tar.gz.enc'
+   sudo node /opt/myoutside/current/apps/server/scripts/restore-backup.mjs /var/tmp/backup.tar.gz.enc /var/tmp/myoutside-restore
+   ```
+
+2. 停服务，把现在的数据整个挪到一边（不删），换上解开的：
+
+   ```bash
+   sudo systemctl stop myoutside
+   sudo mv /var/lib/myoutside /var/lib/myoutside.before-restore-$(date +%Y%m%d-%H%M%S)
+   sudo install -d -m 0700 -o myoutside -g myoutside /var/lib/myoutside
+   sudo cp -a /var/tmp/myoutside-restore/. /var/lib/myoutside/
+   sudo cp -a /var/lib/myoutside.before-restore-<时间>/secrets /var/lib/myoutside/   # 主密钥还在的话；没有了，各用户重填一次 API key
+   sudo chown -R myoutside:myoutside /var/lib/myoutside
+   sudo systemctl start myoutside
+   ```
 
 ## 7. 检查命令
 
@@ -117,6 +167,7 @@ ls /var/run/reboot-required                              # 有这个文件 = 该
 sudo ss -tulpn                                           # 在听哪些端口
 systemctl status caddy; sudo journalctl -u caddy -n 50   # 入口和证书
 systemctl status myoutside; sudo journalctl -u myoutside -n 50   # MyOutside 服务端
+cat /var/lib/myoutside-backup/status.json                # 上次备份（D-0096）
 cat /opt/myoutside/current/VERSION                       # 现在跑的是哪个版本
 curl -sI https://myoutside.org                           # 从外面看（在 Mac 上跑）
 ```

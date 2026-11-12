@@ -45,13 +45,25 @@ if systemctl is-active --quiet myoutside; then
   systemctl stop myoutside
 fi
 
-# 部署前备份：D-0092 的异地备份落地之前，先在服务器本地留一份（只留最近 10 份）
+# 部署前备份（服务已停，数据不会再变）：
+#   本地留一份（只留最近 10 份），新版本出问题时直接拿它退回；
+#   R2 配置好以后再传一份（D-0092）。R2 失败不挡部署（本地这份已经有了），网页的设置里会标红（D-0096）。
 if [ -f /var/lib/myoutside/platform.db ]; then
   install -d -m 0700 /var/backups/myoutside
   tar -czf "/var/backups/myoutside/pre-deploy-$ts.tar.gz" -C /var/lib myoutside
   chmod 0600 "/var/backups/myoutside/pre-deploy-$ts.tar.gz"
   ls -1t /var/backups/myoutside/pre-deploy-*.tar.gz | tail -n +11 | xargs -r rm -f
   echo "已备份数据：/var/backups/myoutside/pre-deploy-$ts.tar.gz"
+  if [ -f /etc/myoutside/backup.env ] && [ -f /etc/myoutside/backup.key ]; then
+    if systemctl start myoutside-backup.service; then
+      echo "已备份到 R2"
+    else
+      echo "警告：备份到 R2 失败（本地备份已经有了，继续部署）："
+      journalctl -u myoutside-backup.service -n 5 --no-pager -o cat || true
+    fi
+  else
+    echo "R2 备份还没配置，跳过（docs/server.md「R2 备份」）"
+  fi
 fi
 
 switch_to() {

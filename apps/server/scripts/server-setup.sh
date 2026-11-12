@@ -39,4 +39,5 @@ install -d -m 0700 -o myoutside -g myoutside /var/lib/myoutside
 install -d -m 0755 /opt/myoutside /opt/myoutside/releases
 install -d -m 0700 /var/backups/myoutside
 install -d -m 0700 /var/lib/myoutside-backup-work
+install -d -m 0755 /var/lib/myoutside-backup
 echo "准备好了：node $(node --version)，账号 myoutside，数据 /var/lib/myoutside"
