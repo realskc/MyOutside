@@ -40,6 +40,10 @@ const copy = (rel) => cpSync(join(repo, rel), join(out, rel), { recursive: true 
 copy("apps/host/renderer");
 copy("apps/server/web");
 copy("apps/server/deploy");
+mkdirSync(join(out, "apps", "server", "scripts"), { recursive: true });
+for (const file of ["backup.mjs", "restore-backup.mjs", "configure-backup.sh"]) {
+  cpSync(join(repo, "apps", "server", "scripts", file), join(out, "apps", "server", "scripts", file));
+}
 for (const id of CLOUD_APPS) copy(`apps/${id}/ui`);
 copy("apps/zheye/recipes");
 
