@@ -14,7 +14,14 @@ fi
 
 if ! command -v aws >/dev/null 2>&1; then
   apt-get update -qq
-  apt-get install -y -qq awscli
+  apt-get install -y -qq unzip
+  aws_tmp="$(mktemp -d)"
+  trap 'rm -rf "$aws_tmp"' EXIT
+  curl -fsSL https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip -o "$aws_tmp/awscliv2.zip"
+  unzip -q "$aws_tmp/awscliv2.zip" -d "$aws_tmp"
+  "$aws_tmp/aws/install" --update
+  rm -rf "$aws_tmp"
+  trap - EXIT
 fi
 
 # NodeSource 的来源名是「. nodistro」，按网站认
