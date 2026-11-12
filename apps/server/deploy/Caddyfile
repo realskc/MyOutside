@@ -4,13 +4,22 @@ myoutside.org {
 	encode zstd gzip
 	header -Server
 
-	# 服务端只有登录、设置密码、退出登录接受请求体，都很小：超过 4 KB 的在这里就挡掉，到不了程序（D-0093）
-	request_body {
-		max_size 4KB
+	# 独立 CodexGateway 项目的入口；保留此规则，避免 MyOutside 部署时覆盖它。
+	handle_path /codex-gateway/* {
+		request_body {
+			max_size 8MB
+		}
+		reverse_proxy 127.0.0.1:8788 {
+			flush_interval -1
+		}
 	}
-
-	# 访客的地址经 X-Forwarded-For 交给服务端（Caddy 会覆盖访客自己填的），WebSocket 自动转发
-	reverse_proxy 127.0.0.1:8787
+	# MyOutside 登录请求仍限制为 4 KB（D-0093）。
+	handle {
+		request_body {
+			max_size 4KB
+		}
+		reverse_proxy 127.0.0.1:8787
+	}
 }
 
 # www 跳到主域名

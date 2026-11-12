@@ -163,6 +163,7 @@
 | [D-0092](0092-backup-to-r2.md) | 服务器数据的备份：每天打一个加密包传到 Cloudflare R2，按规则自动删、锁定期内谁也删不掉 | 有效（未实现） |
 | [D-0093](0093-login-and-server-hardening.md) | 登录与服务器的安全：没登录时能碰的最少、处处限大小、限次数但不为难人、服务进程关在低权限里 | 有效（未实现） |
 | [D-0094](0094-spec-faithful-editorial-maintenance.md) | 统一 user spec 的记录规则，以忠实性和可读性共同检查 | 有效 |
+| [D-0095](0095-independent-codex-gateway-entry.md) | Caddy 保留独立 CodexGateway 的入口 | 有效 |
 
 ## 应用专属决策
 
