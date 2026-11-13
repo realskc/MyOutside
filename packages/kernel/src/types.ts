@@ -38,6 +38,34 @@ export interface SecretCodec {
   decrypt(cipher: string): string;
 }
 
+/**
+ * 凭据存在哪（D-0097）：不提供时存在这个库的平台设置里（按 SecretCodec 加密）；
+ * 服务器试用阶段由服务端提供：大家共用作者的 key，只有管理员能改。
+ */
+export interface CredentialStore {
+  /** 明文，只在平台内部使用；没设置时返回 null */
+  get(key: string): string | null;
+  isSet(key: string): boolean;
+  /** 外壳在设置里保存；null 或空字符串表示清除。不允许时抛 KernelError（FORBIDDEN） */
+  set(key: string, value: string | null): void;
+  /** 没设置时给用户看的提示（不提供时提示去设置里填） */
+  missingMessage?: string;
+}
+
+/**
+ * 平台 AI 的额度（D-0097）：一个周期里（例如本周）这个库的估算花费到了上限，就不再发 AI、搜索、抓取请求。
+ * 花费是请求结束后才记上的，同时进行的几个请求可能一起略超一点。
+ */
+export interface UsageQuota {
+  limitYuan: number;
+  /** 包含 now 的那个周期的起止（毫秒） */
+  period(now: number): { start: number; end: number };
+  /** 周期的叫法，用在提示里，例如「本周」 */
+  label: string;
+  /** 什么时候恢复，用在提示里，例如「下周一 0 点（北京时间）」 */
+  resetText: string;
+}
+
 /** 以应用为作用域的数据访问助手（表名自动加 `appId__` 前缀） */
 export interface AppDb {
   insert(table: string, row: Record<string, SqlValue>): void;

@@ -3,8 +3,9 @@ import { createServer, type IncomingMessage, type Server, type ServerResponse } 
 import type { Duplex } from "node:stream";
 import { extname, join, normalize, resolve, sep } from "node:path";
 import { WebSocketServer, type RawData, type WebSocket } from "ws";
-import { MAX_USERNAME_LENGTH, normalizeUsername, openAccounts, type Accounts, type Session } from "./accounts.js";
+import { JoinError, MAX_USERNAME_LENGTH, normalizeUsername, openAccounts, type Accounts, type Session } from "./accounts.js";
 import { readBackupStatus } from "./backup-status.js";
+import { sharedCredentials, TRIAL_WEEKLY_LIMIT_YUAN, userSpending, weeklyQuota } from "./trial.js";
 import { cloudAppUiDirs, registerCloudApps } from "./cloud-apps.js";
 import { createKernelManager, type KernelManager } from "./kernels.js";
 import { createPasswordHasher, HashBusyError, MAX_PASSWORD_LENGTH, MIN_PASSWORD_LENGTH, type PasswordHasher } from "./password.js";
@@ -33,6 +34,8 @@ export interface ServerConfig {
   kernelIdleMs?: number;
   /** 备份程序写的状态文件（D-0096）；不设就不提供备份状态（本机开发） */
   backupStatusFile?: string;
+  /** 试用阶段每个朋友每周最多花多少元（D-0097）；默认 ¥20 */
+  weeklyAiLimitYuan?: number;
 }
 
 /** 没登录时能发的请求（登录、设置密码）最大 4 KB；超长的用户名在这里就被挡掉（作者：防两百万位长的用户名） */
@@ -75,10 +78,17 @@ export function createMyOutsideServer(config: ServerConfig) {
   const accounts: Accounts = openAccounts(join(config.dataDir, "platform.db"), now);
   const hasher = config.hasher ?? createPasswordHasher();
   const secrets = createAesSecretCodec(loadOrCreateMasterKey(join(config.dataDir, "secrets", "master.key")));
+  const usersDir = join(config.dataDir, "users");
+  const weeklyLimit = config.weeklyAiLimitYuan ?? TRIAL_WEEKLY_LIMIT_YUAN;
   const kernels: KernelManager = createKernelManager({
-    usersDir: join(config.dataDir, "users"),
+    usersDir,
     secrets,
     registerApps: (kernel) => registerCloudApps(kernel, { root: config.root }),
+    // 试用阶段（D-0097）：大家共用作者的 AI key；朋友每周限额，作者自己不限
+    perUser: (userId) => {
+      const isAdmin = accounts.getUser(userId)?.isAdmin === true;
+      return { credentials: sharedCredentials(accounts, secrets, isAdmin), quota: isAdmin ? undefined : weeklyQuota(weeklyLimit) };
+    },
     idleMs: config.kernelIdleMs,
     now,
   });
@@ -140,6 +150,14 @@ export function createMyOutsideServer(config: ServerConfig) {
   /** 请求必须来自自己的页面（防别的网站借用户的浏览器发请求） */
   function requireOwnOrigin(req: IncomingMessage): void {
     if (req.headers.origin !== config.publicOrigin) throw new HttpError(403, "请求来源不对");
+  }
+
+  /** 只给登录了的管理员（D-0097：发邀请、看各用户的用量） */
+  function requireAdmin(req: IncomingMessage): Session {
+    const current = sessionOf(req);
+    if (!current) throw new HttpError(401, "要先登录");
+    if (!current.session.isAdmin) throw new HttpError(403, "只有管理员能用");
+    return current.session;
   }
 
   /** 访客地址：在 Caddy 后面时，从本机来的请求按 X-Forwarded-For（Caddy 默认会覆盖掉访客自己填的） */
@@ -297,6 +315,41 @@ export function createMyOutsideServer(config: ServerConfig) {
     sendJson(res, 200, { ok: true }, { "set-cookie": sessionCookie(session.token, session.expiresAt) });
   }
 
+  /** 用邀请链接注册（D-0097）：朋友自己起用户名、设密码，注册完直接登录 */
+  async function handleJoin(req: IncomingMessage, res: ServerResponse): Promise<void> {
+    requireOwnOrigin(req);
+    const body = await readJson(req, AUTH_BODY_LIMIT);
+    const { token, username, password } = body;
+    if (typeof token !== "string" || typeof username !== "string" || typeof password !== "string" || token.length > 128) {
+      throw new HttpError(400, "请求格式不对");
+    }
+    if (username.length > MAX_USERNAME_LENGTH) throw new HttpError(400, "用户名太长");
+    if (password.length < MIN_PASSWORD_LENGTH || password.length > MAX_PASSWORD_LENGTH) {
+      throw new HttpError(400, `密码长度要在 ${MIN_PASSWORD_LENGTH}–${MAX_PASSWORD_LENGTH} 个字符之间`);
+    }
+    if (!accounts.peekInvite(token)) throw new HttpError(400, "邀请链接无效、已过期或已经用过，请找邀请你的人重新生成");
+    const name = normalizeUsername(username);
+    if (!name) throw new HttpError(400, "用户名只能是 1–32 个字母、数字或 _ . -，并以字母或数字开头");
+    if (accounts.findUser(name)) throw new HttpError(400, `用户名 ${name} 已经有人用了，换一个吧`);
+    let hash: string;
+    try {
+      hash = await hasher.hash(password);
+    } catch (error) {
+      if (error instanceof HashBusyError) return sendJson(res, 503, { ok: false, error: "服务器忙，请稍后再试" });
+      throw error;
+    }
+    let user;
+    try {
+      user = accounts.joinWithInvite(token, name, hash);
+    } catch (error) {
+      if (error instanceof JoinError) throw new HttpError(400, error.message);
+      throw error;
+    }
+    const session = accounts.createSession(user.id);
+    log(`[auth] joined user=${user.username} user_id=${user.id}`);
+    sendJson(res, 200, { ok: true }, { "set-cookie": sessionCookie(session.token, session.expiresAt) });
+  }
+
   // ---------------- 路由 ----------------
 
   async function route(req: IncomingMessage, res: ServerResponse): Promise<void> {
@@ -306,6 +359,15 @@ export function createMyOutsideServer(config: ServerConfig) {
     if (req.method === "POST") {
       if (path === "/__myoutside/login") return handleLogin(req, res);
       if (path === "/__myoutside/setup") return handleSetup(req, res);
+      if (path === "/__myoutside/join") return handleJoin(req, res);
+      if (path === "/__myoutside/invites") {
+        requireOwnOrigin(req);
+        const admin = requireAdmin(req);
+        await readJson(req, AUTH_BODY_LIMIT);
+        const invite = accounts.createInvite(admin.userId);
+        log(`[auth] invite created by=${admin.username}`);
+        return sendJson(res, 200, { link: `${config.publicOrigin}/__myoutside/join#${invite.token}`, expiresAt: invite.expiresAt });
+      }
       if (path === "/__myoutside/logout") {
         requireOwnOrigin(req);
         const current = sessionOf(req);
@@ -323,9 +385,30 @@ export function createMyOutsideServer(config: ServerConfig) {
     if (path === "/__myoutside/setup") {
       return serveFile(res, join(webDir, "setup.html"), { headers: { "content-security-policy": AUTH_CSP } });
     }
+    if (path === "/__myoutside/join") {
+      return serveFile(res, join(webDir, "join.html"), { headers: { "content-security-policy": AUTH_CSP } });
+    }
     if (path === "/__myoutside/session") {
       const current = sessionOf(req);
-      return current ? sendJson(res, 200, { username: current.session.username }) : sendJson(res, 401, { ok: false });
+      return current
+        ? sendJson(res, 200, { username: current.session.username, isAdmin: current.session.isAdmin })
+        : sendJson(res, 401, { ok: false });
+    }
+    if (path === "/__myoutside/admin/users") {
+      // 管理员看各用户本周和一共花了多少（D-0097）：朋友用的是作者的 key
+      requireAdmin(req);
+      const at = now();
+      return sendJson(
+        res,
+        200,
+        accounts.listUsers().map((user) => ({
+          username: user.username,
+          isAdmin: user.isAdmin,
+          createdAt: user.createdAt,
+          weeklyLimitYuan: user.isAdmin ? null : weeklyLimit,
+          ...userSpending(usersDir, user.id, at),
+        })),
+      );
     }
     if (path === "/__myoutside/backup-status") {
       // 备份是整台服务器的事，只给管理员看（D-0096）

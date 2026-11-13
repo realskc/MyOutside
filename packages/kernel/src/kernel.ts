@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { quotaStatus, type AiAccess } from "./ai-access.js";
 import { createAppDb, createMigrationCtx, createReadonlyAppDb } from "./appdb.js";
 import { CREDENTIAL_SETTINGS, encodeSetting } from "./credentials.js";
 import { KernelError } from "./errors.js";
@@ -9,6 +10,7 @@ import type {
   ApiDefinition,
   AppManifest,
   AppModule,
+  CredentialStore,
   PlainContext,
   DbAdapter,
   HandleOptions,
@@ -17,6 +19,7 @@ import type {
   ReadContext,
   SecretCodec,
   TxContext,
+  UsageQuota,
 } from "./types.js";
 
 const MAX_CALL_DEPTH = 8;
@@ -42,6 +45,10 @@ export interface KernelOptions {
   storage: DbAdapter;
   /** 凭据加解密（D-0075）；不提供时凭据以明文保存（测试、脚本） */
   secrets?: SecretCodec;
+  /** 凭据存在别处（D-0097，服务器试用阶段：大家共用作者的 key）；不提供时存在这个库里 */
+  credentials?: CredentialStore;
+  /** 平台 AI 的额度（D-0097，服务器试用阶段的朋友）；不提供时不限 */
+  quota?: UsageQuota;
 }
 
 /** 平台 API 的访问规则：apps = 子应用可调用（需在清单 uses 里声明）；shell = 只有外壳与平台内部 */
@@ -66,7 +73,8 @@ const NOOP = () => {};
  * - 只读 API 直接执行；事务 API 经串行队列、单事务执行；普通 API 直接执行，写入经本应用的事务 API；
  * - 每次调用都按调用者检查权限（D-0053、D-0058、D-0063、D-0086）。
  */
-export function createKernel({ storage, secrets }: KernelOptions) {
+export function createKernel({ storage, secrets, credentials, quota }: KernelOptions) {
+  const aiAccess: AiAccess = { secrets, credentials, quota };
   const apps = new Map<string, AppModule>();
   const manifests = new Map<string, AppManifest>();
   const functions = new Map<string, RegisteredFunction>();
@@ -97,6 +105,7 @@ export function createKernel({ storage, secrets }: KernelOptions) {
     visibility: "public",
     input: z.object({ key: z.string().min(1) }),
     handler: (_ctx, input: { key: string }) => {
+      if (credentials && CREDENTIAL_SETTINGS.has(input.key)) return { value: null, isSet: credentials.isSet(input.key) };
       const row = storage.select<{ value: string }>("SELECT value FROM platform_setting WHERE key = ?", [input.key])[0];
       const value = row ? (JSON.parse(row.value) as unknown) : null;
       const isSet = value !== null && value !== "";
@@ -109,6 +118,13 @@ export function createKernel({ storage, secrets }: KernelOptions) {
     visibility: "public",
     input: z.object({ key: z.string().min(1), value: z.unknown() }),
     handler: (_ctx, input: { key: string; value: unknown }) => {
+      if (credentials && CREDENTIAL_SETTINGS.has(input.key)) {
+        if (input.value !== null && input.value !== undefined && typeof input.value !== "string") {
+          throw new KernelError("VALIDATION", `${input.key} 必须是字符串`);
+        }
+        credentials.set(input.key, (input.value as string | null | undefined) ?? null);
+        return { ok: true as const };
+      }
       const serialized = JSON.stringify(encodeSetting(input.key, input.value ?? null, secrets));
       const existing = storage.select<{ key: string }>("SELECT key FROM platform_setting WHERE key = ?", [input.key])[0];
       if (existing) {
@@ -161,11 +177,18 @@ export function createKernel({ storage, secrets }: KernelOptions) {
     });
   }
 
-  definePlatform("platform.ai.chat", "apps", createPlatformAiDefinition(storage, recordUsage, secrets));
+  definePlatform("platform.ai.chat", "apps", createPlatformAiDefinition(storage, recordUsage, aiAccess));
   /** 实验用：原样透传请求体（D-0082）；普通子应用用 platform.ai.chat */
-  definePlatform("platform.ai.chatRaw", "apps", createPlatformAiRawDefinition(storage, recordUsage, secrets));
-  definePlatform("platform.web.search", "apps", createWebSearchDefinition(storage, recordUsage, secrets));
-  definePlatform("platform.web.fetch", "apps", createWebFetchDefinition(storage, recordUsage, secrets));
+  definePlatform("platform.ai.chatRaw", "apps", createPlatformAiRawDefinition(storage, recordUsage, aiAccess));
+  definePlatform("platform.web.search", "apps", createWebSearchDefinition(storage, recordUsage, aiAccess));
+  definePlatform("platform.web.fetch", "apps", createWebFetchDefinition(storage, recordUsage, aiAccess));
+  /** 这个用户这一周期的额度与已用（D-0097）；没有额度时为 null。只给外壳 */
+  definePlatform("platform.usage.quota", "shell", {
+    kind: "read",
+    visibility: "public",
+    input: z.unknown(),
+    handler: () => (quota ? quotaStatus(storage, quota, Date.now()) : null),
+  });
   /** 用量与估算花费，按调用者（子应用）汇总（D-0074）；只给外壳 */
   definePlatform("platform.usage.summary", "shell", {
     kind: "read",

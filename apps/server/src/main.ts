@@ -9,6 +9,7 @@ import { createMyOutsideServer, type ServerConfig } from "./server.js";
  *   serve [--dev]              启动服务；--dev 用本机临时数据目录、http://localhost:8787（不碰作者的真实数据）
  *   create-user <用户名> [--admin]   建账号，打印一次性的设置链接（24 小时内有效，用一次作废）
  *   setup-link <用户名>          重新生成设置链接（忘了密码时用）
+ *   invite                      生成一个邀请链接（7 天内有效，用一次作废；D-0097）。平时在网页的设置里生成就行
  * 正式环境用环境变量：MYOUTSIDE_DATA_DIR、MYOUTSIDE_ORIGIN、MYOUTSIDE_PORT、MYOUTSIDE_ROOT、MYOUTSIDE_BACKUP_STATUS。
  */
 // 新建的文件、目录默认只有自己能读写（平台库里有密码哈希，用户库里有加密的 API key）
@@ -70,6 +71,18 @@ async function serve(): Promise<void> {
   process.on("SIGINT", () => void stop("SIGINT"));
 }
 
+function invite(): void {
+  const settings = config();
+  const accounts = openAccounts(join(settings.dataDir, "platform.db"));
+  try {
+    const created = accounts.createInvite(null);
+    console.log(`邀请链接（7 天内有效，用一次作废，到 ${new Date(created.expiresAt).toLocaleString("zh-CN", { timeZone: "Asia/Shanghai" })}）：`);
+    console.log(`${settings.publicOrigin}/__myoutside/join#${created.token}`);
+  } finally {
+    accounts.close();
+  }
+}
+
 function admin(): void {
   const settings = config();
   const accounts = openAccounts(join(settings.dataDir, "platform.db"));
@@ -89,8 +102,9 @@ function admin(): void {
 try {
   if (command === "serve") await serve();
   else if (command === "create-user" || command === "setup-link") admin();
+  else if (command === "invite") invite();
   else {
-    console.error("用法：serve [--dev] | create-user <用户名> [--admin] [--dev] | setup-link <用户名> [--dev]");
+    console.error("用法：serve [--dev] | create-user <用户名> [--admin] [--dev] | setup-link <用户名> [--dev] | invite [--dev]");
     process.exit(2);
   }
 } catch (error) {

@@ -2,7 +2,8 @@ import { z } from "zod";
 import { deepseekPost, readSse, readStringSetting } from "./deepseek.js";
 import { KernelError } from "./errors.js";
 import { estimateCost } from "./pricing.js";
-import type { ApiDefinition, DbAdapter, ReadContext, SecretCodec } from "./types.js";
+import type { AiAccess } from "./ai-access.js";
+import type { ApiDefinition, DbAdapter, ReadContext } from "./types.js";
 
 const DEFAULT_MODEL = "deepseek-flash";
 
@@ -119,7 +120,7 @@ export type RecordUsage = (record: UsageRecord) => void;
 export function createPlatformAiDefinition(
   storage: DbAdapter,
   recordUsage: RecordUsage = () => {},
-  secrets?: SecretCodec,
+  access: AiAccess = {},
 ): ApiDefinition {
   return {
     kind: "read",
@@ -141,7 +142,7 @@ export function createPlatformAiDefinition(
         ...(input.reasoningEffort ? { reasoning_effort: input.reasoningEffort } : {}),
         ...(input.stream ? { stream: true, stream_options: { include_usage: true } } : {}),
       };
-      const response = await deepseekPost(storage, secrets, "/chat/completions", body, ctx.signal, "AI 请求");
+      const response = await deepseekPost(storage, access, "/chat/completions", body, ctx.signal, "AI 请求");
 
       let content = "";
       let reasoning = "";
@@ -277,7 +278,7 @@ export type RawChatInput = z.infer<typeof RawChatInputSchema>;
 export function createPlatformAiRawDefinition(
   storage: DbAdapter,
   recordUsage: RecordUsage = () => {},
-  secrets?: SecretCodec,
+  access: AiAccess = {},
 ): ApiDefinition {
   return {
     kind: "read",
@@ -288,7 +289,7 @@ export function createPlatformAiRawDefinition(
       if (body.stream === true) {
         throw new KernelError("PRECONDITION", "实验 API 暂不支持流式（stream: true）");
       }
-      const response = await deepseekPost(storage, secrets, "/chat/completions", body, ctx.signal, "AI 实验请求");
+      const response = await deepseekPost(storage, access, "/chat/completions", body, ctx.signal, "AI 实验请求");
       // 非流式请求在等待期间会持续收到空行（DeepSeek 的请求保活），停止多半发生在读响应体时（D-0084）
       let text: string;
       try {

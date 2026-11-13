@@ -12,6 +12,7 @@ export {
 } from "./platform-ai.js";
 export { WebFetchInputSchema, WebSearchInputSchema } from "./platform-web.js";
 export { estimateCost, isPeak, WEB_REQUEST_PRICE } from "./pricing.js";
+export { type AiAccess, type QuotaStatus } from "./ai-access.js";
 export { createAppDb, createMigrationCtx, createReadonlyAppDb, physicalTableName } from "./appdb.js";
 export type {
   ApiDefinition,
@@ -19,6 +20,7 @@ export type {
   AppDb,
   AppManifest,
   AppModule,
+  CredentialStore,
   PlainContext,
   PlainHandler,
   DbAdapter,
@@ -36,5 +38,6 @@ export type {
   SqlValue,
   TxContext,
   TxHandler,
+  UsageQuota,
   WhereValue,
 } from "./types.js";

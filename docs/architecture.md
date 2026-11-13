@@ -109,7 +109,7 @@ interface AppModule {
 
 ### 3.3 错误
 
-错误码（`packages/kernel/src/errors.ts`）：`UNKNOWN_FUNCTION`、`VALIDATION`、`TX_CALL_INVALID`、`CALL_DEPTH_EXCEEDED`、`NOT_FOUND`、`PRECONDITION`、`UPSTREAM`、`INTERNAL`。事务 API 抛错 → 整个事务回滚。
+错误码（`packages/kernel/src/errors.ts`）：`UNKNOWN_FUNCTION`、`VALIDATION`、`TX_CALL_INVALID`、`CALL_DEPTH_EXCEEDED`、`NOT_FOUND`、`PRECONDITION`、`UPSTREAM`、`QUOTA_EXCEEDED`（AI 额度用完，D-0097）、`INTERNAL`。事务 API 抛错 → 整个事务回滚。
 
 ### 3.4 权限（D-0053、D-0070）
 
@@ -123,6 +123,11 @@ interface AppModule {
 | （外壳调用子应用的 API） | 拒绝 |
 
 拒绝时错误码 `FORBIDDEN`。平台设置中的凭据（`ai.deepseek.apiKey`）任何调用者读到的都是 `{ value: null, isSet }`；在数据库里只存密文 `{"$encrypted": ...}`，由 Electron 传入的 `SecretCodec`（`safeStorage`，macOS 钥匙串 / Windows DPAPI）加解密（`packages/kernel/src/credentials.ts`，D-0075）。
+
+运行环境还可以在建内核时传入（D-0097，`packages/kernel/src/ai-access.ts`）：
+
+- `credentials`：凭据存在别处。服务器试用阶段用它让所有用户读同一把共用的 key（存在平台库），只有管理员能改；
+- `quota`：平台 AI 的额度。每次发 AI / 搜索 / 抓取请求之前，算这个库在当前周期（`period(now)`）里记下的估算花费，到了上限就报 `QUOTA_EXCEEDED`，请求不发出去。
 
 **远程调用**（`handle(request, { caller, remote: true })`，目前只有局域网预览，D-0072）：必须带调用者；不能调用只给外壳的平台 API（身份是对方报上来的，可以伪造）。局域网预览按 Referer 确定调用者（`/shell/` → 外壳，`/apps/<id>/` → 子应用）。
 
@@ -180,6 +185,7 @@ get(table, where) / all(table, where?, { orderBy?, limit?, offset? }) / count(ta
 | `platform.web.search` | 只读 | 子应用（需声明） | DeepSeek 网页搜索（D-0050） |
 | `platform.web.fetch` | 只读 | 子应用（需声明） | DeepSeek 网页抓取，返回 Markdown 正文（D-0050） |
 | `platform.usage.summary` | 只读 | 只给外壳 | 用量与估算花费，按调用者汇总（D-0074） |
+| `platform.usage.quota` | 只读 | 只给外壳 | 当前周期的额度与已用 `{ limitYuan, usedYuan, periodStart, periodEnd, label, resetText }`；没有额度时为 `null`（D-0097） |
 
 实现：`packages/kernel/src/platform-ai.ts`、`platform-web.ts`、`deepseek.ts`（密钥读取、请求、错误整理、SSE 解析）。
 

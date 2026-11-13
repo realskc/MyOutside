@@ -6,8 +6,10 @@ import { fileURLToPath } from "node:url";
 import { afterEach, describe, expect, it } from "vitest";
 import WebSocket from "ws";
 import {
+  chinaWeek,
   createAesSecretCodec,
   createLoginLimiter,
+  INVITE_TTL_MS,
   createMyOutsideServer,
   createPasswordHasher,
   delayAfter,
@@ -310,22 +312,35 @@ describe("服务", () => {
     expect(unknown.error?.code).toBe("FORBIDDEN");
   });
 
-  it("每个用户一个库：一个用户的设置、API key 别人看不到；API key 在库里是密文", async () => {
+  it("每个用户一个库：一个用户的设置别人看不到", async () => {
     const run = await start();
     const alice = rpc(await connectWs(run, { cookie: await signUp(run, "alice"), origin: run.origin }));
     const bob = rpc(await connectWs(run, { cookie: await signUp(run, "bob"), origin: run.origin }));
     expect((await alice.call("platform.settings.set", { key: "ui.language", value: "en" })).ok).toBe(true);
-    expect((await alice.call("platform.settings.set", { key: "ai.deepseek.apiKey", value: "sk-alice-secret" })).ok).toBe(true);
-    expect((await alice.call("platform.settings.get", { key: "ai.deepseek.apiKey" })).result).toEqual({ value: null, isSet: true });
+    expect((await alice.call("platform.settings.get", { key: "ui.language" })).result).toEqual({ value: "en", isSet: true });
     expect((await bob.call("platform.settings.get", { key: "ui.language" })).result).toEqual({ value: null, isSet: false });
-    expect((await bob.call("platform.settings.get", { key: "ai.deepseek.apiKey" })).result).toEqual({ value: null, isSet: false });
+  });
 
-    const aliceId = run.app.accounts.findUser("alice")!.id;
-    const db = new DatabaseSync(join(run.dataDir, "users", aliceId, "myoutside.db"), { readOnly: true });
-    const stored = (db.prepare("SELECT value FROM platform_setting WHERE key = ?").get("ai.deepseek.apiKey") as { value: string }).value;
-    db.close();
-    expect(stored).not.toContain("sk-alice");
+  it("试用阶段（D-0097）：大家共用一把 AI key，只有管理员能改；平台库里只有密文，不进任何用户的库；谁都读不到值", async () => {
+    const run = await start();
+    const admin = rpc(await connectWs(run, { cookie: await signUp(run, "author", undefined, true), origin: run.origin }));
+    const friend = rpc(await connectWs(run, { cookie: await signUp(run, "bob"), origin: run.origin }));
+    expect((await friend.call("platform.settings.get", { key: "ai.deepseek.apiKey" })).result).toEqual({ value: null, isSet: false });
+    const denied = await friend.call("platform.settings.set", { key: "ai.deepseek.apiKey", value: "sk-bob" });
+    expect(denied.error?.code).toBe("FORBIDDEN");
+
+    expect((await admin.call("platform.settings.set", { key: "ai.deepseek.apiKey", value: "sk-author-secret" })).ok).toBe(true);
+    expect((await admin.call("platform.settings.get", { key: "ai.deepseek.apiKey" })).result).toEqual({ value: null, isSet: true });
+    expect((await friend.call("platform.settings.get", { key: "ai.deepseek.apiKey" })).result).toEqual({ value: null, isSet: true });
+
+    const stored = run.app.accounts.getServerSetting("ai.deepseek.apiKey")!;
     expect(stored).toContain("v1:");
+    expect(stored).not.toContain("sk-author");
+    for (const name of ["author", "bob"]) {
+      const db = new DatabaseSync(join(run.dataDir, "users", run.app.accounts.findUser(name)!.id, "myoutside.db"), { readOnly: true });
+      expect(db.prepare("SELECT * FROM platform_setting WHERE key = ?").all("ai.deepseek.apiKey")).toEqual([]);
+      db.close();
+    }
   });
 
   it("WebSocket：超过 1 MB 的消息断开；退出登录后已连着的也立刻失效", async () => {
@@ -343,6 +358,88 @@ describe("服务", () => {
     const after = closed(ws);
     ws.send(JSON.stringify({ t: "call", id: 99, call: "platform.dataVersion" }));
     expect(await after).toBe(4401);
+  });
+
+  it("邀请注册（D-0097）：只有管理员能发邀请；朋友自己起用户名、设密码；链接用一次作废、7 天过期；用户名被占不算用掉", async () => {
+    const run = await start();
+    expect((await post(run, "/__myoutside/invites", {})).status).toBe(401);
+    const friendCookie = await signUp(run, "bob");
+    expect((await post(run, "/__myoutside/invites", {}, { cookie: friendCookie })).status).toBe(403);
+    const adminCookie = await signUp(run, "author", undefined, true);
+    expect((await post(run, "/__myoutside/invites", {}, { cookie: adminCookie, origin: "https://evil.example" })).status).toBe(403);
+    const invite = async () => {
+      const response = await post(run, "/__myoutside/invites", {}, { cookie: adminCookie });
+      expect(response.status).toBe(200);
+      const body = (await response.json()) as { link: string; expiresAt: number };
+      expect(body.link.startsWith(`${run.origin}/__myoutside/join#`)).toBe(true);
+      expect(body.expiresAt).toBe(run.clock.now + INVITE_TTL_MS);
+      return body.link.split("#")[1]!;
+    };
+
+    const page = await fetch(run.base + "/__myoutside/join");
+    expect(page.status).toBe(200);
+    expect(await page.text()).toContain("join.js");
+    expect(page.headers.get("content-security-policy")).toContain("frame-ancestors 'none'");
+
+    const token = await invite();
+    const join = (body: Record<string, unknown>, headers: Record<string, string> = {}) => post(run, "/__myoutside/join", body, headers);
+    expect((await join({ token, username: "carol", password: "correct horse battery" }, { origin: "https://evil.example" })).status).toBe(403);
+    expect((await join({ token, username: "carol", password: "short" })).status).toBe(400);
+    // 用户名被占：报错，链接还能用
+    const taken = await join({ token, username: "BOB", password: "correct horse battery" });
+    expect(taken.status).toBe(400);
+    expect(((await taken.json()) as { error: string }).error).toContain("已经有人用了");
+    const joined = await join({ token, username: "Carol", password: "correct horse battery" });
+    expect(joined.status).toBe(200);
+    const carolCookie = cookieOf(joined);
+    const session = await fetch(run.base + "/__myoutside/session", { headers: { cookie: carolCookie } });
+    expect(await session.json()).toEqual({ username: "carol", isAdmin: false });
+    expect(run.app.accounts.findUser("carol")?.isAdmin).toBe(false);
+    expect(run.logs.some((line) => line.startsWith("[auth] joined user=carol"))).toBe(true);
+    // 用过了
+    expect((await join({ token, username: "dave", password: "correct horse battery" })).status).toBe(400);
+    // 过期
+    const old = await invite();
+    run.clock.now += INVITE_TTL_MS + 1;
+    expect((await join({ token: old, username: "dave", password: "correct horse battery" })).status).toBe(400);
+    expect((await join({ token: "not-a-token", username: "dave", password: "correct horse battery" })).status).toBe(400);
+    expect(run.app.accounts.findUser("dave")).toBeNull();
+  });
+
+  it("朋友每周限额（D-0097）：本周花到 ¥20 就不再发 AI 请求；作者不限；管理员能看到每个人这周花了多少", async () => {
+    const run = await start();
+    const adminCookie = await signUp(run, "author", undefined, true);
+    const friendCookie = await signUp(run, "bob");
+    const admin = rpc(await connectWs(run, { cookie: adminCookie, origin: run.origin }));
+    const friend = rpc(await connectWs(run, { cookie: friendCookie, origin: run.origin }));
+    expect((await admin.call("platform.usage.quota")).result).toBeNull();
+    expect((await friend.call("platform.usage.quota")).result).toMatchObject({ limitYuan: 20, usedYuan: 0, label: "本周" });
+
+    const bobId = run.app.accounts.findUser("bob")!.id;
+    const db = new DatabaseSync(join(run.dataDir, "users", bobId, "myoutside.db"));
+    db.prepare("INSERT INTO platform_usage (caller, kind, cost_yuan, created_at) VALUES ('dialog', 'ai.chat', 25, ?)").run(Date.now());
+    db.prepare("INSERT INTO platform_usage (caller, kind, cost_yuan, created_at) VALUES ('dialog', 'ai.chat', 3, ?)").run(chinaWeek(Date.now()).start - 1);
+    db.close();
+
+    expect((await friend.call("platform.usage.quota")).result).toMatchObject({ usedYuan: 25 });
+    const blocked = await friend.call("platform.ai.chat", { messages: [{ role: "user", content: "hi" }] }, "dialog");
+    expect(blocked.error?.code).toBe("QUOTA_EXCEEDED");
+    expect(blocked.error?.message).toBe("本周的 AI 额度（¥20）用完了，下周一 0 点（北京时间）恢复");
+
+    expect((await fetch(run.base + "/__myoutside/admin/users", { headers: { cookie: friendCookie } })).status).toBe(403);
+    const users = (await (await fetch(run.base + "/__myoutside/admin/users", { headers: { cookie: adminCookie } })).json()) as Array<Record<string, unknown>>;
+    expect(users.map((user) => [user.username, user.isAdmin, user.weeklyLimitYuan, user.weekYuan, user.totalYuan])).toEqual([
+      ["author", true, null, 0, 0],
+      ["bob", false, 20, 25, 28],
+    ]);
+  });
+
+  it("一周从北京时间周一 0 点算起", () => {
+    // 2026-11-16 是星期一；北京时间 00:00 = UTC 前一天 16:00
+    const monday = Date.UTC(2026, 10, 15, 16, 0, 0);
+    expect(chinaWeek(monday)).toEqual({ start: monday, end: monday + 7 * 86_400_000 });
+    expect(chinaWeek(monday - 1).start).toBe(monday - 7 * 86_400_000);
+    expect(chinaWeek(monday + 6 * 86_400_000 + 3_600_000).start).toBe(monday);
   });
 
   it("备份状态（D-0096）：只给登录了的管理员；读备份程序写的状态文件，超过 26 小时没成功就标红", async () => {

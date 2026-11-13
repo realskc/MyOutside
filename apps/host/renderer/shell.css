@@ -138,6 +138,22 @@ body {
   font-weight: 600;
 }
 
+/* 试用阶段的额度、邀请（D-0097） */
+.status-line {
+  margin: 0;
+  font-size: 14px;
+  line-height: 1.6;
+}
+
+.status-line.problem {
+  color: #dc2626;
+  font-weight: 600;
+}
+
+#invite-result {
+  margin-top: 10px;
+}
+
 .lang-toggle {
   width: 56px;
   background: transparent;

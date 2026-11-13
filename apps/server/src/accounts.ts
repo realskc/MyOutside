@@ -4,9 +4,9 @@ import { dirname } from "node:path";
 import { DatabaseSync } from "node:sqlite";
 
 /**
- * 平台库（docs/future/web-version.md §2）：账号、登录会话、一次性设置链接。
+ * 平台库（docs/future/web-version.md §2）：账号、登录会话、一次性设置链接、邀请链接（D-0097）、服务器设置（D-0097）。
  * 和每个用户自己的库（D-0091）分开：这里只有平台的账号信息，没有任何子应用的数据。
- * 令牌只存哈希：库被偷了也拿不到能用的登录状态和设置链接。
+ * 令牌只存哈希：库被偷了也拿不到能用的登录状态、设置链接和邀请链接。
  */
 
 /** 用户名：1–32 个字母、数字或 `_` `.` `-`，不区分大小写（统一存小写） */
@@ -24,12 +24,24 @@ export const USER_ID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}
 
 const SESSION_TTL_MS = 30 * 24 * 3600 * 1000;
 const SETUP_TTL_MS = 24 * 3600 * 1000;
+/** 邀请链接 7 天内有效，用一次就作废（D-0097） */
+export const INVITE_TTL_MS = 7 * 24 * 3600 * 1000;
 
 export interface User {
   id: string;
   username: string;
   passwordHash: string | null;
   isAdmin: boolean;
+}
+
+/** 用邀请链接注册失败的原因 */
+export class JoinError extends Error {
+  constructor(
+    readonly reason: "invite" | "username-invalid" | "username-taken",
+    message: string,
+  ) {
+    super(message);
+  }
 }
 
 export interface Session {
@@ -68,9 +80,24 @@ export function openAccounts(path: string, now: () => number = Date.now) {
       expires_at INTEGER NOT NULL,
       used_at INTEGER
     );
+    CREATE TABLE IF NOT EXISTS invite (
+      token_hash TEXT PRIMARY KEY,
+      created_by TEXT,
+      created_at INTEGER NOT NULL,
+      expires_at INTEGER NOT NULL,
+      used_at INTEGER,
+      used_by TEXT
+    );
+    CREATE TABLE IF NOT EXISTS server_setting (
+      key TEXT PRIMARY KEY,
+      value TEXT NOT NULL,
+      updated_at INTEGER NOT NULL
+    );
   `);
 
   type UserRow = { id: string; username: string; password_hash: string | null; is_admin: number };
+  type InviteRow = { expires_at: number; used_at: number | null };
+  const inviteUsable = (row: InviteRow | undefined): row is InviteRow => !!row && row.used_at === null && row.expires_at > now();
   const toUser = (row: UserRow): User => ({
     id: row.id,
     username: row.username,
@@ -93,6 +120,76 @@ export function openAccounts(path: string, now: () => number = Date.now) {
       if (!name) return null;
       const row = db.prepare("SELECT id, username, password_hash, is_admin FROM user WHERE username = ?").get(name) as UserRow | undefined;
       return row ? toUser(row) : null;
+    },
+
+    getUser(id: string): User | null {
+      const row = db.prepare("SELECT id, username, password_hash, is_admin FROM user WHERE id = ?").get(id) as UserRow | undefined;
+      return row ? toUser(row) : null;
+    },
+
+    listUsers(): Array<{ id: string; username: string; isAdmin: boolean; createdAt: number }> {
+      const rows = db.prepare("SELECT id, username, is_admin, created_at FROM user ORDER BY created_at").all() as Array<{
+        id: string;
+        username: string;
+        is_admin: number;
+        created_at: number;
+      }>;
+      return rows.map((row) => ({ id: row.id, username: row.username, isAdmin: row.is_admin === 1, createdAt: row.created_at }));
+    },
+
+    /** 邀请链接的令牌（D-0097）：7 天过期，用一次就作废；createdBy 为 null 表示从服务器命令行建的 */
+    createInvite(createdBy: string | null): { token: string; expiresAt: number } {
+      const token = newToken();
+      const expiresAt = now() + INVITE_TTL_MS;
+      db.prepare("INSERT INTO invite (token_hash, created_by, created_at, expires_at) VALUES (?, ?, ?, ?)").run(
+        tokenHash(token),
+        createdBy,
+        now(),
+        expiresAt,
+      );
+      return { token, expiresAt };
+    },
+
+    /** 邀请链接还能不能用（不用掉它）：先检查，再算密码哈希，无效的链接不白算 */
+    peekInvite(token: string): boolean {
+      if (!token || token.length > 128) return false;
+      return inviteUsable(db.prepare("SELECT expires_at, used_at FROM invite WHERE token_hash = ?").get(tokenHash(token)) as InviteRow | undefined);
+    },
+
+    /** 用邀请链接注册：用掉链接、建账号、设密码，在一个事务里完成（新账号不是管理员） */
+    joinWithInvite(token: string, username: string, passwordHash: string): User {
+      const name = normalizeUsername(username);
+      if (!name) throw new JoinError("username-invalid", "用户名只能是 1–32 个字母、数字或 _ . -，并以字母或数字开头");
+      db.exec("BEGIN IMMEDIATE");
+      try {
+        const invite = db.prepare("SELECT expires_at, used_at FROM invite WHERE token_hash = ?").get(tokenHash(token)) as InviteRow | undefined;
+        if (!inviteUsable(invite)) throw new JoinError("invite", "邀请链接无效、已过期或已经用过，请找邀请你的人重新生成");
+        if (db.prepare("SELECT 1 FROM user WHERE username = ?").get(name)) throw new JoinError("username-taken", `用户名 ${name} 已经有人用了，换一个吧`);
+        const id = randomUUID();
+        db.prepare("INSERT INTO user (id, username, password_hash, is_admin, created_at) VALUES (?, ?, ?, 0, ?)").run(id, name, passwordHash, now());
+        db.prepare("UPDATE invite SET used_at = ?, used_by = ? WHERE token_hash = ?").run(now(), id, tokenHash(token));
+        db.exec("COMMIT");
+        return { id, username: name, passwordHash, isAdmin: false };
+      } catch (error) {
+        db.exec("ROLLBACK");
+        throw error;
+      }
+    },
+
+    /** 服务器级的设置（D-0097，例如大家共用的 AI key 的密文）；不属于任何一个用户 */
+    getServerSetting(key: string): string | null {
+      const row = db.prepare("SELECT value FROM server_setting WHERE key = ?").get(key) as { value: string } | undefined;
+      return row ? row.value : null;
+    },
+
+    setServerSetting(key: string, value: string | null): void {
+      if (value === null) {
+        db.prepare("DELETE FROM server_setting WHERE key = ?").run(key);
+        return;
+      }
+      db.prepare(
+        "INSERT INTO server_setting (key, value, updated_at) VALUES (?, ?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value, updated_at = excluded.updated_at",
+      ).run(key, value, now());
     },
 
     setPassword(userId: string, passwordHash: string): void {
@@ -157,6 +254,8 @@ export function openAccounts(path: string, now: () => number = Date.now) {
     sweep(): void {
       db.prepare("DELETE FROM session WHERE expires_at <= ?").run(now());
       db.prepare("DELETE FROM setup_token WHERE expires_at <= ? OR used_at IS NOT NULL").run(now());
+      // 用过的邀请留着（谁邀请了谁）；过期没用的删掉
+      db.prepare("DELETE FROM invite WHERE expires_at <= ? AND used_at IS NULL").run(now());
     },
 
     close(): void {

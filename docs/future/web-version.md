@@ -13,7 +13,7 @@
 | 部件 | 在哪 |
 |---|---|
 | 服务端程序（Node，不依赖 Electron） | 服务器，只监听 `127.0.0.1:8787`；Caddy 把 `myoutside.org` 转给它 |
-| 平台库 `platform.db`：用户、登录会话、一次性设置链接、登录失败记录 | 服务器 `/var/lib/myoutside/` |
+| 平台库 `platform.db`：用户、登录会话、一次性设置链接、邀请链接、服务器设置（试用阶段共用的 AI key 的密文，D-0097） | 服务器 `/var/lib/myoutside/` |
 | 每个用户的库 `users/<用户 id>/myoutside.db`（D-0091） | 同上 |
 | 主密钥（加密 API key 用） | `/var/lib/myoutside/secrets/master.key`，只有 `myoutside` 账号能读 |
 | 外壳网页（登录页、子应用面板、消息桥、设置页） | 浏览器，`https://myoutside.org/` |
@@ -34,8 +34,10 @@
 | `apps/server/src/kernels.ts` | 内核管理器（每个用户一份，闲置关掉） |
 | `apps/server/src/cloud-apps.ts` | 上服务器的子应用 |
 | `apps/server/src/password.ts`、`rate-limit.ts`、`secrets.ts` | 密码哈希、限次数、API key 加密 |
-| `apps/server/src/main.ts` | 命令行：`serve`、`create-user`、`setup-link` |
-| `apps/server/web/` | 登录页、设置密码页、`client.js`（外壳一侧）、`bridge.js`（子应用一侧） |
+| `apps/server/src/trial.ts` | 试用阶段（D-0097）：共用的 AI key、朋友每周的额度、各用户的花费 |
+| `apps/server/src/backup-status.ts` | 读备份程序写的状态（D-0096） |
+| `apps/server/src/main.ts` | 命令行：`serve`、`create-user`、`setup-link`、`invite` |
+| `apps/server/web/` | 登录页、设置密码页、邀请注册页（`join.html`）、`client.js`（外壳一侧）、`bridge.js`（子应用一侧） |
 | `apps/host/renderer/shell.js` | 外壳（和 Electron 共用）；服务器版下用 `client.js` 的 `mountApp` 打开子应用 |
 
 ### 本机试用
@@ -107,4 +109,9 @@ MYOUTSIDE_CHECK_SETUP=<设置链接> apps/host/node_modules/.bin/electron apps/s
 之后：
 
 - ✅ 第二段备份（D-0092、D-0096）：2026-11-13 部署程序，2026-11-14 配好 R2、第一次备份成功、恢复演练通过（`docs/server.md`「R2 备份」）；
+- 试用阶段的准备（D-0097，product.md「试用阶段」）：程序就绪（2026-11-14，未部署）——
+  - 大家共用作者的 AI key：管理员在设置里填（显示为「大家共用」），存在平台库，别人的设置里没有这一栏；
+  - 朋友每周最多 ¥20（北京时间周一 0 点重新算），发请求前检查，超了报「本周的 AI 额度用完了」；朋友的设置里显示本周已用多少；
+  - 邀请注册：管理员在设置里生成邀请链接（7 天、用一次），朋友自己起用户名、设密码（`/__myoutside/join`）；
+  - 管理员在设置里能看到每个用户本周和一共的花费；
 - 第三段搬真实数据（Mac 和 ThinkBook 的四个云端应用都当作用过，合并后作者确认再上传）。

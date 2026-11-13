@@ -8,6 +8,7 @@ export type KernelErrorCode =
   | "PRECONDITION"
   | "CONFLICT"
   | "UPSTREAM"
+  | "QUOTA_EXCEEDED"
   | "ABORTED"
   | "INTERNAL";
 

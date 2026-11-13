@@ -80,7 +80,7 @@
 - 数据：`/var/lib/myoutside/`（`platform.db` 账号与会话、`users/<用户 id>/myoutside.db` 每个用户的库、`secrets/master.key` 加密 API key 的主密钥），文件都只有 `myoutside` 能读写。
 - 部署前的本地备份：`/var/backups/myoutside/pre-deploy-<时间>.tar.gz`（只留 10 份）；R2 加密备份见下面「R2 备份」。
 - 登录的封禁：fail2ban 的 `myoutside` 规则（`/etc/fail2ban/filter.d/myoutside.conf`、`jail.d/myoutside-web.local`），只认服务端写的 `ban-request` 那一行，封 1 小时（D-0093）。
-- 管理账号：`myoutside-admin create-user <用户名> [--admin]`、`myoutside-admin setup-link <用户名>`（打印设置链接；只在自己的终端里看）。
+- 管理账号：`myoutside-admin create-user <用户名> [--admin]`、`myoutside-admin setup-link <用户名>`（打印设置链接；只在自己的终端里看）、`myoutside-admin invite`（打印邀请链接；平时在网页的设置里生成就行，D-0097）。
 - 部署：在 Mac 上 `bash apps/server/scripts/deploy.sh`（每次都要作者明确同意，AGENTS.md 红线 4）；第一次准备服务器用 `apps/server/scripts/server-setup.sh`。
 
 ### R2 备份（D-0092、D-0096）

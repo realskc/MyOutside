@@ -11,7 +11,28 @@ const DICT = {
     languageLabel: "界面语言",
     apiKeyLabel: "DeepSeek API Key",
     apiKeyHint: "保存在本机，用系统钥匙串加密；任何子应用都读不到。",
-    apiKeyHintServer: "保存在服务器上，加密保存；任何子应用都读不到。",
+    apiKeyLabelShared: "DeepSeek API Key（大家共用）",
+    apiKeyHintShared: "试用阶段所有用户都用这把 key，加密保存在服务器上，任何子应用、任何用户都读不到；朋友每人每周有额度。",
+    aiQuotaTitle: "AI 额度",
+    aiQuotaShared: "试用期间 AI 用的是邀请你的人提供的 key。",
+    aiQuotaLine: (used, limit, reset) => `本周已用 ${used} / ${limit}，${reset}恢复。`,
+    aiNoKey: "服务器还没有配置 AI 的 key，AI 功能暂时用不了，请联系邀请你的人。",
+    aiQuotaHint: "试用期间 AI 用的是邀请你的人提供的 key，每人每周有额度；花费是按 DeepSeek 官方价格估算的。",
+    inviteTitle: "邀请朋友",
+    inviteCreate: "生成邀请链接",
+    inviteCopy: "复制",
+    inviteCopied: "已复制",
+    inviteUntil: (until) => `${until} 前有效`,
+    inviteFailed: (reason) => `生成失败：${reason}`,
+    inviteHint: "链接 7 天内有效，用一次就作废；只发给你要邀请的人。对方打开后自己起用户名、设密码。",
+    usersTitle: "用户",
+    usersName: "用户名",
+    usersWeek: "本周花费",
+    usersTotal: "一共",
+    usersLimit: "额度",
+    usersAdmin: "管理员",
+    usersNoLimit: "不限",
+    usersPerWeek: (limit) => `每周 ${limit}`,
     save: "保存",
     saved: "已保存",
     notSet: "未设置",
@@ -53,7 +74,28 @@ const DICT = {
     languageLabel: "Language",
     apiKeyLabel: "DeepSeek API Key",
     apiKeyHint: "Stored locally, encrypted with the system keychain; no app can read it.",
-    apiKeyHintServer: "Stored on the server, encrypted; no app can read it.",
+    apiKeyLabelShared: "DeepSeek API Key (shared)",
+    apiKeyHintShared: "During the trial every user uses this key. It is stored encrypted on the server; no app and no user can read it. Each friend has a weekly budget.",
+    aiQuotaTitle: "AI budget",
+    aiQuotaShared: "During the trial, AI runs on a key provided by the person who invited you.",
+    aiQuotaLine: (used, limit, reset) => `Used ${used} of ${limit} this week; resets ${reset}.`,
+    aiNoKey: "The server has no AI key yet, so AI features are unavailable. Ask the person who invited you.",
+    aiQuotaHint: "During the trial, AI runs on a key provided by the person who invited you, with a weekly budget per person. Costs are estimated from DeepSeek's official prices.",
+    inviteTitle: "Invite a friend",
+    inviteCreate: "Create invite link",
+    inviteCopy: "Copy",
+    inviteCopied: "Copied",
+    inviteUntil: (until) => `Valid until ${until}`,
+    inviteFailed: (reason) => `Failed: ${reason}`,
+    inviteHint: "The link works once and expires in 7 days; send it only to the person you invite. They choose their own username and password.",
+    usersTitle: "Users",
+    usersName: "Username",
+    usersWeek: "This week",
+    usersTotal: "Total",
+    usersLimit: "Budget",
+    usersAdmin: "admin",
+    usersNoLimit: "Unlimited",
+    usersPerWeek: (limit) => `${limit} / week`,
     save: "Save",
     saved: "Saved",
     notSet: "Not set",
@@ -251,6 +293,7 @@ function closeSettings() {
 
 async function renderSettings() {
   let hasKey = false;
+  let quota = null;
   try {
     // 凭据读不到值，只能知道是否已设置
     const res = await call("platform.settings.get", { key: "ai.deepseek.apiKey" });
@@ -258,17 +301,31 @@ async function renderSettings() {
   } catch {
     /* ignore */
   }
-  await refreshBackupStatus();
+  if (SERVER) {
+    await Promise.all([refreshBackupStatus(), refreshMe()]);
+    try {
+      const res = await call("platform.usage.quota", {});
+      quota = res.ok ? res.result : null;
+    } catch {
+      /* ignore */
+    }
+  }
+  // 服务器试用阶段（D-0097）：大家共用作者的 key，只有管理员能改；朋友看到的是自己本周的额度
+  const isAdmin = SERVER && me && me.isAdmin;
+  const canEditKey = !SERVER || isAdmin;
 
   settingsView.innerHTML =
     `<h2>${t("settingsTitle")}</h2>` +
     `<div class="setting-row"><label>${t("languageLabel")}</label>` +
     `<select id="set-lang"><option value="zh">中文</option><option value="en">English</option></select></div>` +
-    `<div class="setting-row"><label>${t("apiKeyLabel")}</label>` +
-    `<input id="set-api-key" type="password" placeholder="${hasKey ? t("apiKeyPlaceholderSet") : t("apiKeyPlaceholder")}" />` +
-    `<div class="setting-actions"><button id="save-api-key">${t("save")}</button>` +
-    `<span class="hint">${hasKey ? t("saved") : t("notSet")}</span></div>` +
-    `<p class="hint">${t(SERVER ? "apiKeyHintServer" : "apiKeyHint")}</p></div>` +
+    (canEditKey
+      ? `<div class="setting-row"><label>${t(SERVER ? "apiKeyLabelShared" : "apiKeyLabel")}</label>` +
+        `<input id="set-api-key" type="password" placeholder="${hasKey ? t("apiKeyPlaceholderSet") : t("apiKeyPlaceholder")}" />` +
+        `<div class="setting-actions"><button id="save-api-key">${t("save")}</button>` +
+        `<span class="hint">${hasKey ? t("saved") : t("notSet")}</span></div>` +
+        `<p class="hint">${t(SERVER ? "apiKeyHintShared" : "apiKeyHint")}</p></div>`
+      : quotaRowHtml(quota, hasKey)) +
+    (isAdmin ? inviteRowHtml() + usersRowHtml() : "") +
     backupRowHtml() +
     `<div class="setting-row usage-row"><label>${t("usageTitle")}</label>` +
     `<select id="usage-period">` +
@@ -287,7 +344,7 @@ async function renderSettings() {
     void setLanguage(langSelect.value === "en" ? "en" : "zh");
   });
 
-  document.getElementById("save-api-key").addEventListener("click", async () => {
+  document.getElementById("save-api-key")?.addEventListener("click", async () => {
     const input = document.getElementById("set-api-key");
     const value = input.value.trim();
     if (!value) return;
@@ -295,6 +352,104 @@ async function renderSettings() {
     input.value = "";
     await renderSettings();
   });
+
+  if (isAdmin) {
+    document.getElementById("invite-create").addEventListener("click", () => void createInvite());
+    void renderUsers();
+  }
+}
+
+// ---- 服务器试用阶段（D-0097）：当前用户、朋友的额度、邀请、各用户的花费 ----
+
+/** 服务器版的当前用户 { username, isAdmin } */
+let me = null;
+
+async function refreshMe() {
+  try {
+    const res = await fetch("/__myoutside/session", { cache: "no-store" });
+    if (res.ok) me = await res.json();
+  } catch {
+    /* 网络断了：保留上次的 */
+  }
+}
+
+const yuan = (value) => `¥${value.toFixed(2)}`;
+
+function quotaRowHtml(quota, hasKey) {
+  let line = hasKey ? t("aiQuotaShared") : t("aiNoKey");
+  let problem = !hasKey;
+  if (hasKey && quota) {
+    const reset = lang === "zh" ? quota.resetText : new Date(quota.periodEnd).toLocaleString("en-US", { dateStyle: "medium", timeStyle: "short", hour12: false });
+    line = t("aiQuotaLine")(yuan(quota.usedYuan), yuan(quota.limitYuan), reset);
+    problem = quota.usedYuan >= quota.limitYuan;
+  }
+  return (
+    `<div class="setting-row"><label>${t("aiQuotaTitle")}</label>` +
+    `<p id="ai-quota" class="status-line${problem ? " problem" : ""}">${escapeHtml(line)}</p>` +
+    `<p class="hint">${t("aiQuotaHint")}</p></div>`
+  );
+}
+
+function inviteRowHtml() {
+  return (
+    `<div class="setting-row"><label>${t("inviteTitle")}</label>` +
+    `<div class="setting-actions"><button id="invite-create">${t("inviteCreate")}</button></div>` +
+    `<div id="invite-result"></div>` +
+    `<p class="hint">${t("inviteHint")}</p></div>`
+  );
+}
+
+async function createInvite() {
+  const box = document.getElementById("invite-result");
+  try {
+    const res = await fetch("/__myoutside/invites", { method: "POST", headers: { "content-type": "application/json" }, body: "{}" });
+    const body = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(body.error || String(res.status));
+    const until = new Date(body.expiresAt).toLocaleString(lang === "zh" ? "zh-CN" : "en-US", { hour12: false });
+    box.innerHTML =
+      `<input id="invite-link" readonly value="${escapeHtml(body.link)}" />` +
+      `<div class="setting-actions"><button id="invite-copy">${t("inviteCopy")}</button>` +
+      `<span class="hint">${escapeHtml(t("inviteUntil")(until))}</span></div>`;
+    const input = document.getElementById("invite-link");
+    input.addEventListener("focus", () => input.select());
+    document.getElementById("invite-copy").addEventListener("click", async (event) => {
+      try {
+        await navigator.clipboard.writeText(body.link);
+        event.target.textContent = t("inviteCopied");
+      } catch {
+        input.select();
+      }
+    });
+  } catch (error) {
+    box.innerHTML = `<p class="status-line problem">${escapeHtml(t("inviteFailed")(String(error.message || error)))}</p>`;
+  }
+}
+
+function usersRowHtml() {
+  return `<div class="setting-row usage-row"><label>${t("usersTitle")}</label><div id="users-table" class="usage-table"></div></div>`;
+}
+
+async function renderUsers() {
+  const el = document.getElementById("users-table");
+  if (!el) return;
+  try {
+    const res = await fetch("/__myoutside/admin/users", { cache: "no-store" });
+    if (!res.ok) throw new Error(String(res.status));
+    const users = await res.json();
+    el.innerHTML =
+      `<table><thead><tr><th>${t("usersName")}</th><th>${t("usersWeek")}</th><th>${t("usersTotal")}</th><th>${t("usersLimit")}</th></tr></thead><tbody>` +
+      users
+        .map(
+          (user) =>
+            `<tr><td>${escapeHtml(user.username)}${user.isAdmin ? ` (${t("usersAdmin")})` : ""}</td>` +
+            `<td>${yuan(user.weekYuan)}</td><td>${yuan(user.totalYuan)}</td>` +
+            `<td>${user.weeklyLimitYuan === null ? t("usersNoLimit") : t("usersPerWeek")(yuan(user.weeklyLimitYuan))}</td></tr>`,
+        )
+        .join("") +
+      `</tbody></table>`;
+  } catch (error) {
+    el.textContent = String(error);
+  }
 }
 
 // ---- 服务器备份（D-0096）：只有服务器版、只给管理员；超过一天没成功或上次失败，设置按钮上带红点 ----

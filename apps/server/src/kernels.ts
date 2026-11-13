@@ -1,6 +1,6 @@
 import { mkdirSync } from "node:fs";
 import { join } from "node:path";
-import { createKernel, type DbAdapter, type Kernel, type SecretCodec } from "@myoutside/kernel";
+import { createKernel, type CredentialStore, type DbAdapter, type Kernel, type SecretCodec, type UsageQuota } from "@myoutside/kernel";
 import { createNodeSqliteAdapter } from "@myoutside/kernel-node";
 import { USER_ID_PATTERN } from "./accounts.js";
 
@@ -12,6 +12,8 @@ export interface KernelManagerOptions {
   usersDir: string;
   secrets: SecretCodec;
   registerApps: (kernel: Kernel) => void;
+  /** 每个用户的内核另外带什么（D-0097：共用的 AI key、朋友的额度） */
+  perUser?: (userId: string) => { credentials?: CredentialStore; quota?: UsageQuota };
   idleMs?: number;
   now?: () => number;
 }
@@ -34,7 +36,7 @@ export function createKernelManager(options: KernelManagerOptions) {
     mkdirSync(dir, { recursive: true, mode: 0o700 });
     const storage = createNodeSqliteAdapter({ path: join(dir, "myoutside.db") });
     try {
-      const kernel = createKernel({ storage, secrets: options.secrets });
+      const kernel = createKernel({ storage, secrets: options.secrets, ...options.perUser?.(userId) });
       options.registerApps(kernel);
       kernel.start();
       return { kernel, storage, active: 0, lastUsed: now() };

@@ -1,5 +1,6 @@
 export { createMyOutsideServer, AUTH_BODY_LIMIT, WS_MESSAGE_LIMIT, type MyOutsideServer, type ServerConfig } from "./server.js";
-export { openAccounts, normalizeUsername, type Accounts } from "./accounts.js";
+export { openAccounts, normalizeUsername, INVITE_TTL_MS, type Accounts } from "./accounts.js";
+export { chinaWeek, TRIAL_WEEKLY_LIMIT_YUAN } from "./trial.js";
 export { createPasswordHasher, type PasswordHasher } from "./password.js";
 export { createLoginLimiter, delayAfter } from "./rate-limit.js";
 export { createAesSecretCodec, loadOrCreateMasterKey } from "./secrets.js";

@@ -1,6 +1,6 @@
 import { DatabaseSync } from "node:sqlite";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { createKernel, estimateCost, isPeak, type DbAdapter, type SecretCodec, type SqlValue } from "../src/index.js";
+import { createKernel, estimateCost, isPeak, KernelError, type DbAdapter, type SecretCodec, type SqlValue } from "../src/index.js";
 
 function createMemoryAdapter(): DbAdapter {
   const db = new DatabaseSync(":memory:");
@@ -495,5 +495,99 @@ describe("platform AI / web", () => {
     if (r.ok) return;
     expect(r.error.code).toBe("UPSTREAM");
     expect(r.error.details).toMatchObject({ status: 400, body: { error: { message: "bad" } } });
+  });
+});
+
+describe("凭据放在别处、按周期限额（D-0097，服务器试用阶段）", () => {
+  function sharedStore(initial: string | null, canSet: boolean) {
+    let value = initial;
+    return {
+      get: () => value,
+      isSet: () => value !== null,
+      set: (_key: string, next: string | null) => {
+        if (!canSet) throw new KernelError("FORBIDDEN", "试用阶段不能改");
+        value = next && next.trim() ? next.trim() : null;
+      },
+      missingMessage: "服务器还没有配置 AI 的 key，请联系管理员",
+      get current() {
+        return value;
+      },
+    };
+  }
+  const week = { start: 1_000_000, end: 1_000_000 + 7 * 86_400_000 };
+  const quota = { limitYuan: 20, period: () => week, label: "本周", resetText: "下周一 0 点" };
+  const payload = { messages: [{ role: "user", content: "hi" }] };
+  const addUsage = (storage: DbAdapter, cost: number, at: number) =>
+    storage.execute("INSERT INTO platform_usage (caller, kind, cost_yuan, created_at) VALUES ('dialog', 'ai.chat', ?, ?)", [cost, at]);
+
+  it("凭据：读写都走给定的地方，不进这个库；不允许时 FORBIDDEN；没设置时用它给的提示", async () => {
+    const storage = createMemoryAdapter();
+    const store = sharedStore(null, true);
+    const kernel = createKernel({ storage, credentials: store });
+    kernel.start();
+    const missing = await kernel.handle({ call: "platform.ai.chat", payload });
+    expect(!missing.ok && missing.error.message).toBe("服务器还没有配置 AI 的 key，请联系管理员");
+
+    expect((await kernel.handle({ call: "platform.settings.set", payload: { key: "ai.deepseek.apiKey", value: " sk-shared " } }, { caller: "shell" })).ok).toBe(true);
+    expect(store.current).toBe("sk-shared");
+    expect(storage.select("SELECT * FROM platform_setting WHERE key = 'ai.deepseek.apiKey'")).toEqual([]);
+    const got = await kernel.handle({ call: "platform.settings.get", payload: { key: "ai.deepseek.apiKey" } }, { caller: "shell" });
+    expect(got.ok && got.result).toEqual({ value: null, isSet: true });
+
+    let auth = "";
+    vi.stubGlobal("fetch", async (_url: string, init: { headers: Record<string, string> }) => {
+      auth = init.headers.authorization!;
+      return jsonResponse({ choices: [{ message: { content: "ok" }, finish_reason: "stop" }] });
+    });
+    expect((await kernel.handle({ call: "platform.ai.chat", payload })).ok).toBe(true);
+    expect(auth).toBe("Bearer sk-shared");
+
+    const friend = createKernel({ storage: createMemoryAdapter(), credentials: sharedStore("sk-shared", false) });
+    friend.start();
+    const denied = await friend.handle({ call: "platform.settings.set", payload: { key: "ai.deepseek.apiKey", value: "sk-mine" } }, { caller: "shell" });
+    expect(!denied.ok && denied.error.code).toBe("FORBIDDEN");
+    // 别的设置照常存在自己的库里
+    expect((await friend.handle({ call: "platform.settings.set", payload: { key: "ui.language", value: "en" } }, { caller: "shell" })).ok).toBe(true);
+  });
+
+  it("额度：本周期花到上限就不再发请求（QUOTA_EXCEEDED）；上一周期的不算；外壳能看到已用多少", async () => {
+    const storage = createMemoryAdapter();
+    const kernel = createKernel({ storage, credentials: sharedStore("sk-shared", false), quota });
+    kernel.start();
+    let requests = 0;
+    vi.stubGlobal("fetch", async () => {
+      requests += 1;
+      return jsonResponse({ choices: [{ message: { content: "ok" }, finish_reason: "stop" }] });
+    });
+    addUsage(storage, 15, week.start - 1); // 上一周期
+    addUsage(storage, 19.99, week.start + 10);
+    expect((await kernel.handle({ call: "platform.ai.chat", payload })).ok).toBe(true);
+    expect(requests).toBe(1);
+
+    addUsage(storage, 0.01, week.start + 20);
+    for (const call of [
+      { call: "platform.ai.chat", payload },
+      { call: "platform.ai.chatRaw", payload: { body: { model: "deepseek-flash", messages: [] } } },
+      { call: "platform.web.search", payload: { query: "x" } },
+      { call: "platform.web.fetch", payload: { url: "https://a.com" } },
+    ]) {
+      const r = await kernel.handle(call);
+      expect(!r.ok && r.error.code, call.call).toBe("QUOTA_EXCEEDED");
+      if (!r.ok) expect(r.error.message).toBe("本周的 AI 额度（¥20）用完了，下周一 0 点恢复");
+    }
+    expect(requests).toBe(1);
+
+    const status = await kernel.handle({ call: "platform.usage.quota", payload: {} }, { caller: "shell" });
+    expect(status.ok && status.result).toMatchObject({ limitYuan: 20, periodStart: week.start, periodEnd: week.end, label: "本周" });
+    if (status.ok) expect((status.result as { usedYuan: number }).usedYuan).toBeCloseTo(20, 6);
+    // 子应用看不到
+    const fromApp = await kernel.handle({ call: "platform.usage.quota", payload: {} }, { caller: "dialog" });
+    expect(!fromApp.ok && fromApp.error.code).toBe("FORBIDDEN");
+
+    // 没有额度的内核（作者自己、Electron）：不限，额度是 null
+    const free = createKernel({ storage: createMemoryAdapter(), credentials: sharedStore("sk-shared", true) });
+    free.start();
+    const none = await free.handle({ call: "platform.usage.quota", payload: {} }, { caller: "shell" });
+    expect(none.ok && none.result).toBeNull();
   });
 });

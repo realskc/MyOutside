@@ -2,7 +2,8 @@
 # MyOutside 的管理命令（在服务器上运行）：
 #   myoutside-admin create-user <用户名> [--admin]   建账号，打印一次性的设置链接
 #   myoutside-admin setup-link <用户名>              重新生成设置链接（忘了密码时）
-# 设置链接能用来设密码：只在自己的终端里看，不要贴到别处（AGENTS.md 红线 3）。
+#   myoutside-admin invite                           生成邀请链接（平时在网页的设置里生成就行；D-0097）
+# 设置链接能用来设密码：只在自己的终端里看，不要贴到别处（AGENTS.md 红线 3）。邀请链接只发给被邀请的人。
 exec sudo -u myoutside env \
   MYOUTSIDE_DATA_DIR=/var/lib/myoutside \
   MYOUTSIDE_ROOT=/opt/myoutside/current \
