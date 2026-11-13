@@ -75,7 +75,7 @@
 
 - systemd 服务 `myoutside`（`/etc/systemd/system/myoutside.service`，来自仓库 `apps/server/deploy/`）：系统账号 `myoutside`（不能登录），只监听 `127.0.0.1:8787`，崩溃自动重启，开机自启。
 - 沙箱：没有任何特权、过滤系统调用、系统目录只读、看不到家目录，只能写 `/var/lib/myoutside`；`systemd-analyze security myoutside` 评分 1.4（越低越好，2026-11-11）。
-- Node 24（NodeSource 软件源，进自动安全更新：`/etc/apt/apt.conf.d/52myoutside-node-upgrades`）。
+- Node 24（NodeSource 软件源，进自动安全更新：`/etc/apt/apt.conf.d/52myoutside-node-upgrades`）。Node 自动更新后，系统会自动重启用到它的服务（MyOutside、CodexGateway）：2026-11-13 早上 6:46 自动更新时就重启过一次。重启时进行中的调用最多等 30 秒，更长的（例如很长的 AI 回复）会被打断。
 - 代码：`/opt/myoutside/releases/<时间>/`，`/opt/myoutside/current` 指向当前版本，只留最近 5 个。
 - 数据：`/var/lib/myoutside/`（`platform.db` 账号与会话、`users/<用户 id>/myoutside.db` 每个用户的库、`secrets/master.key` 加密 API key 的主密钥），文件都只有 `myoutside` 能读写。
 - 部署前的本地备份：`/var/backups/myoutside/pre-deploy-<时间>.tar.gz`（只留 10 份）；R2 加密备份见下面「R2 备份」。
