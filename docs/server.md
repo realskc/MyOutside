@@ -87,7 +87,7 @@
 
 **做什么**：`myoutside-backup.timer` 每天香港时间凌晨 4 点（随机推迟最多 15 分钟）运行 `apps/server/scripts/backup.mjs`，每次部署前也跑一次。每次都给平台库和每个用户库拍 SQLite 快照，打包、压缩、用备份钥匙加密（AES-256-GCM），传到 R2 的 `daily/`（香港时间星期天另传 `weekly/`，1 号另传 `monthly/`；文件名是香港时间 `YYYYMMDD-HHMMSS.tar.gz.enc`）。传完马上下载回来，核对一字不差，再解密、解开、逐个打开检查。结果写进 `/var/lib/myoutside-backup/status.json`，管理员在网页的设置里能看到上次成功的时间；从没成功、超过 26 小时没成功或者上一次失败，设置按钮上带红点。不备份主密钥（`secrets/`）。
 
-**现在的状态**（2026-11-13）：程序就绪，R2 还没配置。配置分两步，都由作者自己做；R2 令牌和备份钥匙不放进仓库，也不经过聊天（AGENTS.md 红线 3）。
+**现在的状态**（2026-11-14）：程序已部署。Cloudflare 这边，桶 `myoutside-backup` 是作者建的（位置 Western North America，WNAM），锁定规则和自动删除规则是 agent 经作者同意、在作者的浏览器里配的（Braiser），令牌由作者自己创建。服务器上的配置脚本还没运行。R2 令牌和备份钥匙不放进仓库，也不经过聊天（AGENTS.md 红线 3）。
 
 #### 第一步：Cloudflare 后台
 
@@ -104,7 +104,7 @@
    | `monthly-180d` | `monthly/` | 180 天 |
 
 4. **自动删除**：同一页 **Object lifecycle rules** → **Add rule**，加三条：前缀 `daily/` 上传 8 天后删除，`weekly/` 36 天，`monthly/` 181 天。自带的「7 天后中止没完成的分块上传」那条留着。
-5. **令牌**：回到 R2 的 Overview，**Account Details** 一栏里 **API Tokens** 旁边的 **Manage** → **Create Account API token**。权限选 **Object Read & Write**，只给 `myoutside-backup` 这一个桶，不设过期。这种令牌只能读写这个桶里的文件，改不了上面的锁定和删除规则。
+5. **令牌**：回到 R2 的 Overview，右侧 **Account Details** 里的 **Manage API Tokens** → **Create Account API token**（打开的是表单，还没建）。名字 `myoutside-server-backup`；权限选 **Object Read & Write**；**Apply to specific buckets only**，选 `myoutside-backup`；TTL 保持 **Forever**；IP 过滤留空。最后点表单底部的 **Create Account API Token** 才真正创建。这种令牌只能读写这个桶里的文件，改不了上面的锁定和删除规则。
 6. 创建以后，页面上会显示 **Access Key ID**、**Secret Access Key** 和 S3 的地址（`https://<账号 id>.r2.cloudflarestorage.com`）。Secret 只显示这一次：**先别关这个页面**，直接做第二步。
 
 #### 第二步：服务器上（作者自己的终端）
