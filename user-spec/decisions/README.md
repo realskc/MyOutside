@@ -160,7 +160,7 @@
 | [D-0089](0089-caddy-as-front.md) | 服务器的对外入口用 Caddy：自动 HTTPS，先放占位页 | 有效 |
 | [D-0090](0090-sandboxed-app-frames.md) | 浏览器里，子应用的界面放进沙箱 iframe；外壳按消息来自哪个 iframe 认出调用者 | 有效 |
 | [D-0091](0091-one-database-per-user.md) | 多用户：每个用户一个独立的数据库，服务器为每个用户各开一份内核 | 有效 |
-| [D-0092](0092-backup-to-r2.md) | 服务器数据的备份：每天打一个加密包传到 Cloudflare R2，按规则自动删、锁定期内谁也删不掉 | 有效（每月恢复演练被 D-0096 取代；R2 待配置） |
+| [D-0092](0092-backup-to-r2.md) | 服务器数据的备份：每天打一个加密包传到 Cloudflare R2，按规则自动删、锁定期内谁也删不掉 | 有效（每月恢复演练被 D-0096 取代） |
 | [D-0093](0093-login-and-server-hardening.md) | 登录与服务器的安全：没登录时能碰的最少、处处限大小、限次数但不为难人、服务进程关在低权限里 | 有效 |
 | [D-0094](0094-spec-faithful-editorial-maintenance.md) | 统一 user spec 的记录规则，以忠实性和可读性共同检查 | 有效 |
 | [D-0095](0095-independent-codex-gateway-entry.md) | Caddy 保留独立 CodexGateway 的入口 | 有效 |

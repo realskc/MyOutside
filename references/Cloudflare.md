@@ -40,7 +40,8 @@
   - 令牌：R2 Overview 右侧 Account Details 里有 Account ID、S3 API 地址和 **Manage API Tokens** 链接（`/r2/api-tokens`）。那一页分 Account API Tokens / User API Tokens 两块，各有一个「Create … API token」链接，点了只是打开表单（`/r2/api-tokens/create?type=account`）。表单：Token name（默认「R2 Account Token」）、四种权限单选（默认 Object Read only）、Specify bucket(s)（默认全部桶；选「Apply to specific buckets only」后在下拉框里挑桶）、TTL（默认 Forever）、Client IP Address Filtering（Include / Exclude），底部 **Create Account API Token** 按钮才真正创建。
   - 选桶的下拉框程序化填值不会弹出选项，要真的键盘输入才行（agent 自动操作时的经验）。
   - 有一次刷新时后台报「Timeout: Request timed out」，过几秒重新打开就好了。
-- **aws 命令行**（[aws CLI](https://developers.cloudflare.com/r2/examples/aws/aws-cli/)）：`--endpoint-url https://<账号 id>.r2.cloudflarestorage.com`，region 填 `auto`。2025 年初 aws 命令行默认加 CRC 校验头时 R2 曾报错，当时的绕法是 `AWS_REQUEST_CHECKSUM_CALCULATION=when_required`；2026-10 的官方示例已经不提这件事。推断：R2 已经支持（没实测；第一次备份时会知道）。
+- **aws 命令行**（[aws CLI](https://developers.cloudflare.com/r2/examples/aws/aws-cli/)）：`--endpoint-url https://<账号 id>.r2.cloudflarestorage.com`，region 填 `auto`。2025 年初 aws 命令行默认加 CRC 校验头时 R2 曾报错，当时的绕法是 `AWS_REQUEST_CHECKSUM_CALCULATION=when_required`；2026-10 的官方示例已经不提这件事。实测（2026-11-14，aws-cli 2.40.1）：不加这些设置，上传、下载、列出、`head-object` 都正常。
+- **实测的规则效果**（2026-11-14，MyOutside 的桶）：`head-object` 返回的 `Expiration` 是 `expiry-date="<上传时间 + 天数>", rule-id="<自动删除规则名>"`；删锁定期内的对象返回 `ObjectLockedByBucketPolicy`，对象还在；Object Read & Write 令牌调 `get-bucket-lifecycle-configuration` 返回 `AccessDenied`（连桶的配置都读不到）。
 - 用途：MyOutside 服务器数据库的异地加密备份（[D-0092](../user-spec/decisions/0092-backup-to-r2.md)、[D-0096](../user-spec/decisions/0096-backup-completion-and-fixes.md)；操作步骤见 [docs/server.md「R2 备份」](../docs/server.md)）。
 
 ## 后台给的建议（作者在 2026-11-11 看到的）

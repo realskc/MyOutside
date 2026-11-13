@@ -87,7 +87,15 @@
 
 **做什么**：`myoutside-backup.timer` 每天香港时间凌晨 4 点（随机推迟最多 15 分钟）运行 `apps/server/scripts/backup.mjs`，每次部署前也跑一次。每次都给平台库和每个用户库拍 SQLite 快照，打包、压缩、用备份钥匙加密（AES-256-GCM），传到 R2 的 `daily/`（香港时间星期天另传 `weekly/`，1 号另传 `monthly/`；文件名是香港时间 `YYYYMMDD-HHMMSS.tar.gz.enc`）。传完马上下载回来，核对一字不差，再解密、解开、逐个打开检查。结果写进 `/var/lib/myoutside-backup/status.json`，管理员在网页的设置里能看到上次成功的时间；从没成功、超过 26 小时没成功或者上一次失败，设置按钮上带红点。不备份主密钥（`secrets/`）。
 
-**现在的状态**（2026-11-14）：程序已部署。Cloudflare 这边，桶 `myoutside-backup` 是作者建的（位置 Western North America，WNAM），锁定规则和自动删除规则是 agent 经作者同意、在作者的浏览器里配的（Braiser），令牌由作者自己创建。服务器上的配置脚本还没运行。R2 令牌和备份钥匙不放进仓库，也不经过聊天（AGENTS.md 红线 3）。
+**现在的状态**（2026-11-14）：在用。桶 `myoutside-backup` 是作者建的（位置 Western North America，WNAM）；锁定规则和自动删除规则是 agent 经作者同意、在作者的浏览器里配的（Braiser）；令牌 `myoutside-server-backup`（Object Read & Write，只限这个桶）由作者自己创建，作者在服务器终端运行了配置脚本。R2 令牌和备份钥匙不放进仓库，也不经过聊天（AGENTS.md 红线 3）。
+
+2026-11-14 配好后检查过：
+
+- 第一次备份成功（`daily/20261114-012853.tar.gz.enc`，74 KB），定时器已打开（下一次在当天凌晨 4 点后）；
+- 对象上带着自动删除时间（`expiry-date` 是上传 8 天后，`rule-id="daily-delete-8d"`）；
+- 锁定生效：另传一个测试文件 `daily/lock-check-20261114-013213.txt` 再删，返回 `ObjectLockedByBucketPolicy`，文件还在（它会在 8 天后被自动删掉）；
+- 服务器上的令牌连桶的配置都读不到（`AccessDenied`），更改不了锁定和删除规则；
+- 恢复演练：从 R2 下载最新的一份、解开、逐个打开检查都通过，恢复出来的账号数和各表行数与线上一致。
 
 #### 第一步：Cloudflare 后台
 
