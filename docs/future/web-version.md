@@ -114,4 +114,4 @@ MYOUTSIDE_CHECK_SETUP=<设置链接> apps/host/node_modules/.bin/electron apps/s
   - 朋友每周最多 ¥20（北京时间周一 0 点重新算），发请求前检查，超了报「本周的 AI 额度用完了」；朋友的设置里显示本周已用多少；
   - 邀请注册：管理员在设置里生成邀请链接（7 天、用一次），朋友自己起用户名、设密码（`/__myoutside/join`）；
   - 管理员在设置里能看到每个用户本周和一共的花费；
-- 第三段搬真实数据（Mac 和 ThinkBook 的四个云端应用都当作用过，合并后作者确认再上传）。
+- ✅ 第三段搬真实数据（D-0098）：2026-11-14 把 Mac 和 ThinkBook 的四个云端应用的数据合并（两边没有重复），作者确认后放进作者的 `realskc` 账号；之后以服务器为准，本地 Electron 不再装这四个子应用，本机的那一份备份后清掉（`scripts/cleanup-local-cloud-apps.mjs`，两台都清完就删掉脚本）。

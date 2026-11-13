@@ -166,6 +166,7 @@
 | [D-0095](0095-independent-codex-gateway-entry.md) | Caddy 保留独立 CodexGateway 的入口 | 有效 |
 | [D-0096](0096-backup-completion-and-fixes.md) | 备份补全：每次备份都做完整恢复检查，部署前也传 R2，网页上看得到备份状态；修正星期天和 1 号按 UTC 算 | 有效 |
 | [D-0097](0097-trial-stage-shared-key-quota-invites.md) | 服务器试用阶段：大家共用作者的 key（存在平台库），朋友每周 ¥20（发请求前检查），邀请链接注册 | 有效 |
+| [D-0098](0098-cloud-apps-server-is-source-of-truth.md) | 学英语、对话、围棋、哲野以服务器为准：真实数据合并后搬进 realskc 账号，本地 Electron 不再装它们 | 有效 |
 
 ## 应用专属决策
 

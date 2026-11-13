@@ -1213,16 +1213,21 @@ app.whenReady().then(async () => {
   console.log("[host] data dir:", dataDir);
 
   const kernel = createKernel({ storage: createNodeSqliteAdapter({ path: dbPath }), secrets: createSecretCodec() });
-  kernel.registerApp(vocabApp, vocabManifest);
-  kernel.registerApp(dialogApp, dialogManifest);
-  kernel.registerApp(goApp, goManifest);
+  // 学英语、对话、围棋、哲野以服务器为准（D-0098）：作者日常用的 Electron 只装要用本机的纯蓝和网易云下载。
+  // 冒烟测试（在数据副本上）和开发时的 MYOUTSIDE_ALL_APPS=1 仍装上全部子应用。
+  const withCloudApps = process.env.MYOUTSIDE_SMOKE === "1" || process.env.MYOUTSIDE_ALL_APPS === "1";
+  if (withCloudApps) {
+    kernel.registerApp(vocabApp, vocabManifest);
+    kernel.registerApp(dialogApp, dialogManifest);
+    kernel.registerApp(goApp, goManifest);
+  }
   kernel.registerApp(
     // 转 MIDI 的包装脚本从仓库里的 apps/66CCFF/scripts 读（66CCFF-0012）
     createX66CCFFApp({ dataDir: join(dataDir, "apps", "66CCFF"), scriptsDir: join(appDir("66CCFF"), "scripts") }),
     x66ccffManifest,
   );
   // 哲野的配方从仓库里的 apps/zheye/recipes 读：改了提示词，下一次试跑就生效（ZHEYE-0021）
-  kernel.registerApp(createZheyeApp({ recipesDir: join(appDir("zheye"), "recipes") }), zheyeManifest);
+  if (withCloudApps) kernel.registerApp(createZheyeApp({ recipesDir: join(appDir("zheye"), "recipes") }), zheyeManifest);
   kernel.registerApp(
     // 冒烟检查不碰作者的网易云账号：不给登录信息的位置，下载文件夹放在临时数据里（NETEASE-0001）
     createNeteaseApp(

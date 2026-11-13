@@ -4,6 +4,8 @@
 
 当前状态：**v0 开发中**——Electron 程序 + 内核 + 子应用「学英语」「对话」「围棋」「66CCFF（纯蓝）」已可用。
 
+服务器版在 `https://myoutside.org`（服务器试用阶段）：学英语、对话、围棋、哲野以服务器为准，在浏览器里用；本地 Electron 只装要用本机的纯蓝和网易云下载（D-0098；开发时设 `MYOUTSIDE_ALL_APPS=1` 可以在 Electron 里装上全部子应用）。
+
 文档分两层：
 
 1. `user-spec/` — **作者的预期**（项目的源头）：产品是什么、为谁、什么重要、什么不要；以及 `decisions/`——每个实现选择为什么这样做、什么时候可以推翻。应用专属的预期与决策在 `apps/<app>/user-spec/`（目前有 `apps/go`、`apps/66CCFF`、`apps/netease` 等）。从 `user-spec/README.md` 读起。
@@ -24,7 +26,8 @@ pnpm.cmd typecheck  # 全部类型检查
 pnpm.cmd simulate   # 模拟「对话应用」经内核调用 vocab（跨应用路径演示）
 pnpm.cmd ai:check   # 用真实接口检查平台 AI / 搜索 / 抓取：后台运行、在数据副本上、花几分钱；密钥从系统钥匙串解密，只在内存里使用
 pnpm.cmd build:toefl # 从《词以类记》分级结果重新生成参考词表数据（源：D:\Resource\TOEFL）
-pnpm.cmd dev        # 启动桌面端（Electron 窗口）
+pnpm.cmd dev        # 启动桌面端（Electron 窗口；默认只有纯蓝、网易云下载，D-0098）
+pnpm --filter @myoutside/server dev   # 本机跑服务器版（临时数据，http://localhost:8787），开发学英语、对话、围棋、哲野用这个
 pnpm.cmd dev:lan    # 开发用 LAN 预览：额外在 3000 端口提供 Web 界面（默认关闭）
 pnpm.cmd smoke      # 冒烟测试：后台自检内核 / 桥 / 子应用 iframe 后自动退出（MYOUTSIDE_SMOKE_SHOW=1 显示窗口）
 powershell -ExecutionPolicy Bypass -File apps/66CCFF/scripts/setup-engine.ps1  # 纯蓝引擎（一次性，需 uv；下载 Python/PyTorch/模型）

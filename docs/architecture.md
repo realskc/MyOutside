@@ -48,7 +48,7 @@ interface AppModule {
 ```
 
 - 函数用 `defineTx(schema, handler)` / `defineRead(schema, handler)` 定义（`packages/kernel/src/api.ts`）。
-- Electron 主进程在启动时 `kernel.registerApp(...)` 注册全部子应用，再 `kernel.start()`；注册必须在 start 之前。
+- Electron 主进程在启动时 `kernel.registerApp(...)` 注册子应用，再 `kernel.start()`；注册必须在 start 之前。默认只注册纯蓝、网易云下载，学英语、对话、围棋、哲野以服务器为准；冒烟测试和 `MYOUTSIDE_ALL_APPS=1` 时注册全部（D-0098）。服务器上每个用户的内核注册的是那四个云端应用（`apps/server/src/cloud-apps.ts`）。
 - 子应用界面目录由 Electron 主进程硬编码登记（`apps/host/src/main/index.ts` 的 `uiDirs`）。
 - 每个子应用一份清单 `manifest.json`，以 `kernel.registerApp(app, manifest)` 注册（§2.1）。
 
